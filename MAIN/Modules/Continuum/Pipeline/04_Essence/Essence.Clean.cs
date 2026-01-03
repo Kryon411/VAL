@@ -24,6 +24,9 @@ namespace VAL.Continuum.Pipeline.Essence
             // Trim trailing whitespace per line
             s = Regex.Replace(s, @"[ \t]+\n", "\n");
 
+            // Preserve structural line breaks for labels/language markers.
+            s = PreserveStructuralLineBreaks(s);
+
             // Collapse >2 blank lines into 2
             s = Regex.Replace(s, @"\n{3,}", "\n\n");
 
@@ -33,6 +36,21 @@ namespace VAL.Continuum.Pipeline.Essence
 
             // Final trim
             return s.Trim();
+        }
+
+        private static string PreserveStructuralLineBreaks(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text ?? string.Empty;
+
+            var labels = @"(?:USER|ASSISTANT|USER \(intent\)|ASSISTANT \(tag\)|TURN)";
+            text = Regex.Replace(text, $@"(?m)^(?<label>{labels}:)[ \t]+(?=\S)", "${label}\n");
+
+            var languages = @"(?:powershell|csharp|bash|zsh|sh|shell|cmd|console)";
+            text = Regex.Replace(text, $@"(?im)^(?<lang>[ \t]*{languages})\s+(?=\S)", "${lang}\n");
+            text = Regex.Replace(text, $@"(?im)^(?<lang>[ \t]*{languages})(?=[^\s])", "${lang}\n");
+
+            return text;
         }
     }
 }
