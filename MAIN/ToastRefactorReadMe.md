@@ -19,7 +19,6 @@ This snapshot implements a **centralized toast policy + routing layer** so toast
 
 - `Modules/Continuum/Pipeline/00_Common/ContinuumHost.cs`
   - All Continuum toasts now route through `ToastHub`
-  - “Archiving enabled” toast is now **once per chat** (ToastLedger-backed) to stop settings-click spam
   - Chronicle prompt toast gating moved into `ToastHub` (cooldown + once-per-chat)
   - Operation guard toasts (`OperationInProgress`, `OperationCancelled`) centralized + cooldowned
 
@@ -46,8 +45,6 @@ This snapshot implements a **centralized toast policy + routing layer** so toast
 - Grouping/replace behavior is centralized (pulse group, chronicle group, continuum guidance).
 
 ## Keys you’ll care about first
-- `ToastKey.ContinuumArchivingEnabled`  
-  Once-per-chat: stops repeated Continuum “archiving” toasts.
 - `ToastKey.ChroniclePrompt`  
   Once-per-chat + 45s cooldown.
 
@@ -68,4 +65,3 @@ You uploaded `.txt`-suffixed files earlier; this build has **clean extensions re
    - No repeated Continuum toast spam on settings clicks
    - Chronicle prompt appears at most once per chat
    - Pulse toasts replace within the pulse group cleanly
-

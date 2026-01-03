@@ -75,21 +75,6 @@ namespace VAL.Host
                 // Continuum lifecycle
                 // -----------------
                 {
-                    ToastKey.ContinuumArchivingEnabled,
-                    new ToastDef(
-                        ToastKey.ContinuumArchivingEnabled,
-                        "Continuum is archiving this chat in a truth.log, which is viewable through the Session button in the Control Centre.",
-                        null,
-                        ToastManager.ToastDurationBucket.S,
-                        "continuum.lifecycle",
-                        ReplaceGroup: true,
-                        BypassBurstDedupe: false,
-                        IsPassive: true,
-                        OncePerChat: false,
-                        LedgerId: null,
-                        Cooldown: TimeSpan.Zero)
-                },
-                {
                     ToastKey.ContinuumArchivingPaused,
                     new ToastDef(
                         ToastKey.ContinuumArchivingPaused,
