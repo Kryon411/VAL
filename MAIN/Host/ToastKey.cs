@@ -8,7 +8,6 @@ namespace VAL.Host
         VoidDisabled,
 
         // Continuum lifecycle
-        ContinuumArchivingEnabled,
         ContinuumArchivingPaused,
 
         // Continuum guidance

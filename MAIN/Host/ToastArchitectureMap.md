@@ -41,7 +41,6 @@ Also important:
 
 #### Toast catalog strings (defined at top)
 - **Archiving:**
-  - `Toast_ContinuumArchivingEnabled`
   - `Toast_ContinuumArchivingPaused`
 - **Pulse:**
   - `Toast_PulseInitiated`, `Toast_PulseReady`
@@ -66,15 +65,11 @@ Also important:
 - `continuum.command.toggle_logging` → shows **Paused** toast when disabling.
 - `continuum.ui.prelude_prompt` → `ShowActions("Starting a new chat?", ...)` with **Prelude / Dismiss**.
 - `continuum.ui.composer_interaction` → may show **Chronicle** action toast (once-per-chat + cooldown).
-- `continuum.truth.append` / `continuum.truth` → appends to Truth.log and may show **Archiving enabled** (once per attach).
 - `continuum.command.pulse` → Pulse toasts (initiated, ready, unavailable, etc.).
 - `continuum.command.chronicle_rebuild_truth` → Chronicle sticky toast.
 - `continuum.chronicle.done` → replaces sticky toast with completion toast.
 
 #### Internal gating inside ContinuumHost
-- Per-attach gate for **Archiving enabled**:
-  - Reset on each `HandleSessionAttach(...)`.
-  - Shows when the first truth line append happens after attach.
 - Chronicle prompt gating:
   - requires meaningful chat + no Chronicle marker
   - cooldown `ChroniclePromptCooldown = 45s`
@@ -134,12 +129,3 @@ Also stores `VAL_PreludeNudgeSuppressUntil` to avoid new-chat prompts during Pul
 Toast-relevant emits:
 - `continuum.ui.prelude_prompt` — when user clicks/types into a blank new-chat composer.
 - `continuum.ui.composer_interaction` — when user interacts with composer in an existing chat.
-
-## 8) Likely cause of "every click spawns the archiving toast"
-
-If the client repeatedly sends `continuum.session.attach` (or `continuum.session.attached`) while you’re still in the same chat, `HandleSessionAttach(...)` resets the **per-attach** gate:
-- `_archivingEnabledToastShownForAttach = false`
-
-Then the next `continuum.truth.append` will call `MaybeToastArchivingEnabled(...)` and the "Continuum is archiving…" toast can fire again.
-
-So the quickest debug is: log when `continuum.session.attach` arrives and from which DOM event/path.

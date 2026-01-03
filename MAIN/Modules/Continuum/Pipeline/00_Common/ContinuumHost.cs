@@ -26,9 +26,6 @@ namespace VAL.Continuum
         // -------------------------
         // Toast Catalog v1 (final)
         // -------------------------
-        private const string Toast_ContinuumArchivingEnabled =
-            "Continuum is archiving this chat in a truth.log, which is viewable through the Session button in the Control Centre.";
-
         private const string Toast_ContinuumArchivingPaused =
             "Continuum has been paused and archiving has stopped.";
 
@@ -155,7 +152,6 @@ namespace VAL.Continuum
         private static bool _loggingEnabled = true;
 
         // Toast intent gating:
-        // - Archiving lifecycle toast: shown on the first real composer interaction per attach.
         // - Chronicle guidance: shown only after the user has dwelled in the chat for a moment
         //   (prevents spam when bouncing between chats) *and* then interacts with the composer.
         private static int _toastAttachToken;
@@ -164,13 +160,8 @@ namespace VAL.Continuum
         private static bool _toastAttachBaselineInitialized;
         private static DateTime _toastAttachUtc = DateTime.MinValue;
         private static bool _toastAttachDwellMet;
-        private static bool _toastAttachArchivingShown;
         private static bool _toastAttachChronicleShown;
         private static int _toastAttachLastCapturedTurns;
-
-        // Once-per-chat suppression for ContinuumArchivingEnabled.
-        // This prevents re-attach / idle reloads from re-emitting the lifecycle toast.
-        private static readonly HashSet<string> _archivingEnabledShownChats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private static readonly TimeSpan ToastAttachDwellWindow = TimeSpan.FromSeconds(2);
 
@@ -394,7 +385,6 @@ namespace VAL.Continuum
                 attachMissingTruthLog = !HasTruthLog(cid);
 
             bool chronicleRunning;
-            bool loggingEnabled;
             bool isDuplicateAttach = false;
 
             var nowUtc = DateTime.UtcNow;
@@ -409,7 +399,6 @@ namespace VAL.Continuum
                     _lastPreludePromptHref = string.Empty;
 
                 chronicleRunning = _chronicleRunning;
-                loggingEnabled = _loggingEnabled;
 
                 // Dedupe: the client may ping session.attach repeatedly during a short watchdog window.
                 if (!string.IsNullOrWhiteSpace(cid) &&
@@ -429,7 +418,6 @@ namespace VAL.Continuum
                     _toastAttachChatId = cid;
                     _toastAttachUtc = nowUtc;
                     _toastAttachDwellMet = false;
-                    _toastAttachArchivingShown = false;
                     _toastAttachChronicleShown = false;
                     _toastAttachLastCapturedTurns = 0;
                 }
@@ -550,8 +538,7 @@ namespace VAL.Continuum
                 }
                 catch { }
 
-                // On first real new-chat composer intent, confirm that Continuum archiving is enabled.
-// Action toast: Prelude inject (host-side) or dismiss.
+                // Action toast: Prelude inject (host-side) or dismiss.
                 ToastHub.TryShowActions(
                     ToastKey.PreludePrompt,
                     new (string Label, Action OnClick)[]
@@ -622,14 +609,6 @@ namespace VAL.Continuum
 
             EssenceInjectQueue.Enqueue(seed);
         }
-
-        // -------------------------
-        // Archiving lifecycle toast
-        // -------------------------
-        // The "Archiving enabled" toast is now triggered on first real composer interaction
-        // (per attach) rather than on the first Truth.log write, because DOM capture can
-        // write partial Truth.log entries without the user committing to the chat.
-
 
         // -------------------------
         // Pulse
@@ -1041,11 +1020,9 @@ namespace VAL.Continuum
                 // Suppress while Chronicle is running.
                 bool chronicleRunning;
                 bool refreshInFlight;
-                bool loggingEnabled;
                 DateTime suppressPreludeUntil;
                 bool attachMatch;
                 bool attachDwellMet;
-                bool archivingAlreadyShown;
                 bool chronicleAlreadyShown;
 
                 var nowUtc = DateTime.UtcNow;
@@ -1054,7 +1031,6 @@ namespace VAL.Continuum
                 {
                     chronicleRunning = _chronicleRunning;
                     refreshInFlight = _refreshInFlight;
-                    loggingEnabled = _loggingEnabled;
                     suppressPreludeUntil = _suppressPreludeToastUntilUtc;
 
                     attachMatch = !string.IsNullOrWhiteSpace(_toastAttachChatId) &&
@@ -1066,7 +1042,6 @@ namespace VAL.Continuum
                     }
 
                     attachDwellMet = attachMatch && _toastAttachDwellMet;
-                    archivingAlreadyShown = !attachMatch || _toastAttachArchivingShown;
                     chronicleAlreadyShown = !attachMatch || _toastAttachChronicleShown;
                 }
 
@@ -1086,34 +1061,6 @@ namespace VAL.Continuum
                 }
 
                 bool commitReady = capturedTurns >= (_toastAttachBaselineTurns + 2);
-
-                // First real composer interaction: show the lifecycle "archiving enabled" toast (once per attach).
-                // NOTE: We intentionally DO NOT gate this behind the Pulse suppression window;
-                // Pulse-created chats should still get the archiving toast when the user sends the seed.
-                if (attachMatch && commitReady && !archivingAlreadyShown && loggingEnabled && !refreshInFlight)
-                {
-                    bool marked;
-                    lock (Sync)
-                    {
-                        marked = !_toastAttachArchivingShown && _toastAttachChatId.Equals(cid, StringComparison.OrdinalIgnoreCase);
-                        if (marked) _toastAttachArchivingShown = true;
-                    }
-
-                    if (marked)
-                    {
-                        // Once-per-chat suppression (guards against re-attach idle reloads).
-                        bool shouldShow;
-                        lock (Sync)
-                        {
-                            shouldShow = !_archivingEnabledShownChats.Contains(cid);
-                            if (shouldShow) _archivingEnabledShownChats.Add(cid);
-                        }
-                        if (shouldShow)
-                        {
-                            ToastHub.TryShow(ToastKey.ContinuumArchivingEnabled, chatId: cid, bypassLaunchQuiet: true);
-                        }
-}
-                }
 
                 if (!commitReady) return;
 
@@ -1434,7 +1381,6 @@ private static void MaybeShowChronicleSuggested(string chatId)
                         _toastAttachChatId.Equals(cid, StringComparison.OrdinalIgnoreCase))
                     {
                         _toastAttachChronicleShown = true;
-                        _toastAttachArchivingShown = true;
                     }
                 }
 
@@ -1493,7 +1439,6 @@ private static void MaybeShowChronicleSuggested(string chatId)
 
                 // Replace the sticky "do not send" toast with the completion toast.
                 ToastHub.TryShow(ToastKey.ChronicleCompleted, chatId: cid, bypassLaunchQuiet: true);
-                ToastHub.TryShow(ToastKey.ContinuumArchivingEnabled, chatId: cid, bypassLaunchQuiet: true);
 
                 TryAppendChronicleAudit(cid, $"Chronicle COMPLETED | Utc={DateTime.UtcNow:o} | Captured={captured} | Ms={ms}");
                 OperationCoordinator.End(GuardedOperationKind.Chronicle);
