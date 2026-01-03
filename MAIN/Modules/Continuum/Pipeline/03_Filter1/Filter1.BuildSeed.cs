@@ -318,7 +318,7 @@ namespace VAL.Continuum.Pipeline.Filter1
             if (sb == null) return;
 
             var msgLabel = $"***Message {ex.Index} - USER***";
-            if (ex.UserLineIndex >= 0) msgLabel += $" (TruthLine {ex.UserLineIndex})";
+            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {ex.UserLineIndex}\u2013{ex.UserLineIndex})";
             msgLabel += ":";
 
             sb.AppendLine(msgLabel);
@@ -331,7 +331,7 @@ namespace VAL.Continuum.Pipeline.Filter1
             sb.AppendLine();
 
             var respLabel = $"***Response {ex.Index} - ASSISTANT***";
-            if (ex.AssistantLineIndex >= 0) respLabel += $" (TruthLine {ex.AssistantLineIndex})";
+            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {ex.AssistantLineIndex}\u2013{ex.AssistantLineIndex})";
             respLabel += ":";
 
             sb.AppendLine(respLabel);
