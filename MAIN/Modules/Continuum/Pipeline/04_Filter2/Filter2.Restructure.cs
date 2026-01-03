@@ -11,10 +11,10 @@ namespace VAL.Continuum.Pipeline.Filter2
     /// Filter 2: packs Seed exchanges into a single RestructuredSeed text blob.
     ///
     /// Output shape:
-    /// - WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (authoritative): last complete exchange
+    /// - WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE): last complete exchange
     /// - HOW TO PROCEED
-    /// - ACTIVE THREAD (most relevant prior exchange): remaining pinned exchanges, most recent first
-    /// - CONTEXT FILLER (reference only): older exchanges in reverse order (newest -> oldest), budgeted to ~28k chars
+    /// - ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE): remaining pinned exchanges, most recent first
+    /// - CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE): older exchanges in reverse order (newest -> oldest), budgeted to ~28k chars
     /// </summary>
     public static class Filter2Restructure
     {
@@ -45,6 +45,8 @@ namespace VAL.Continuum.Pipeline.Filter2
 
             sb.AppendLine("HOW TO PROCEED");
             sb.AppendLine(SeparatorLine);
+            sb.AppendLine();
+            sb.AppendLine("See CONTEXT BLOCK — READ ONLY above.");
             sb.AppendLine();
 
             sb.AppendLine("ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)");
@@ -106,19 +108,10 @@ namespace VAL.Continuum.Pipeline.Filter2
             // Keep assistant text rich, but remove obvious procedural/test-step blocks unless they carry an anchor tag.
             var sb = new StringBuilder();
 
-            var msgLabel = $"Message {ex.Index} — USER";
-            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {FormatTruthRange(ex.UserLineIndex)})";
-            msgLabel += ":";
-
-            sb.AppendLine(msgLabel);
+            sb.AppendLine(FormatSourceLine(ex));
+            sb.AppendLine("USER:");
             sb.AppendLine(!string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]");
-            sb.AppendLine();
-
-            var respLabel = $"Response {ex.Index} — ASSISTANT";
-            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {FormatTruthRange(ex.AssistantLineIndex)})";
-            respLabel += ":";
-
-            sb.AppendLine(respLabel);
+            sb.AppendLine("ASSISTANT:");
 
             var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]";
             sb.AppendLine(SanitizeAssistantForWwlo(assistant));
@@ -257,26 +250,42 @@ namespace VAL.Continuum.Pipeline.Filter2
         {
             var sb = new StringBuilder();
 
-            var msgLabel = $"Message {ex.Index} — USER";
-            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {FormatTruthRange(ex.UserLineIndex)})";
-            msgLabel += ":";
-
-            sb.AppendLine(msgLabel);
+            sb.AppendLine(FormatSourceLine(ex));
+            sb.AppendLine("USER:");
             sb.AppendLine(!string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]");
-
-            sb.AppendLine();
-
-            var respLabel = $"Response {ex.Index} — ASSISTANT";
-            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {FormatTruthRange(ex.AssistantLineIndex)})";
-            respLabel += ":";
-
-            sb.AppendLine(respLabel);
+            sb.AppendLine("ASSISTANT:");
             var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]";
             sb.AppendLine(sanitizeAssistant ? SanitizeAssistantForWwlo(assistant) : assistant);
 
             return sb.ToString().TrimEnd();
         }
 
-        private static string FormatTruthRange(int lineIndex) => $"{lineIndex}\u2013{lineIndex}";
+        private static string FormatSourceLine(Filter1BuildSeed.SeedExchange ex)
+            => $"Source: Truth {FormatTruthRange(ex.UserLineIndex, ex.AssistantLineIndex)}";
+
+        private static string FormatTruthRange(int userLineIndex, int assistantLineIndex)
+        {
+            int min = int.MaxValue;
+            int max = int.MinValue;
+
+            if (userLineIndex >= 0)
+            {
+                min = Math.Min(min, userLineIndex);
+                max = Math.Max(max, userLineIndex);
+            }
+
+            if (assistantLineIndex >= 0)
+            {
+                min = Math.Min(min, assistantLineIndex);
+                max = Math.Max(max, assistantLineIndex);
+            }
+
+            if (min == int.MaxValue || max == int.MinValue)
+            {
+                return "?–?";
+            }
+
+            return $"{min}\u2013{max}";
+        }
     }
 }
