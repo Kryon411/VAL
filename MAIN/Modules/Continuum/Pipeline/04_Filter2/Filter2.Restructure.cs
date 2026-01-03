@@ -11,13 +11,14 @@ namespace VAL.Continuum.Pipeline.Filter2
     /// Filter 2: packs Seed exchanges into a single RestructuredSeed text blob.
     ///
     /// Output shape:
-    /// - WHERE WE LEFT OFF (authoritative): last complete exchange
-    /// - ACTIVE THREAD (reference): remaining pinned exchanges, most recent first
+    /// - WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (authoritative): last complete exchange
+    /// - HOW TO PROCEED
+    /// - ACTIVE THREAD (most relevant prior exchange): remaining pinned exchanges, most recent first
     /// - CONTEXT FILLER (reference only): older exchanges in reverse order (newest -> oldest), budgeted to ~28k chars
     /// </summary>
     public static class Filter2Restructure
     {
-        private const string SeparatorLine = "────────────────────────────────────────────";
+        private const string SeparatorLine = "──────────────────────────────────────────────────";
 
         public static string BuildRestructuredSeed(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
@@ -32,7 +33,7 @@ namespace VAL.Continuum.Pipeline.Filter2
 
             var sb = new StringBuilder();
 
-            sb.AppendLine("WHERE WE LEFT OFF (AUTHORITATIVE)");
+            sb.AppendLine("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)");
             sb.AppendLine(SeparatorLine);
             sb.AppendLine();
 
@@ -42,7 +43,11 @@ namespace VAL.Continuum.Pipeline.Filter2
                 sb.AppendLine();
             }
 
-            sb.AppendLine("ACTIVE THREAD (REFERENCE)");
+            sb.AppendLine("HOW TO PROCEED");
+            sb.AppendLine(SeparatorLine);
+            sb.AppendLine();
+
+            sb.AppendLine("ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)");
             sb.AppendLine(SeparatorLine);
             sb.AppendLine();
 
@@ -53,7 +58,7 @@ namespace VAL.Continuum.Pipeline.Filter2
                 sb.AppendLine();
             }
 
-            sb.AppendLine("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE)");
+            sb.AppendLine("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)");
             sb.AppendLine(SeparatorLine);
             sb.AppendLine();
 
@@ -101,7 +106,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             var sb = new StringBuilder();
 
             var msgLabel = $"Message {ex.Index} — USER";
-            if (ex.UserLineIndex >= 0) msgLabel += $" (TruthLine {ex.UserLineIndex})";
+            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {ex.UserLineIndex})";
             msgLabel += ":";
 
             sb.AppendLine(msgLabel);
@@ -109,7 +114,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine();
 
             var respLabel = $"Response {ex.Index} — ASSISTANT";
-            if (ex.AssistantLineIndex >= 0) respLabel += $" (TruthLine {ex.AssistantLineIndex})";
+            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {ex.AssistantLineIndex})";
             respLabel += ":";
 
             sb.AppendLine(respLabel);
@@ -252,7 +257,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             var sb = new StringBuilder();
 
             var msgLabel = $"Message {ex.Index} — USER";
-            if (ex.UserLineIndex >= 0) msgLabel += $" (TruthLine {ex.UserLineIndex})";
+            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {ex.UserLineIndex})";
             msgLabel += ":";
 
             sb.AppendLine(msgLabel);
@@ -261,7 +266,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine();
 
             var respLabel = $"Response {ex.Index} — ASSISTANT";
-            if (ex.AssistantLineIndex >= 0) respLabel += $" (TruthLine {ex.AssistantLineIndex})";
+            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {ex.AssistantLineIndex})";
             respLabel += ":";
 
             sb.AppendLine(respLabel);
