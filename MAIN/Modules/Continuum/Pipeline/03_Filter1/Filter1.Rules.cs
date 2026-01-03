@@ -88,10 +88,13 @@ namespace VAL.Continuum.Pipeline.Filter1
             catch { return Array.Empty<Match>(); }
         }
 
-        public static string FilterUser(string text) => FilterAndSlice(text, isAssistant: false);
-        public static string FilterAssistant(string text) => FilterAndSlice(text, isAssistant: true);
+        public static string FilterUser(string text) => FilterAndSlice(text, isAssistant: false, slice: true);
+        public static string FilterAssistant(string text) => FilterAndSlice(text, isAssistant: true, slice: true);
 
-        private static string FilterAndSlice(string text, bool isAssistant)
+        public static string FilterUserUncut(string text) => FilterAndSlice(text, isAssistant: false, slice: false);
+        public static string FilterAssistantUncut(string text) => FilterAndSlice(text, isAssistant: true, slice: false);
+
+        private static string FilterAndSlice(string text, bool isAssistant, bool slice)
         {
             var s = (text ?? string.Empty).Replace("\r\n", "\n").Trim();
             if (string.IsNullOrWhiteSpace(s)) return string.Empty;
@@ -117,6 +120,9 @@ namespace VAL.Continuum.Pipeline.Filter1
 
             // 5) Collapse accidental repeated blocks (prevents "stutter" output).
             s = CollapseConsecutiveDuplicateParagraphs(s);
+
+            if (!slice)
+                return s;
 
             // 6) Slice if needed.
             if (isAssistant)

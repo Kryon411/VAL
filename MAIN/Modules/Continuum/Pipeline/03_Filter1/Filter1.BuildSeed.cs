@@ -25,6 +25,9 @@ namespace VAL.Continuum.Pipeline.Filter1
             public string UserText { get; init; } = string.Empty;
             public string AssistantText { get; init; } = string.Empty;
 
+            public string UserTextUncut { get; init; } = string.Empty;
+            public string AssistantTextUncut { get; init; } = string.Empty;
+
             public int UserLineIndex { get; init; } = -1;
             public int AssistantLineIndex { get; init; } = -1;
         }
@@ -209,6 +212,8 @@ namespace VAL.Continuum.Pipeline.Filter1
 
                 var u = Filter1Rules.FilterUser(uRaw);
                 var a = Filter1Rules.FilterAssistant(aRaw);
+                var uUncut = Filter1Rules.FilterUserUncut(uRaw);
+                var aUncut = Filter1Rules.FilterAssistantUncut(aRaw);
 
                 // Protect Filter2 budget from pathological paste cases.
                 if ((u?.Length ?? 0) + (a?.Length ?? 0) > Filter1Rules.MaxExchangeChars)
@@ -223,7 +228,9 @@ namespace VAL.Continuum.Pipeline.Filter1
                     UserLineIndex = userLine,
                     AssistantLineIndex = assistantLine,
                     UserText = u ?? string.Empty,
-                    AssistantText = a ?? string.Empty
+                    AssistantText = a ?? string.Empty,
+                    UserTextUncut = uUncut ?? string.Empty,
+                    AssistantTextUncut = aUncut ?? string.Empty
                 });
 
                 Reset();
