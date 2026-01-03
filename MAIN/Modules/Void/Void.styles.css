@@ -1,0 +1,23 @@
+/* Void.styles.css — minimal functional styling for Void placeholders */
+
+/* Placeholder that replaces hidden code blocks / screenshots. */
+[data-val-void-placeholder="1"] {
+    font-style: italic;
+    color: #888;
+    font-size: 12px;
+    line-height: 1.25;
+    margin: 6px 0;
+    display: block;
+    max-width: 100%;
+    box-sizing: border-box;
+    clear: both;
+    cursor: pointer;
+    user-select: none;
+    overflow-wrap: anywhere;
+}
+
+/* When expanded, keep the toggle present but spatially unobtrusive. */
+[data-val-void-placeholder="1"][data-val-void-ph-state="expanded"] {
+    margin: 4px 0 0 0;
+    opacity: 0.7;
+}

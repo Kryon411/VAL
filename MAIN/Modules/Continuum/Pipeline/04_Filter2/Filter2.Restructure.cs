@@ -1,0 +1,266 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using VAL.Continuum.Pipeline.Filter1;
+
+namespace VAL.Continuum.Pipeline.Filter2
+{
+    /// <summary>
+    /// Filter 2: packs Seed exchanges into a single RestructuredSeed text blob.
+    ///
+    /// Output shape:
+    /// - WHERE WE LEFT OFF: last N exchanges with MOST RECENT FIRST (newest -> older)
+    /// - CONTEXT FILLER: older exchanges in reverse order (newest -> oldest), budgeted to ~28k chars
+    /// </summary>
+    public static class Filter2Restructure
+    {
+        public static string BuildRestructuredSeed(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
+        {
+            if (exchanges == null || exchanges.Count == 0)
+                return string.Empty;
+
+            int total = exchanges.Count;
+            int pin = Math.Min(Filter2Rules.WhereWeLeftOffCount, total);
+
+            var whereWeLeftOff = exchanges.Skip(total - pin).ToList();
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine("WHERE WE LEFT OFF");
+            sb.AppendLine("(Most recent first — newest → older)");
+            sb.AppendLine();
+
+            // Render the pinned tail with the MOST RECENT exchange first.
+            // This prevents a reader (human or model) from assuming the first exchange in the block
+            // is the latest when only skimming the top of the file.
+            for (int i = whereWeLeftOff.Count - 1; i >= 0; i--)
+            {
+                sb.AppendLine(FormatExchangeWhereWeLeftOff(whereWeLeftOff[i]));
+                sb.AppendLine();
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("CONTEXT FILLER (reverse walkback)");
+            sb.AppendLine();
+
+            int budget = Filter2Rules.BudgetChars;
+            int overflowLimit = Filter2Rules.OverflowFinishExchangeMaxChars;
+
+            // Start adding older exchanges newest -> oldest (excluding the pinned tail).
+            int used = sb.Length;
+            for (int i = total - pin - 1; i >= 0; i--)
+            {
+                var block = FormatExchange(exchanges[i], includeExchangeHeader: true) + "\n\n";
+
+                if (used + block.Length <= budget)
+                {
+                    sb.Append(block);
+                    used += block.Length;
+                    continue;
+                }
+
+                // If we haven't crossed budget yet, allow ONE whole exchange as overflow.
+                if (used < budget)
+                {
+                    if (block.Length <= overflowLimit)
+                    {
+                        sb.Append(block);
+                        used += block.Length;
+                    }
+                    else
+                    {
+                        sb.AppendLine($"[Exchange {exchanges[i].Index} omitted: overflow too large ({block.Length} chars)]");
+                    }
+                }
+
+                break;
+            }
+
+            return sb.ToString().Trim();
+        }
+
+        
+        private static string FormatExchangeWhereWeLeftOff(Filter1BuildSeed.SeedExchange ex)
+        {
+            // WHERE WE LEFT OFF should anchor durable state, not transient verification checklists.
+            // Keep assistant text rich, but remove obvious procedural/test-step blocks unless they carry an anchor tag.
+            var sb = new StringBuilder();
+
+            var msgLabel = $"***Message {ex.Index} - USER***";
+            if (ex.UserLineIndex >= 0) msgLabel += $" (TruthLine {ex.UserLineIndex})";
+            msgLabel += ":";
+
+            sb.AppendLine(msgLabel);
+            sb.AppendLine(!string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]");
+            sb.AppendLine();
+
+            var respLabel = $"***Response {ex.Index} - ASSISTANT***";
+            if (ex.AssistantLineIndex >= 0) respLabel += $" (TruthLine {ex.AssistantLineIndex})";
+            respLabel += ":";
+
+            sb.AppendLine(respLabel);
+
+            var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]";
+            sb.AppendLine(SanitizeAssistantForWwlo(assistant));
+
+            return sb.ToString().TrimEnd();
+        }
+
+        private static string SanitizeAssistantForWwlo(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return text ?? string.Empty;
+
+            // If the assistant explicitly anchored a state sentence, do not strip those lines.
+            bool HasAnchorTag(string line)
+            {
+                var t = line.Trim();
+                return t.EndsWith("(goal)", StringComparison.OrdinalIgnoreCase)
+                    || t.EndsWith("(checkpoint)", StringComparison.OrdinalIgnoreCase)
+                    || t.EndsWith("(milestone)", StringComparison.OrdinalIgnoreCase);
+            }
+
+            var lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+            int listy = 0;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var t = lines[i].TrimStart();
+                if (HasAnchorTag(lines[i])) continue;
+
+                if (t.StartsWith("-", StringComparison.Ordinal) ||
+                    t.StartsWith("*", StringComparison.Ordinal) ||
+                    t.StartsWith("•", StringComparison.Ordinal) ||
+                    Regex.IsMatch(t, @"^\d+[\.\)]\s+"))
+                {
+                    listy++;
+                }
+            }
+
+            // Also detect common procedural prompts that should not lead a handoff.
+            int procedural = 0;
+            foreach (var l in lines)
+            {
+                var t = l.Trim();
+                if (HasAnchorTag(t)) continue;
+
+                if (t.IndexOf("do these", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    t.IndexOf("checks in order", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    t.IndexOf("tell me which", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    t.IndexOf("report back", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    t.IndexOf("answer just this", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    procedural++;
+                }
+            }
+
+            bool looksLikeChecklist = listy >= 3 || procedural >= 2;
+
+            if (!looksLikeChecklist)
+            {
+                return text.Trim();
+            }
+
+            // Remove list blocks (numbered/bulleted) while preserving anchored lines.
+            var kept = new List<string>(lines.Length);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var raw = lines[i];
+                var t = raw.TrimStart();
+
+                if (HasAnchorTag(raw))
+                {
+                    kept.Add(raw);
+                    continue;
+                }
+
+                bool isListy = t.StartsWith("-", StringComparison.Ordinal) ||
+                               t.StartsWith("*", StringComparison.Ordinal) ||
+                               t.StartsWith("•", StringComparison.Ordinal) ||
+                               Regex.IsMatch(t, @"^\d+[\.\)]\s+");
+
+                if (isListy) continue;
+
+                // Drop common "ops prompt" lines that are only relevant at runtime.
+                var tt = raw.Trim();
+                if (tt.IndexOf("do these", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    tt.IndexOf("checks in order", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    tt.IndexOf("tell me which", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    tt.IndexOf("report back", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    tt.IndexOf("answer just this", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    continue;
+                }
+
+                kept.Add(raw);
+            }
+
+            // Collapse excessive blank lines
+            var collapsed = new List<string>(kept.Count);
+            bool lastBlank = false;
+            foreach (var l in kept)
+            {
+                bool blank = string.IsNullOrWhiteSpace(l);
+                if (blank)
+                {
+                    if (!lastBlank) collapsed.Add(string.Empty);
+                    lastBlank = true;
+                }
+                else
+                {
+                    collapsed.Add(l.TrimEnd());
+                    lastBlank = false;
+                }
+            }
+
+            var result = string.Join("\n", collapsed).Trim();
+
+            // If we stripped too much, fall back to a conservative head+tail extraction.
+            if (result.Length < 40 && text.Length > 80)
+            {
+                // Keep first 2 paragraphs and last paragraph.
+                var paras = text.Split(new[] { "\n\n" }, StringSplitOptions.None)
+                                .Select(p => p.Trim())
+                                .Where(p => p.Length > 0)
+                                .ToList();
+                if (paras.Count <= 3) return text.Trim();
+
+                var take = new List<string>();
+                take.Add(paras[0]);
+                take.Add(paras[1]);
+                take.Add(paras[paras.Count - 1]);
+                result = string.Join("\n\n", take).Trim();
+            }
+
+            return result;
+        }
+
+private static string FormatExchange(Filter1BuildSeed.SeedExchange ex, bool includeExchangeHeader)
+        {
+            var sb = new StringBuilder();
+
+            if (includeExchangeHeader)
+            {
+                sb.AppendLine($"--- Exchange {ex.Index} ---");
+            }
+
+            var msgLabel = $"***Message {ex.Index} - USER***";
+            if (ex.UserLineIndex >= 0) msgLabel += $" (TruthLine {ex.UserLineIndex})";
+            msgLabel += ":";
+
+            sb.AppendLine(msgLabel);
+            sb.AppendLine(!string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]");
+
+            sb.AppendLine();
+
+            var respLabel = $"***Response {ex.Index} - ASSISTANT***";
+            if (ex.AssistantLineIndex >= 0) respLabel += $" (TruthLine {ex.AssistantLineIndex})";
+            respLabel += ":";
+
+            sb.AppendLine(respLabel);
+            sb.AppendLine(!string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]");
+
+            return sb.ToString().TrimEnd();
+        }
+    }
+}

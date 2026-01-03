@@ -1,0 +1,10 @@
+{
+  "name": "Continuum",
+  "enabled": true,
+  "entry": "Continuum.Client.js",
+  "version": "3.1.32",
+  "description": "Core Continuum logger (Truth.log + Capsule triggers).",
+  "scripts": [
+    "Continuum.Client.js"
+  ]
+}

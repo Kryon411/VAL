@@ -1,0 +1,28 @@
+using System;
+
+namespace VAL.Host.Commands
+{
+    internal static class VoidCommandHandlers
+    {
+        private static bool? _lastEnabledState = null;
+
+        public static void HandleSetEnabled(HostCommand cmd)
+        {
+            // Default false when the field is missing or malformed.
+            var enabled = false;
+            if (cmd.TryGetBool("enabled", out var parsed))
+                enabled = parsed;
+
+            // Cooldown: only toast once per state transition.
+            if (_lastEnabledState != enabled)
+            {
+                _lastEnabledState = enabled;
+
+                if (enabled)
+                    ToastHub.TryShow(ToastKey.VoidEnabled);
+                else
+                    ToastHub.TryShow(ToastKey.VoidDisabled);
+            }
+        }
+    }
+}

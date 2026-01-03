@@ -1,0 +1,266 @@
+/* ModuleDock.styles.css — VAL SoftGlass Dock */
+
+.valdock{
+  position: fixed;
+  z-index: 9998;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial;
+  color: rgba(245,251,255,0.75);
+}
+
+/* Controls pill */
+.valdock-pill{
+  position: relative;
+  top: -8px;
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  appearance: none;
+  border: 1px solid rgba(120, 180, 240, 0.16);
+
+  /* Match the expanded Control Centre panel's SoftGlass scaffold */
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  background-color: rgba(2, 10, 20, 0.86);
+  color: rgba(245,251,255,0.75);
+  padding: 10px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: none;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    opacity 0.35s ease;
+}
+
+.valdock-pill:hover{
+  border-color: rgba(120, 180, 240, 0.28);
+  box-shadow: none;
+  transform: translateY(-1px);
+  opacity: 1;
+}
+
+.valdock-pill:active{
+  transform: translateY(1px) scale(0.99);
+}
+
+/* Expanded Control Centre panel */
+.valdock-panel{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 520px;
+  max-width: 80vw;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  background-color: rgba(2,10,20,0.96);
+  border: 1px solid rgba(120, 180, 240, 0.16);
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: none;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.valdock-header{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 10px;
+  cursor: move;
+  user-select: none;
+}
+
+.valdock-title{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  grid-column: 2;
+  justify-self: center;
+  text-align: center;
+  font-size: 16px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+
+.valdock-close{
+  grid-column: 3;
+  justify-self: end;
+  appearance: none;
+  border: none;
+  background: rgba(8,24,40,0.9);
+  color: rgba(208,232,255,0.75);
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.valdock-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.valdock-actions{
+  justify-content: center;
+  width: 100%;
+}
+
+.valdock-divider{
+  width: 100%;
+  height: 1px;
+  background: rgba(80, 120, 160, 0.22);
+  opacity: 0.7;
+  border-radius: 999px;
+}
+
+
+.valdock-row-title{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.valdock-btn{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  appearance: none;
+  border: none;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.06), rgba(4,18,30,0.96));
+  background-color: rgba(4,18,32,0.96);
+  color: rgba(245,251,255,0.75);
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.valdock-btn.secondary{
+  opacity: 0.95;
+}
+
+.valdock-btn.ghost{
+  background: rgba(4,18,30,0.4);
+  box-shadow: none;
+}
+
+.valdock-btn:hover{
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+
+.valdock-btn:active{
+  transform: translateY(1px) scale(0.97);
+  box-shadow: none;
+}
+
+.valdock-toggle{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.valdock-tg-label{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.valdock-tg-switch{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  appearance: none;
+  border: none;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.05), rgba(4,18,30,0.92));
+  background-color: rgba(3,14,26,0.96);
+  color: rgba(245,251,255,0.75);
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 11px;
+  box-shadow: none;
+}
+
+.valdock-status{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  opacity: 0.8;
+  font-size: 12px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(80, 120, 160, 0.15);
+}
+
+.valdock-snap-level{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.valdock-snap-level-normal{
+  background: rgba(0, 150, 0, 0.24);
+  color: #b6ffb6;
+}
+
+.valdock-snap-level-soft{
+  background: rgba(180, 160, 0, 0.26);
+  color: #fff2b3;
+}
+
+.valdock-snap-level-medium{
+  background: rgba(200, 120, 0, 0.28);
+  color: #ffd0a8;
+}
+
+.valdock-snap-level-critical{
+  background: rgba(180, 40, 40, 0.3);
+  color: #ffb3b3;
+}
+
+/* Hover tooltips (SoftGlass) */
+.valdock-tooltip{
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  max-width: 320px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  background-color: rgba(2,10,20,0.96);
+  border: 1px solid rgba(120, 180, 240, 0.18);
+  box-shadow: none;
+  color: rgba(235,245,255,0.69);
+  font-size: 12px;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.valdock-tooltip.visible{
+  opacity: 1;
+  transform: translateY(0);
+}

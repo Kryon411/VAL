@@ -1,0 +1,6 @@
+{
+  "name": "Void",
+  "enabled": true,
+  "entry": "Void.main.js",
+  "styles": "Void.styles.css"
+}

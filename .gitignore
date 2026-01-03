@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+PRODUCT/
+InstallerOutput/
+*.exe
+*.zip
+*.log

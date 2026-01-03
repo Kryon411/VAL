@@ -1,0 +1,8 @@
+{
+  "name": "Dock",
+  "enabled": true,
+  "entry": "Dock.main.js",
+  "styles": "Dock.styles.css",
+  "hooks": [],
+  "description": "Persistent Module Dock (Continuum + Void) with buttons and toggles."
+}
