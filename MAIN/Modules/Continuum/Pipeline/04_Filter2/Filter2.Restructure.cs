@@ -120,11 +120,8 @@ namespace VAL.Continuum.Pipeline.Filter2
             if (string.IsNullOrWhiteSpace(candidate))
                 return sliced ?? string.Empty;
 
-            int length = candidate.Trim().Length;
-            if (length > Filter1Rules.MaxExchangeChars || length > Filter2Rules.WhereWeLeftOffMaxTextChars)
-                return sliced ?? string.Empty;
-
-            return candidate;
+            const int MaxWwloUncutChars = Filter2Rules.WhereWeLeftOffMaxTextChars;
+            return candidate.Length <= MaxWwloUncutChars ? candidate : (sliced ?? string.Empty);
         }
 
         private static string SanitizeAssistantForWwlo(string text)
