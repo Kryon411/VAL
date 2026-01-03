@@ -46,8 +46,6 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine("HOW TO PROCEED");
             sb.AppendLine(SeparatorLine);
             sb.AppendLine();
-            sb.AppendLine("See CONTEXT BLOCK — READ ONLY above.");
-            sb.AppendLine();
 
             sb.AppendLine("ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)");
             sb.AppendLine(SeparatorLine);
@@ -104,17 +102,16 @@ namespace VAL.Continuum.Pipeline.Filter2
         
         private static string FormatExchangeWhereWeLeftOff(Filter1BuildSeed.SeedExchange ex)
         {
-            // WHERE WE LEFT OFF should anchor durable state, not transient verification checklists.
-            // Keep assistant text rich, but remove obvious procedural/test-step blocks unless they carry an anchor tag.
             var sb = new StringBuilder();
 
             sb.AppendLine(FormatSourceLine(ex));
             sb.AppendLine("USER:");
-            sb.AppendLine(!string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]");
+            var user = !string.IsNullOrWhiteSpace(ex.UserTextUncut) ? ex.UserTextUncut : ex.UserText;
+            sb.AppendLine(!string.IsNullOrWhiteSpace(user) ? user.Trim() : "[USER: empty]");
             sb.AppendLine("ASSISTANT:");
 
-            var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]";
-            sb.AppendLine(SanitizeAssistantForWwlo(assistant));
+            var assistant = !string.IsNullOrWhiteSpace(ex.AssistantTextUncut) ? ex.AssistantTextUncut : ex.AssistantText;
+            sb.AppendLine(!string.IsNullOrWhiteSpace(assistant) ? assistant.Trim() : "[ASSISTANT: empty]");
 
             return sb.ToString().TrimEnd();
         }
