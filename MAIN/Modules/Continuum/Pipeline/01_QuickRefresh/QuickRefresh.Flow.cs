@@ -50,7 +50,7 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
 
             token.ThrowIfCancellationRequested();
 
-            // 4) Essence-M (Pulse) - keep existing mechanical cleaning + header
+            // 4) Essence-M (Pulse) - keep existing mechanical cleaning + layout
             var essenceText = EssenceBuild.BuildEssenceM(chatId, restructured);
             if (string.IsNullOrWhiteSpace(essenceText))
                 throw new InvalidOperationException("Essence-M builder returned no content.");

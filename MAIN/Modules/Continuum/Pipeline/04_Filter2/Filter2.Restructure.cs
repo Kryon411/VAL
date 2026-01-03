@@ -11,11 +11,14 @@ namespace VAL.Continuum.Pipeline.Filter2
     /// Filter 2: packs Seed exchanges into a single RestructuredSeed text blob.
     ///
     /// Output shape:
-    /// - WHERE WE LEFT OFF: last N exchanges with MOST RECENT FIRST (newest -> older)
-    /// - CONTEXT FILLER: older exchanges in reverse order (newest -> oldest), budgeted to ~28k chars
+    /// - WHERE WE LEFT OFF (authoritative): last complete exchange
+    /// - ACTIVE THREAD (reference): remaining pinned exchanges, most recent first
+    /// - CONTEXT FILLER (reference only): older exchanges in reverse order (newest -> oldest), budgeted to ~28k chars
     /// </summary>
     public static class Filter2Restructure
     {
+        private const string SeparatorLine = "────────────────────────────────────────────";
+
         public static string BuildRestructuredSeed(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
             if (exchanges == null || exchanges.Count == 0)
@@ -24,25 +27,34 @@ namespace VAL.Continuum.Pipeline.Filter2
             int total = exchanges.Count;
             int pin = Math.Min(Filter2Rules.WhereWeLeftOffCount, total);
 
-            var whereWeLeftOff = exchanges.Skip(total - pin).ToList();
+            var pinnedTail = exchanges.Skip(total - pin).ToList();
+            var lastExchange = pinnedTail.Count > 0 ? pinnedTail[pinnedTail.Count - 1] : null;
 
             var sb = new StringBuilder();
 
-            sb.AppendLine("WHERE WE LEFT OFF");
-            sb.AppendLine("(Most recent first — newest → older)");
+            sb.AppendLine("WHERE WE LEFT OFF (AUTHORITATIVE)");
+            sb.AppendLine(SeparatorLine);
             sb.AppendLine();
 
-            // Render the pinned tail with the MOST RECENT exchange first.
-            // This prevents a reader (human or model) from assuming the first exchange in the block
-            // is the latest when only skimming the top of the file.
-            for (int i = whereWeLeftOff.Count - 1; i >= 0; i--)
+            if (lastExchange != null)
             {
-                sb.AppendLine(FormatExchangeWhereWeLeftOff(whereWeLeftOff[i]));
-                sb.AppendLine();
+                sb.AppendLine(FormatExchangeWhereWeLeftOff(lastExchange));
                 sb.AppendLine();
             }
 
-            sb.AppendLine("CONTEXT FILLER (reverse walkback)");
+            sb.AppendLine("ACTIVE THREAD (REFERENCE)");
+            sb.AppendLine(SeparatorLine);
+            sb.AppendLine();
+
+            // Render the remaining pinned tail (most recent first), excluding the last exchange used above.
+            for (int i = pinnedTail.Count - 2; i >= 0; i--)
+            {
+                sb.AppendLine(FormatExchange(pinnedTail[i], sanitizeAssistant: false));
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE)");
+            sb.AppendLine(SeparatorLine);
             sb.AppendLine();
 
             int budget = Filter2Rules.BudgetChars;
@@ -52,7 +64,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             int used = sb.Length;
             for (int i = total - pin - 1; i >= 0; i--)
             {
-                var block = FormatExchange(exchanges[i], includeExchangeHeader: true) + "\n\n";
+                var block = FormatExchange(exchanges[i], sanitizeAssistant: false) + "\n\n";
 
                 if (used + block.Length <= budget)
                 {
@@ -88,7 +100,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             // Keep assistant text rich, but remove obvious procedural/test-step blocks unless they carry an anchor tag.
             var sb = new StringBuilder();
 
-            var msgLabel = $"***Message {ex.Index} - USER***";
+            var msgLabel = $"Message {ex.Index} — USER";
             if (ex.UserLineIndex >= 0) msgLabel += $" (TruthLine {ex.UserLineIndex})";
             msgLabel += ":";
 
@@ -96,7 +108,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine(!string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]");
             sb.AppendLine();
 
-            var respLabel = $"***Response {ex.Index} - ASSISTANT***";
+            var respLabel = $"Response {ex.Index} — ASSISTANT";
             if (ex.AssistantLineIndex >= 0) respLabel += $" (TruthLine {ex.AssistantLineIndex})";
             respLabel += ":";
 
@@ -235,16 +247,11 @@ namespace VAL.Continuum.Pipeline.Filter2
             return result;
         }
 
-private static string FormatExchange(Filter1BuildSeed.SeedExchange ex, bool includeExchangeHeader)
+        private static string FormatExchange(Filter1BuildSeed.SeedExchange ex, bool sanitizeAssistant)
         {
             var sb = new StringBuilder();
 
-            if (includeExchangeHeader)
-            {
-                sb.AppendLine($"--- Exchange {ex.Index} ---");
-            }
-
-            var msgLabel = $"***Message {ex.Index} - USER***";
+            var msgLabel = $"Message {ex.Index} — USER";
             if (ex.UserLineIndex >= 0) msgLabel += $" (TruthLine {ex.UserLineIndex})";
             msgLabel += ":";
 
@@ -253,12 +260,13 @@ private static string FormatExchange(Filter1BuildSeed.SeedExchange ex, bool incl
 
             sb.AppendLine();
 
-            var respLabel = $"***Response {ex.Index} - ASSISTANT***";
+            var respLabel = $"Response {ex.Index} — ASSISTANT";
             if (ex.AssistantLineIndex >= 0) respLabel += $" (TruthLine {ex.AssistantLineIndex})";
             respLabel += ":";
 
             sb.AppendLine(respLabel);
-            sb.AppendLine(!string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]");
+            var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]";
+            sb.AppendLine(sanitizeAssistant ? SanitizeAssistantForWwlo(assistant) : assistant);
 
             return sb.ToString().TrimEnd();
         }

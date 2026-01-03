@@ -56,8 +56,12 @@ namespace VAL.Continuum.Pipeline.Filter1
         private static readonly Regex CodeFenceRegex = new(@"```.*?```", RegexOptions.Singleline | RegexOptions.Compiled);
 
         // Detect injected preambles / prior seeds that often get pasted into chat.
-        private static readonly Regex LargePreambleRegex = new(@"^\s*CONTINUUM\s+CONTEXT\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex EssenceHeaderRegex = new(@"^\s*VAL\s+CONTINUUM\s+—\s+ESSENCE\-M\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex LargePreambleRegex =
+            new(@"^\s*(Continuing\s+an\s+ongoing\s+working\s+session\s+with\s+VAL|CONTEXT\s+BLOCK\s+[—\-]\s+READ\s+ONLY)\b",
+                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex EssenceHeaderRegex =
+            new(@"^\s*(ESSENCE[\-\u2011]M\s+SNAPSHOT|CONTEXT\s+BLOCK\s+[—\-]\s+READ\s+ONLY)\b",
+                RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         // File name on its own line (upload cards often list "file.ext" then "Zip Archive"/"Document").
         private static readonly Regex FileNameLineRegex =
