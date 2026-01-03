@@ -57,10 +57,10 @@ namespace VAL.Continuum.Pipeline.Filter1
 
         // Detect injected preambles / prior seeds that often get pasted into chat.
         private static readonly Regex LargePreambleRegex =
-            new(@"^\s*(Continuing\s+an\s+ongoing\s+working\s+session\s+with\s+VAL|CONTEXT\s+BLOCK\s+[—\-]\s+READ\s+ONLY)\b",
+            new(@"^\s*(Continuing\s+an\s+ongoing\s+working\s+session\s+with\s+VAL|CONTEXT\s+BLOCK\s+[—\-]\s+READ\s+ONLY|WHERE\s+WE\s+LEFT\s+OFF\s+[—\-]\s+LAST\s+COMPLETE\s+EXCHANGE\s*\(AUTHORITATIVE\)|CONTEXT\s+FILLER\s*\(REFERENCE\s+ONLY\s+[—\-]\s+DO\s+NOT\s+ADVANCE\s+FROM\s+HERE\))\b",
                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex EssenceHeaderRegex =
-            new(@"^\s*(ESSENCE[\-\u2011]M\s+SNAPSHOT|CONTEXT\s+BLOCK\s+[—\-]\s+READ\s+ONLY)\b",
+            new(@"^\s*(ESSENCE[\-\u2011]M\s+SNAPSHOT(?:\s*\(AUTHORITATIVE\))?|CONTEXT\s+BLOCK\s+[—\-]\s+READ\s+ONLY|WHERE\s+WE\s+LEFT\s+OFF\s+[—\-]\s+LAST\s+COMPLETE\s+EXCHANGE\s*\(AUTHORITATIVE\)|CONTEXT\s+FILLER\s*\(REFERENCE\s+ONLY\s+[—\-]\s+DO\s+NOT\s+ADVANCE\s+FROM\s+HERE\))\b",
                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         // File name on its own line (upload cards often list "file.ext" then "Zip Archive"/"Document").
