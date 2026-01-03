@@ -713,9 +713,16 @@ namespace VAL.Continuum
             bool hasContext =
                 text.IndexOf("CONTEXT BLOCK", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf("ESSENCE-M SNAPSHOT", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("ESSENCE\u2011M SNAPSHOT", StringComparison.OrdinalIgnoreCase) >= 0;
+                text.IndexOf("ESSENCE\u2011M SNAPSHOT", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)", StringComparison.OrdinalIgnoreCase) >= 0;
 
-            return hasEssence && hasContext;
+            bool hasAuthoritativeSeed =
+                text.IndexOf("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            return (hasEssence && hasContext) || hasAuthoritativeSeed;
         }
 
 

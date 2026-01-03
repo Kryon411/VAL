@@ -58,6 +58,7 @@ namespace VAL.Continuum.Pipeline.Filter2
                 sb.AppendLine();
             }
 
+            // Reference-only context; downstream logic should not treat this section as authoritative.
             sb.AppendLine("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)");
             sb.AppendLine(SeparatorLine);
             sb.AppendLine();
