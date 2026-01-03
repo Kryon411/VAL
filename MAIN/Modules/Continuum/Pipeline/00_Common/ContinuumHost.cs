@@ -706,15 +706,8 @@ namespace VAL.Continuum
 
             // Keep this intentionally simple and robust.
             // We only want to classify chats that clearly contain the ESSENCE-M handoff payload.
-            bool hasEssence =
-                text.IndexOf("ESSENCE-M", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("ESSENCE\u2011M", StringComparison.OrdinalIgnoreCase) >= 0;
-
             bool hasContext =
-                text.IndexOf("CONTEXT BLOCK", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf("CONTEXT BLOCK — READ ONLY", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("ESSENCE-M SNAPSHOT", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("ESSENCE\u2011M SNAPSHOT", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -725,7 +718,7 @@ namespace VAL.Continuum
                 text.IndexOf("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 text.IndexOf("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0;
 
-            return (hasEssence && hasContext) || hasAuthoritativeSeed;
+            return hasAuthoritativeSeed || hasContext;
         }
 
 

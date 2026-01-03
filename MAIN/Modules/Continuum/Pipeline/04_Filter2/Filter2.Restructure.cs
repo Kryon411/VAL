@@ -18,8 +18,6 @@ namespace VAL.Continuum.Pipeline.Filter2
     /// </summary>
     public static class Filter2Restructure
     {
-        private const string SeparatorLine = "──────────────────────────────────────────────────";
-
         public static string BuildRestructuredSeed(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
             if (exchanges == null || exchanges.Count == 0)
@@ -34,7 +32,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             var sb = new StringBuilder();
 
             sb.AppendLine("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)");
-            sb.AppendLine(SeparatorLine);
+            sb.AppendLine(Filter2Rules.SeparatorLine);
             sb.AppendLine();
 
             if (lastExchange != null)
@@ -44,11 +42,11 @@ namespace VAL.Continuum.Pipeline.Filter2
             }
 
             sb.AppendLine("HOW TO PROCEED");
-            sb.AppendLine(SeparatorLine);
+            sb.AppendLine(Filter2Rules.SeparatorLine);
             sb.AppendLine();
 
             sb.AppendLine("ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)");
-            sb.AppendLine(SeparatorLine);
+            sb.AppendLine(Filter2Rules.SeparatorLine);
             sb.AppendLine();
 
             // Render the remaining pinned tail (most recent first), excluding the last exchange used above.
@@ -60,7 +58,7 @@ namespace VAL.Continuum.Pipeline.Filter2
 
             // Reference-only context; downstream logic should not treat this section as authoritative.
             sb.AppendLine("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)");
-            sb.AppendLine(SeparatorLine);
+            sb.AppendLine(Filter2Rules.SeparatorLine);
             sb.AppendLine();
 
             int budget = Filter2Rules.BudgetChars;
@@ -106,14 +104,27 @@ namespace VAL.Continuum.Pipeline.Filter2
 
             sb.AppendLine(FormatSourceLine(ex));
             sb.AppendLine("USER:");
-            var user = !string.IsNullOrWhiteSpace(ex.UserTextUncut) ? ex.UserTextUncut : ex.UserText;
+            var user = SelectWwloText(ex.UserTextUncut, ex.UserText);
             sb.AppendLine(!string.IsNullOrWhiteSpace(user) ? user.Trim() : "[USER: empty]");
             sb.AppendLine("ASSISTANT:");
 
-            var assistant = !string.IsNullOrWhiteSpace(ex.AssistantTextUncut) ? ex.AssistantTextUncut : ex.AssistantText;
+            var assistant = SelectWwloText(ex.AssistantTextUncut, ex.AssistantText);
             sb.AppendLine(!string.IsNullOrWhiteSpace(assistant) ? assistant.Trim() : "[ASSISTANT: empty]");
 
             return sb.ToString().TrimEnd();
+        }
+
+        private static string SelectWwloText(string uncut, string sliced)
+        {
+            var candidate = uncut ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(candidate))
+                return sliced ?? string.Empty;
+
+            int length = candidate.Trim().Length;
+            if (length > Filter1Rules.MaxExchangeChars || length > Filter2Rules.WhereWeLeftOffMaxTextChars)
+                return sliced ?? string.Empty;
+
+            return candidate;
         }
 
         private static string SanitizeAssistantForWwlo(string text)
