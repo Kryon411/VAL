@@ -107,7 +107,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             var sb = new StringBuilder();
 
             var msgLabel = $"Message {ex.Index} — USER";
-            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {ex.UserLineIndex})";
+            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {FormatTruthRange(ex.UserLineIndex)})";
             msgLabel += ":";
 
             sb.AppendLine(msgLabel);
@@ -115,7 +115,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine();
 
             var respLabel = $"Response {ex.Index} — ASSISTANT";
-            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {ex.AssistantLineIndex})";
+            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {FormatTruthRange(ex.AssistantLineIndex)})";
             respLabel += ":";
 
             sb.AppendLine(respLabel);
@@ -258,7 +258,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             var sb = new StringBuilder();
 
             var msgLabel = $"Message {ex.Index} — USER";
-            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {ex.UserLineIndex})";
+            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {FormatTruthRange(ex.UserLineIndex)})";
             msgLabel += ":";
 
             sb.AppendLine(msgLabel);
@@ -267,7 +267,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine();
 
             var respLabel = $"Response {ex.Index} — ASSISTANT";
-            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {ex.AssistantLineIndex})";
+            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {FormatTruthRange(ex.AssistantLineIndex)})";
             respLabel += ":";
 
             sb.AppendLine(respLabel);
@@ -276,5 +276,7 @@ namespace VAL.Continuum.Pipeline.Filter2
 
             return sb.ToString().TrimEnd();
         }
+
+        private static string FormatTruthRange(int lineIndex) => $"{lineIndex}\u2013{lineIndex}";
     }
 }
