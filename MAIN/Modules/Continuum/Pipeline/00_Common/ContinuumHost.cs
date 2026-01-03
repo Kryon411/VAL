@@ -706,8 +706,16 @@ namespace VAL.Continuum
 
             // Keep this intentionally simple and robust.
             // We only want to classify chats that clearly contain the ESSENCE-M handoff payload.
-            return text.IndexOf("VAL CONTINUUM", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                   text.IndexOf("ESSENCE-M", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool hasEssence =
+                text.IndexOf("ESSENCE-M", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("ESSENCE\u2011M", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            bool hasContext =
+                text.IndexOf("CONTEXT BLOCK", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("ESSENCE-M SNAPSHOT", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("ESSENCE\u2011M SNAPSHOT", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            return hasEssence && hasContext;
         }
 
 

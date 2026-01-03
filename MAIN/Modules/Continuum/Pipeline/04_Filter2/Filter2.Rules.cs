@@ -18,7 +18,7 @@ namespace VAL.Continuum.Pipeline.Filter2
         // Allow finishing ONE whole exchange after budget is crossed (prevents half-turn cutoffs).
         public const int OverflowFinishExchangeMaxChars = 8_000;
 
-        // Exchanges to pin at the top as the "handoff tail anchor".
+        // Exchanges to pin at the top as the "handoff tail anchor" (latest exchange is authoritative).
         public const int WhereWeLeftOffCount = 2;
     }
 }

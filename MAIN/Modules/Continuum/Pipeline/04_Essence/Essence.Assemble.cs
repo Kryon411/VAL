@@ -1,8 +1,6 @@
 using System;
 using System.Text;
 using System.Text.RegularExpressions;
-using VAL.Continuum.Pipeline.Common;
-
 namespace VAL.Continuum.Pipeline.Essence
 {
     public static class EssenceAssemble
@@ -29,25 +27,8 @@ namespace VAL.Continuum.Pipeline.Essence
             // Collapse accidental triple blank lines
             s = Regex.Replace(s, @"\n{3,}", "\n\n");
 
-            // Add a small, stable header for the new chat (no meta, no instructions).
-            // Keep it short; the transcript itself is the product.
-            var sb = new StringBuilder(s.Length + 256);
-
-            // Continuum guardrail preamble (Context.txt)
-            var preamble = ContinuumPreamble.Load();
-            if (!string.IsNullOrWhiteSpace(preamble))
-            {
-                sb.AppendLine(preamble.Trim());
-                sb.AppendLine();
-            }
-
-
-            sb.AppendLine("VAL CONTINUUM — ESSENCE-M (PULSE)");
-            sb.AppendLine($"chatId: {chatId}");
-            sb.AppendLine();
-            sb.AppendLine(s.Trim());
-
-            return sb.ToString().Trim();
+            // The Essence payload is a plain-text snapshot. Context.txt is injected separately.
+            return s.Trim();
         }
     }
 }
