@@ -12,6 +12,9 @@ namespace VAL.Continuum.Pipeline.Filter2
     /// </summary>
     internal static class Filter2Rules
     {
+        // Short, stable separator line (avoid composer wrapping).
+        public const string SeparatorLine = "────────────────────────────────────────────────";
+
         // Total budget for RestructuredSeed (does NOT include Context.txt preamble injected later).
         public const int BudgetChars = 28_000;
 
@@ -20,5 +23,8 @@ namespace VAL.Continuum.Pipeline.Filter2
 
         // Exchanges to pin at the top as the "handoff tail anchor" (latest exchange is authoritative).
         public const int WhereWeLeftOffCount = 2;
+
+        // WWLO prefers uncut text only when safely bounded.
+        public const int WhereWeLeftOffMaxTextChars = 6_000;
     }
 }
