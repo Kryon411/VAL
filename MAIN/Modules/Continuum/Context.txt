@@ -1,6 +1,5 @@
 Continuing an ongoing working session with VAL (not a new conversation).
 
-──────────
 CONTEXT BLOCK — READ ONLY
 ──────────
 (Carried context, not a user message)
@@ -30,6 +29,5 @@ Only request files/artifacts when the user explicitly refers to code/filenames, 
 
 If any instruction conflicts, defer to “Where We Left Off” and do nothing else.
 
-──────────
 ESSENCE‑M SNAPSHOT (AUTHORITATIVE)
 ──────────

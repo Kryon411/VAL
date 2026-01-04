@@ -278,7 +278,6 @@ namespace VAL.Continuum.Pipeline.Filter2
                 sb.AppendLine();
             }
 
-            sb.AppendLine(Filter2Rules.Separator);
             sb.AppendLine(title);
             sb.AppendLine(Filter2Rules.Separator);
 
@@ -300,7 +299,6 @@ namespace VAL.Continuum.Pipeline.Filter2
             {
                 header.AppendLine();
             }
-            header.AppendLine(Filter2Rules.Separator);
             header.AppendLine(title);
             header.AppendLine(Filter2Rules.Separator);
             return header.Length;
