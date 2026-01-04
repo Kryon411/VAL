@@ -114,8 +114,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine($"USER: {userOut}");
 
             var assistant = SelectWwloText(ex.AssistantTextUncut, ex.AssistantText);
-            var assistantOut = !string.IsNullOrWhiteSpace(assistant) ? assistant.Trim() : "[ASSISTANT: empty]";
-            sb.AppendLine($"ASSISTANT: {assistantOut}");
+            AppendAssistantBlock(sb, assistant, sanitizeAssistant: false);
             return sb.ToString().TrimEnd();
         }
 
@@ -261,10 +260,10 @@ namespace VAL.Continuum.Pipeline.Filter2
             var sb = new StringBuilder();
 
             sb.AppendLine(FormatSourceLine(ex));
-            var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]";
+            var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : string.Empty;
             var user = !string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]";
             sb.AppendLine($"USER: {user}");
-            sb.AppendLine($"ASSISTANT: {(sanitizeAssistant ? SanitizeAssistantForWwlo(assistant) : assistant)}");
+            AppendAssistantBlock(sb, assistant, sanitizeAssistant);
 
             return sb.ToString().TrimEnd();
         }
@@ -348,6 +347,37 @@ namespace VAL.Continuum.Pipeline.Filter2
             }
 
             return $"{min}\u2013{max}";
+        }
+
+        private static void AppendAssistantBlock(StringBuilder sb, string assistantText, bool sanitizeAssistant)
+        {
+            sb.AppendLine("ASSISTANT:");
+            sb.AppendLine(NormalizeAssistantContent(assistantText, sanitizeAssistant));
+        }
+
+        private static string NormalizeAssistantContent(string assistantText, bool sanitizeAssistant)
+        {
+            var raw = assistantText ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return "[ASSISTANT: empty]";
+            }
+
+            var match = Regex.Match(raw, @"^\s*Reasoned for (?:\d+h )?\d+m \d+s(?:\r?\n)?", RegexOptions.CultureInvariant);
+            var remainder = match.Success ? raw.Substring(match.Length) : raw;
+
+            var content = remainder;
+            if (sanitizeAssistant)
+            {
+                content = SanitizeAssistantForWwlo(content);
+            }
+
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return "[ASSISTANT: empty]";
+            }
+
+            return content;
         }
     }
 }
