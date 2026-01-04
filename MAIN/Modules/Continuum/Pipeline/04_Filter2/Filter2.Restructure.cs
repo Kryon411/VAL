@@ -105,12 +105,13 @@ namespace VAL.Continuum.Pipeline.Filter2
 
             sb.AppendLine(FormatSourceLine(ex));
             var user = SelectWwloText(ex.UserTextUncut, ex.UserText);
-            sb.AppendLine($"USER: {!string.IsNullOrWhiteSpace(user) ? user.Trim() : "[USER: empty]"}");
+            var userOut = !string.IsNullOrWhiteSpace(user) ? user.Trim() : "[USER: empty]";
+            sb.AppendLine($"USER: {userOut}");
 
             var assistant = SelectWwloText(ex.AssistantTextUncut, ex.AssistantText);
-            sb.AppendLine($"ASSISTANT: {!string.IsNullOrWhiteSpace(assistant) ? assistant.Trim() : "[ASSISTANT: empty]"}");
-
-            return sb.ToString().TrimEnd();
+            var assistantOut = !string.IsNullOrWhiteSpace(assistant) ? assistant.Trim() : "[ASSISTANT: empty]";
+            sb.AppendLine($"ASSISTANT: {assistantOut}");
+return sb.ToString().TrimEnd();
         }
 
         private static string SelectWwloText(string uncut, string sliced)
