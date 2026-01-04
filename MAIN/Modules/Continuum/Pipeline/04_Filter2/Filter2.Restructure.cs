@@ -273,23 +273,11 @@ namespace VAL.Continuum.Pipeline.Filter2
 
         private static void AppendSection(StringBuilder sb, string title, string bodyText)
         {
-            if (sb.Length > 0 && !EndsWithBlankLine(sb))
-            {
-                sb.AppendLine();
-            }
-
-            EnsureLineStart(sb);
-            sb.AppendLine(Filter2Rules.SeparatorLine);
-            sb.AppendLine(title);
-            sb.AppendLine(Filter2Rules.Separator);
+            AppendHeading(sb, title, sb);
 
             if (!string.IsNullOrEmpty(bodyText))
             {
                 sb.Append(bodyText.TrimEnd('\r', '\n'));
-                sb.AppendLine();
-            }
-            else
-            {
                 sb.AppendLine();
             }
         }
@@ -297,48 +285,104 @@ namespace VAL.Continuum.Pipeline.Filter2
         private static int GetSectionHeaderLength(StringBuilder sb, string title)
         {
             var header = new StringBuilder();
-            if (sb.Length > 0 && !EndsWithBlankLine(sb))
-            {
-                header.AppendLine();
-            }
-            EnsureLineStart(header);
-            header.AppendLine(Filter2Rules.SeparatorLine);
-            header.AppendLine(title);
-            header.AppendLine(Filter2Rules.Separator);
+            AppendHeading(header, title, sb);
             return header.Length;
         }
 
         private static int GetSectionFooterLength()
             => Environment.NewLine.Length;
 
-        private static bool EndsWithBlankLine(StringBuilder sb)
+        private static void AppendHeading(StringBuilder target, string title, StringBuilder context)
         {
-            if (sb.Length >= 2 &&
-                sb[sb.Length - 1] == '\n' &&
-                sb[sb.Length - 2] == '\n')
-                return true;
-
-            if (sb.Length >= 4 &&
-                sb[sb.Length - 1] == '\n' &&
-                sb[sb.Length - 2] == '\r' &&
-                sb[sb.Length - 3] == '\n' &&
-                sb[sb.Length - 4] == '\r')
-                return true;
-
-            return false;
+            EnsureHeadingGap(target, context);
+            target.AppendLine(title);
+            target.AppendLine();
+            target.AppendLine();
         }
 
-        private static void EnsureLineStart(StringBuilder sb)
+        private static void EnsureHeadingGap(StringBuilder target, StringBuilder context)
         {
-            if (sb.Length == 0)
+            if (context.Length == 0)
             {
+                target.AppendLine();
                 return;
             }
 
-            char last = sb[sb.Length - 1];
-            if (last != '\n' && last != '\r')
+            int trailingBreaks = CountTrailingLineBreaks(context);
+            if (ReferenceEquals(target, context) && trailingBreaks > 2)
             {
-                sb.AppendLine();
+                TrimTrailingLineBreaks(target, 2);
+                trailingBreaks = 2;
+            }
+            else if (trailingBreaks > 2)
+            {
+                trailingBreaks = 2;
+            }
+
+            if (trailingBreaks == 0)
+            {
+                target.AppendLine();
+                target.AppendLine();
+                return;
+            }
+
+            if (trailingBreaks == 1)
+            {
+                target.AppendLine();
+            }
+        }
+
+        private static int CountTrailingLineBreaks(StringBuilder sb)
+        {
+            int count = 0;
+            int index = sb.Length - 1;
+            while (index >= 0)
+            {
+                char ch = sb[index];
+                if (ch == '\n')
+                {
+                    count++;
+                    index--;
+                    if (index >= 0 && sb[index] == '\r')
+                    {
+                        index--;
+                    }
+                    continue;
+                }
+
+                if (ch == '\r')
+                {
+                    count++;
+                    index--;
+                    continue;
+                }
+
+                break;
+            }
+
+            return count;
+        }
+
+        private static void TrimTrailingLineBreaks(StringBuilder sb, int keepCount)
+        {
+            int trailing = CountTrailingLineBreaks(sb);
+            while (trailing > keepCount && sb.Length > 0)
+            {
+                char ch = sb[sb.Length - 1];
+                if (ch == '\n')
+                {
+                    sb.Length -= 1;
+                    if (sb.Length > 0 && sb[sb.Length - 1] == '\r')
+                    {
+                        sb.Length -= 1;
+                    }
+                }
+                else if (ch == '\r')
+                {
+                    sb.Length -= 1;
+                }
+
+                trailing--;
             }
         }
 
