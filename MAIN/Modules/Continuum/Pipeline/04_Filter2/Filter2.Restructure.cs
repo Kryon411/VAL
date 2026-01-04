@@ -278,6 +278,8 @@ namespace VAL.Continuum.Pipeline.Filter2
                 sb.AppendLine();
             }
 
+            EnsureLineStart(sb);
+            sb.AppendLine(Filter2Rules.SeparatorLine);
             sb.AppendLine(title);
             sb.AppendLine(Filter2Rules.SeparatorLine);
 
@@ -299,6 +301,8 @@ namespace VAL.Continuum.Pipeline.Filter2
             {
                 header.AppendLine();
             }
+            EnsureLineStart(header);
+            header.AppendLine(Filter2Rules.SeparatorLine);
             header.AppendLine(title);
             header.AppendLine(Filter2Rules.SeparatorLine);
             return header.Length;
@@ -322,6 +326,20 @@ namespace VAL.Continuum.Pipeline.Filter2
                 return true;
 
             return false;
+        }
+
+        private static void EnsureLineStart(StringBuilder sb)
+        {
+            if (sb.Length == 0)
+            {
+                return;
+            }
+
+            char last = sb[sb.Length - 1];
+            if (last != '\n' && last != '\r')
+            {
+                sb.AppendLine();
+            }
         }
 
         private static string FormatTruthRange(int userLineIndex, int assistantLineIndex)
