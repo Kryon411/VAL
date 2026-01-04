@@ -279,7 +279,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             }
 
             sb.AppendLine(title);
-            sb.AppendLine(Filter2Rules.SeparatorLine);
+            sb.AppendLine(Filter2Rules.Separator);
 
             if (!string.IsNullOrEmpty(bodyText))
             {
@@ -300,7 +300,7 @@ namespace VAL.Continuum.Pipeline.Filter2
                 header.AppendLine();
             }
             header.AppendLine(title);
-            header.AppendLine(Filter2Rules.SeparatorLine);
+            header.AppendLine(Filter2Rules.Separator);
             return header.Length;
         }
 
