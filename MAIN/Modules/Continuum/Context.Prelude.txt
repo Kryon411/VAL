@@ -2,9 +2,9 @@ This prelude explains how to leave small, explicit markers so key context can su
 
 Read once, then continue naturally.
 
-────────────────────
+──────────
 TAGGING RULES (USE SPARINGLY)
-────────────────────
+──────────
 
 Default: no tag.
 Use at most one tag per assistant reply, applied to a single sentence.
