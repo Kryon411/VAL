@@ -13,7 +13,7 @@ namespace VAL.Continuum.Pipeline.Filter2
     internal static class Filter2Rules
     {
         // Short, stable separator line (avoid composer wrapping).
-        public const string SeparatorLine = "----------------------------------------";
+        public const string Separator = "──────────";
 
         // Total budget for RestructuredSeed (does NOT include Context.txt preamble injected later).
         public const int BudgetChars = 28_000;

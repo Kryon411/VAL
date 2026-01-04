@@ -1,5 +1,6 @@
 using System;
 using System.Text.RegularExpressions;
+using VAL.Continuum.Pipeline.Filter2;
 
 namespace VAL.Continuum.Pipeline.Essence
 {
@@ -25,6 +26,9 @@ namespace VAL.Continuum.Pipeline.Essence
 
             // Preserve structural line breaks for labels/language markers.
             s = PreserveStructuralLineBreaks(s);
+
+            // Normalize hyphen-only separator lines.
+            s = Regex.Replace(s, @"(?m)^[\-]+$", Filter2Rules.Separator);
 
             // Remove common accidental UI markers (keep conservative)
             // Example: literal "[Screenshot hidden]" if it ever leaks into captured text
