@@ -601,41 +601,24 @@ try {
   // - single newlines inside a paragraph (=> <br>)
   // We do NOT trim lines to avoid jamming words together.
   function _plainTextToProseHtml(text) {
-    const t = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    const lines = t.split("\n");
+  // Convert plain text into ProseMirror-friendly HTML that preserves layout robustly.
+  // IMPORTANT: We avoid <br> because ChatGPT's ProseMirror pipeline may drop/normalize it
+  // when HTML is injected. Instead, we emit one <p> per line (including empty lines).
+  // This guarantees that "Source:" / "USER:" etc never glue together.
+  const t = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = t.split("\n");
 
-    let htmlOut = "";
-    let inP = false;
-    let wroteInP = false;
-
-    const openP = () => { if (!inP) { htmlOut += "<p>"; inP = true; wroteInP = false; } };
-    const closeP = () => { if (inP) { htmlOut += "</p>"; inP = false; wroteInP = false; } };
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      if (line === "") {
-        // blank line => paragraph break
-        closeP();
-        continue;
-      }
-
-      openP();
-      if (wroteInP) htmlOut += "<br>";
-      // Preserve leading spaces by converting them to &nbsp; (only the leading run).
-      const leading = (line.match(/^\s+/) || [""])[0];
-      const rest = line.slice(leading.length);
-      const leadingHtml = leading.replace(/ /g, "&nbsp;").replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;");
-      htmlOut += leadingHtml + _escapeHtml(rest);
-      wroteInP = true;
+  let htmlOut = "";
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === "") {
+      htmlOut += "<p></p>";
+    } else {
+      htmlOut += "<p>" + _escapeHtml(line) + "</p>";
     }
-
-    // ensure at least one paragraph exists so ProseMirror doesn't end up empty
-    if (!htmlOut) htmlOut = "<p></p>";
-    else closeP();
-
-    return htmlOut;
   }
+  return htmlOut;
+}
 
 
   function injectIntoComposer(text) {
