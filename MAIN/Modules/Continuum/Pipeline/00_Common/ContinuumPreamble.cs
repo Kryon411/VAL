@@ -137,7 +137,7 @@ namespace VAL.Continuum.Pipeline
 
                 var preamble = LoadPreamble(id);
                 if (string.IsNullOrWhiteSpace(preamble))
-                    return e.Trim();
+                    return e;
 
                 var trimmedPreamble = preamble.Trim();
                 var trimmedEssence = e.Trim();
@@ -145,16 +145,17 @@ namespace VAL.Continuum.Pipeline
                 // Idempotency: if the essence already begins with the current preamble, don't prepend again.
                 // (This avoids accidental double-injection when Pulse/Prelude flows overlap.)
                 if (IsAlreadyPrepended(trimmedEssence, trimmedPreamble))
-                    return trimmedEssence;
+                    return e;
 
                 if (string.IsNullOrWhiteSpace(trimmedEssence))
-                    return trimmedPreamble;
+                    return preamble;
 
-                return (trimmedPreamble + "\n\n" + trimmedEssence).Trim();
+                var preambleWithGap = EnsureEndsWithBlankLine(preamble);
+                return preambleWithGap + e;
             }
             catch
             {
-                return (essenceText ?? string.Empty).Trim();
+                return essenceText ?? string.Empty;
             }
         }
 
@@ -241,6 +242,49 @@ namespace VAL.Continuum.Pipeline
                 if (char.IsWhiteSpace(s[i]))
                     return true;
             }
+            return false;
+        }
+
+        private static string EnsureEndsWithBlankLine(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+
+            if (EndsWithBlankLine(text))
+                return text;
+
+            if (EndsWithLineBreak(text))
+                return text + Environment.NewLine;
+
+            return text + Environment.NewLine + Environment.NewLine;
+        }
+
+        private static bool EndsWithBlankLine(string text)
+        {
+            if (text.Length >= 2 &&
+                text[text.Length - 1] == '\n' &&
+                text[text.Length - 2] == '\n')
+                return true;
+
+            if (text.Length >= 4 &&
+                text[text.Length - 1] == '\n' &&
+                text[text.Length - 2] == '\r' &&
+                text[text.Length - 3] == '\n' &&
+                text[text.Length - 4] == '\r')
+                return true;
+
+            return false;
+        }
+
+        private static bool EndsWithLineBreak(string text)
+        {
+            if (text.Length >= 1 && text[text.Length - 1] == '\n')
+                return true;
+
+            if (text.Length >= 2 &&
+                text[text.Length - 1] == '\n' &&
+                text[text.Length - 2] == '\r')
+                return true;
+
             return false;
         }
 

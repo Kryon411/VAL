@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace VAL.Continuum.Pipeline.Essence
@@ -19,7 +18,7 @@ namespace VAL.Continuum.Pipeline.Essence
             var s = workingSet;
 
             // Normalize newlines
-            s = s.Replace("\r\n", "\n");
+            s = s.Replace("\r\n", "\n").Replace("\r", "\n");
 
             // Trim trailing whitespace per line
             s = Regex.Replace(s, @"[ \t]+\n", "\n");
@@ -27,15 +26,11 @@ namespace VAL.Continuum.Pipeline.Essence
             // Preserve structural line breaks for labels/language markers.
             s = PreserveStructuralLineBreaks(s);
 
-            // Collapse >2 blank lines into 2
-            s = Regex.Replace(s, @"\n{3,}", "\n\n");
-
             // Remove common accidental UI markers (keep conservative)
             // Example: literal "[Screenshot hidden]" if it ever leaks into captured text
             s = Regex.Replace(s, @"\[Screenshot hidden\]", "", RegexOptions.IgnoreCase);
 
-            // Final trim
-            return s.Trim();
+            return s;
         }
 
         private static string PreserveStructuralLineBreaks(string text)
