@@ -44,6 +44,9 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine("HOW TO PROCEED");
             sb.AppendLine(Filter2Rules.SeparatorLine);
             sb.AppendLine();
+            sb.AppendLine("Continue the same working session.");
+            sb.AppendLine("Read WWLO first, then respond to the last user instruction.");
+            sb.AppendLine();
 
             sb.AppendLine("ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)");
             sb.AppendLine(Filter2Rules.SeparatorLine);
@@ -84,10 +87,6 @@ namespace VAL.Continuum.Pipeline.Filter2
                     {
                         sb.Append(block);
                         used += block.Length;
-                    }
-                    else
-                    {
-                        sb.AppendLine($"[Exchange {exchanges[i].Index} omitted: overflow too large ({block.Length} chars)]");
                     }
                 }
 
