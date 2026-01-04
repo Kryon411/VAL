@@ -31,9 +31,7 @@ namespace VAL.Continuum.Pipeline.Filter2
 
             var sb = new StringBuilder();
 
-            sb.AppendLine("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)");
-            sb.AppendLine(Filter2Rules.SeparatorLine);
-            sb.AppendLine();
+            AppendSectionHeader(sb, "WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)");
 
             if (lastExchange != null)
             {
@@ -41,16 +39,13 @@ namespace VAL.Continuum.Pipeline.Filter2
                 sb.AppendLine();
             }
 
-            sb.AppendLine("HOW TO PROCEED");
-            sb.AppendLine(Filter2Rules.SeparatorLine);
-            sb.AppendLine();
-            sb.AppendLine("Continue the same working session.");
-            sb.AppendLine("Read WWLO first, then respond to the last user instruction.");
+            AppendSectionHeader(sb, "HOW TO PROCEED");
+            sb.AppendLine("Proceed from \"WHERE WE LEFT OFF\".");
+            sb.AppendLine("If WWLO contains a direct instruction, answer it.");
+            sb.AppendLine("Otherwise acknowledge continuity and wait.");
             sb.AppendLine();
 
-            sb.AppendLine("ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)");
-            sb.AppendLine(Filter2Rules.SeparatorLine);
-            sb.AppendLine();
+            AppendSectionHeader(sb, "ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)");
 
             // Render the remaining pinned tail (most recent first), excluding the last exchange used above.
             for (int i = pinnedTail.Count - 2; i >= 0; i--)
@@ -60,15 +55,14 @@ namespace VAL.Continuum.Pipeline.Filter2
             }
 
             // Reference-only context; downstream logic should not treat this section as authoritative.
-            sb.AppendLine("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)");
-            sb.AppendLine(Filter2Rules.SeparatorLine);
-            sb.AppendLine();
+            AppendSectionHeader(sb, "CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)");
 
             int budget = Filter2Rules.BudgetChars;
             int overflowLimit = Filter2Rules.OverflowFinishExchangeMaxChars;
 
             // Start adding older exchanges newest -> oldest (excluding the pinned tail).
             int used = sb.Length;
+            bool addedFiller = false;
             for (int i = total - pin - 1; i >= 0; i--)
             {
                 var block = FormatExchange(exchanges[i], sanitizeAssistant: false) + "\n\n";
@@ -77,6 +71,7 @@ namespace VAL.Continuum.Pipeline.Filter2
                 {
                     sb.Append(block);
                     used += block.Length;
+                    addedFiller = true;
                     continue;
                 }
 
@@ -87,10 +82,17 @@ namespace VAL.Continuum.Pipeline.Filter2
                     {
                         sb.Append(block);
                         used += block.Length;
+                        addedFiller = true;
                     }
                 }
 
                 break;
+            }
+
+            if (!addedFiller)
+            {
+                sb.AppendLine("(no reference-only exchanges captured)");
+                sb.AppendLine();
             }
 
             return sb.ToString().Trim();
@@ -102,13 +104,11 @@ namespace VAL.Continuum.Pipeline.Filter2
             var sb = new StringBuilder();
 
             sb.AppendLine(FormatSourceLine(ex));
-            sb.AppendLine("USER:");
             var user = SelectWwloText(ex.UserTextUncut, ex.UserText);
-            sb.AppendLine(!string.IsNullOrWhiteSpace(user) ? user.Trim() : "[USER: empty]");
-            sb.AppendLine("ASSISTANT:");
+            sb.AppendLine($"USER: {!string.IsNullOrWhiteSpace(user) ? user.Trim() : "[USER: empty]"}");
 
             var assistant = SelectWwloText(ex.AssistantTextUncut, ex.AssistantText);
-            sb.AppendLine(!string.IsNullOrWhiteSpace(assistant) ? assistant.Trim() : "[ASSISTANT: empty]");
+            sb.AppendLine($"ASSISTANT: {!string.IsNullOrWhiteSpace(assistant) ? assistant.Trim() : "[ASSISTANT: empty]"}");
 
             return sb.ToString().TrimEnd();
         }
@@ -255,17 +255,34 @@ namespace VAL.Continuum.Pipeline.Filter2
             var sb = new StringBuilder();
 
             sb.AppendLine(FormatSourceLine(ex));
-            sb.AppendLine("USER:");
-            sb.AppendLine(!string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]");
-            sb.AppendLine("ASSISTANT:");
             var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : "[ASSISTANT: empty]";
-            sb.AppendLine(sanitizeAssistant ? SanitizeAssistantForWwlo(assistant) : assistant);
+            var user = !string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]";
+            sb.AppendLine($"USER: {user}");
+            sb.AppendLine($"ASSISTANT: {(sanitizeAssistant ? SanitizeAssistantForWwlo(assistant) : assistant)}");
 
             return sb.ToString().TrimEnd();
         }
 
         private static string FormatSourceLine(Filter1BuildSeed.SeedExchange ex)
             => $"Source: Truth {FormatTruthRange(ex.UserLineIndex, ex.AssistantLineIndex)}";
+
+        private static void AppendSectionHeader(StringBuilder sb, string title)
+        {
+            if (sb.Length > 0 && !EndsWithBlankLine(sb))
+            {
+                sb.AppendLine();
+            }
+
+            sb.AppendLine(title);
+            sb.AppendLine(Filter2Rules.SeparatorLine);
+            sb.AppendLine();
+        }
+
+        private static bool EndsWithBlankLine(StringBuilder sb)
+        {
+            if (sb.Length < 2) return false;
+            return sb[sb.Length - 1] == '\n' && sb[sb.Length - 2] == '\n';
+        }
 
         private static string FormatTruthRange(int userLineIndex, int assistantLineIndex)
         {

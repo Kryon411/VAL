@@ -1,10 +1,9 @@
 Continuing an ongoing working session with VAL (not a new conversation).
 
-────────────────────
 CONTEXT BLOCK — READ ONLY
+----------------------------------------
 (Carried context, not a user message)
 ESSENCE-M VERSION: Golden Standard v1.1
-────────────────────
 
 The ESSENCE‑M content that follows is the authoritative snapshot of the immediately preceding discussion.
 Use it to determine what is active and in scope; do not recreate, summarize, or re‑diagnose earlier work unless explicitly asked.
@@ -30,6 +29,5 @@ Only request files/artifacts when the user explicitly refers to code/filenames, 
 
 If any instruction conflicts, defer to “Where We Left Off” and do nothing else.
 
-────────────────────
 ESSENCE‑M SNAPSHOT (AUTHORITATIVE)
-────────────────────
+----------------------------------------

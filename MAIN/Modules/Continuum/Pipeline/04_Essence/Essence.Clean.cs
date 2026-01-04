@@ -43,8 +43,10 @@ namespace VAL.Continuum.Pipeline.Essence
             if (string.IsNullOrEmpty(text))
                 return text ?? string.Empty;
 
-            var labels = @"(?:USER|ASSISTANT|USER \(intent\)|ASSISTANT \(tag\)|TURN)";
-            text = Regex.Replace(text, $@"(?m)^(?<label>{labels}:)[ \t]+(?=\S)", "${label}\n");
+            var labels = @"(?:USER|ASSISTANT)";
+            text = Regex.Replace(text, $@"(?m)^(?<label>{labels}):[ \t]*\n[ \t]*(?=\S)", "${label}: ");
+            text = Regex.Replace(text, $@"(?m)^(?<label>{labels}):[ \t]+(?=\S)", "${label}: ");
+            text = Regex.Replace(text, $@"(?m)^(?<label>{labels}):(?=\S)", "${label}: ");
 
             var languages = @"(?:powershell|csharp|bash|zsh|sh|shell|cmd|console)";
             text = Regex.Replace(text, $@"(?im)^(?<lang>[ \t]*{languages})\s+(?=\S)", "${lang}\n");
