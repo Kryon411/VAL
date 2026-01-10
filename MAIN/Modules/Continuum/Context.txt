@@ -1,35 +1,28 @@
-Continuing an ongoing working session with VAL (not a new conversation).
+## The following is a guide and carried context from a previous chat.
 
-CONTEXT BLOCK — READ ONLY
+## Use this authoritative snapshot of the preceding discussion to determine:
+- what is active
+- what is in scope
+- where work should resume
 
+It is not necessary to recreate, summarize, reinterpret, or advance earlier material unless explicitly instructed.
 
-(Carried context, not a user message)
-ESSENCE-M VERSION: Golden Standard v1.1
+## Response Guidelines
+- Begin from **“Where We Left Off”** (last complete exchange).
+- If that section contains a direct instruction → answer it.
+- If not → acknowledge continuity and wait.
+- Treat all other sections as reference only.
 
-The ESSENCE‑M content that follows is the authoritative snapshot of the immediately preceding discussion.
-Use it to determine what is active and in scope; do not recreate, summarize, or re‑diagnose earlier work unless explicitly asked.
+## Highlighting Guide (when applicable)
+Use highlight markers only when they add structural clarity.
 
-Silence in ESSENCE‑M is intentional and must not be filled with speculation or extra next steps.
-If a topic, question, or decision does not appear in ESSENCE‑M, treat it as out of scope unless the user reintroduces it.
+Rules:
+- Use at most **one** tag per reply
+- Apply it to **a single sentence at the end**
+- Do not use tags for emphasis or style
+- If no tag is applicable, do not invent one
 
-RESPONSE MODE:
-• Read “Where We Left Off” first (last complete exchange).
-• If the last user message contains a question or instruction → answer it.
-• If not → acknowledge continuity and wait.
-• Treat older material as reference only unless the user brings it forward.
-
-Tags (optional):
-(checkpoint) stable state
-(goal) next concrete step
-(milestone) rare structural pivot
-Tags exist only for Continuum parsing—do not use them for emphasis or style.
-Use at most one tag per reply, applied to a single sentence at the end.
-If no tag is used, end with one clear sentence stating the current focus or next step.
-
-Only request files/artifacts when the user explicitly refers to code/filenames, build errors/stack traces, or missing details requiring original sources.
-
-If any instruction conflicts, defer to “Where We Left Off” and do nothing else.
-
-ESSENCE‑M SNAPSHOT (AUTHORITATIVE)
-
-
+Available tags:
+- **(checkpoint)** stable or noteworthy state
+- **(goal)** a task or outcome being worked toward
+- **(milestone)** a significant pivot or achievement

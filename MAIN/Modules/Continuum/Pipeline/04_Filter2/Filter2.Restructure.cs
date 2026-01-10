@@ -293,12 +293,16 @@ namespace VAL.Continuum.Pipeline.Filter2
             => Environment.NewLine.Length;
 
         private static void AppendHeading(StringBuilder target, string title, StringBuilder context)
-        {
-            EnsureHeadingGap(target, context);
-            target.AppendLine(title);
-            target.AppendLine();
-            target.AppendLine();
-        }
+    {
+        // Markdown-first headings: render cleanly in ChatGPT after ProseMirror injection,
+        // while remaining readable as plain text on disk.
+        // IMPORTANT: keep the HR line isolated with blank lines so Markdown parses reliably.
+        target.AppendLine();
+        target.AppendLine("---");
+        target.AppendLine();
+        target.Append("## ").AppendLine(title);
+        target.AppendLine();
+    }
 
         private static void EnsureHeadingGap(StringBuilder target, StringBuilder context)
         {

@@ -14,6 +14,7 @@ using VAL.Continuum;
 using VAL.Continuum.Pipeline.Inject;
 using VAL.Host;
 using VAL.Host.Commands;
+using VAL.Host.Portal;
 
 namespace VAL
 {
@@ -106,6 +107,28 @@ namespace VAL
             WebView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             WebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
             WebView.CoreWebView2.Settings.IsWebMessageEnabled = true;
+
+
+            // ---- Portal runtime (armed-only hotkey + clipboard staging) ----
+            try
+            {
+                PortalRuntime.Initialize(
+                    postJson: (json) => { try { WebView.CoreWebView2.PostWebMessageAsJson(json); } catch { } },
+                    focusWebView: () => { try { WebView.Focus(); } catch { } try { _ = WebView.CoreWebView2.ExecuteScriptAsync("(()=>{try{const selectors=['form textarea','textarea[placeholder]','div[contenteditable=\"true\"][role=\"textbox\"]','div.ProseMirror[contenteditable=\"true\"]','div[contenteditable=\"true\"][data-slate-editor=\"true\"]'];for(const s of selectors){  const el=document.querySelector(s);  if(el){ try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true; }}// fallback: find any visible contenteditable in the bottom composer regionconst cands=[...document.querySelectorAll('div[contenteditable=\"true\"]')].filter(e=>{  const r=e.getBoundingClientRect();  return r.width>100 && r.height>20 && r.bottom> (window.innerHeight*0.55);});if(cands.length){  const el=cands[cands.length-1];  try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true;}}catch(e){} return false;})()"); } catch { } }
+                );
+
+                this.SourceInitialized += (_, __) =>
+                {
+                    try
+                    {
+                        var hwnd = new WindowInteropHelper(this).Handle;
+                        if (hwnd != IntPtr.Zero) PortalRuntime.AttachWindow(hwnd);
+                    }
+                    catch { }
+                };
+            }
+            catch { }
+
             WebView.DefaultBackgroundColor = System.Drawing.Color.FromArgb(11, 12, 16);
 
             // Continuum seed dispatch timer (100ms).

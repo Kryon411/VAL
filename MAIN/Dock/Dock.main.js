@@ -18,6 +18,30 @@
 
   const THEME_ENABLED_KEY = "VAL_ThemeEnabled";
 
+  // Portal (Capture & Stage)
+  // Portal should ALWAYS default to Off on load (armed state is explicit user action).
+  const PORTAL_ENABLED_KEY = "VAL_PortalEnabled";
+  const PORTAL_COUNT_KEY   = "VAL_PortalStageCount";
+
+  function getPortalEnabled(){ return false; } // force Off at boot
+  function setPortalEnabled(next){ try { localStorage.setItem(PORTAL_ENABLED_KEY, next ? "1" : "0"); } catch(_) {} }
+
+  function getPortalCount(){
+    try {
+      const v = localStorage.getItem(PORTAL_COUNT_KEY);
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.max(0, Math.min(10, n)) : 0;
+    } catch(_) {}
+    return 0;
+  }
+  function setPortalCount(n){
+    try {
+      const c = Math.max(0, Math.min(10, Number(n)||0));
+      localStorage.setItem(PORTAL_COUNT_KEY, String(c));
+    } catch(_) {}
+  }
+
+
   function readBoolLS(key, fallback){
     try{
       const v = localStorage.getItem(key);
@@ -215,6 +239,33 @@ function isPreludeNudgeSuppressed(){
     buttonEl.addEventListener("blur", hideTooltip, true);
   }
 
+
+  // Ensure the ChatGPT composer is focused so host-side Ctrl+V paste lands correctly.
+  // We keep selectors broad because ChatGPT's composer can vary (textarea vs contenteditable).
+  function focusComposerForPaste(){
+    try {
+      const selectors = [
+        "#prompt-textarea",
+        "textarea#prompt-textarea",
+        "textarea[data-testid='prompt-textarea']",
+        "textarea[placeholder*='Message']",
+        "textarea[placeholder*='Send']",
+        "div.ProseMirror[contenteditable='true']",
+        "[role='textbox'][contenteditable='true']",
+        "div[contenteditable='true'][role='textbox']",
+      ];
+
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+        try { el.focus({ preventScroll: true }); } catch(_) { try { el.focus(); } catch(__) {} }
+        try { el.click(); } catch(_) {}
+        return true;
+      }
+    } catch(_) {}
+    return false;
+  }
+
   function toggle(label, module, initialPressed, tooltipText){
     const wrap = el("div","valdock-toggle");
     const lab  = el("div","valdock-tg-label",label);
@@ -244,7 +295,15 @@ function isPreludeNudgeSuppressed(){
         try { setVoidEnabled(next); } catch(_) {}
       }
 
-      if (module==="Theme") {
+      
+      if (module==="Portal") {
+        try {
+          setPortalEnabled(next);
+          post({ type:"portal.command.set_enabled", enabled: next });
+        } catch(_) {}
+      }
+
+if (module==="Theme") {
         try { setThemeEnabled(next); } catch(_) {}
       }
     }, true);
@@ -427,6 +486,16 @@ function isPreludeNudgeSuppressed(){
             const msg = ev && ev.data;
             if (!msg || typeof msg !== "object") return;
             if ((msg.type || "") === "continuum.chronicle.start") setChronicleBusy(true);
+            if ((msg.type || "") === "portal.stage.count") {
+              try {
+                const c = Number(msg.count);
+                if (Number.isFinite(c)) {
+                  setPortalCount(c);
+                  if (portalCount) portalCount.textContent = `${Math.max(0, Math.min(10, c))}/10`;
+                }
+              } catch(_) {}
+            }
+
           } catch(_) {}
         });
       }
@@ -447,6 +516,31 @@ function isPreludeNudgeSuppressed(){
     }, true);
 
     rowBtns.append(pulseBtn, preludeBtn, chronicleBtn, openBtn);
+
+    // Portal row
+    const rowP = el("div","valdock-row");
+    const portalCount = el("div","valdock-count", `0/10`);
+    const portalSendBtn = btn("Send", "secondary");
+    attachTooltip(portalSendBtn, "Paste all staged clipboard images into the composer (max 10).");
+
+    portalSendBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      try { focusComposerForPaste(); } catch(_) {}
+      setTimeout(()=>{ try { post({ type:"portal.command.send_staged", max: 10 }); } catch(_) {} }, 80);
+    }, true);
+
+    rowP.append(
+      el("div","valdock-row-title","Portal:"),
+      toggle(
+        "Capture & Stage",
+        "Portal",
+        false,
+        "Arm Portal. Press 1 to open Screen Snip. Any clipboard images will stage (max 10)."
+      ),
+      portalCount,
+      portalSendBtn
+    );
+
 
     // Void row
     const rowV = el("div","valdock-row");
@@ -485,11 +579,20 @@ function isPreludeNudgeSuppressed(){
 
     // Compose
 
+    const divider0 = el("div","valdock-divider");
     const divider1 = el("div","valdock-divider");
     const divider2 = el("div","valdock-divider");
 
-    panel.append(header, rowC, rowBtns, divider1, rowV, divider2, rowT, status);
+    panel.append(header, rowC, rowBtns, divider0, rowP, divider1, rowV, divider2, rowT, status);
     dock.append(pill, panel);
+
+    // Portal safety: always start disarmed, and reset count display.
+    try {
+      setPortalEnabled(false);
+      setPortalCount(0);
+      if (portalCount) portalCount.textContent = "0/10";
+      post({ type:"portal.command.set_enabled", enabled: false });
+    } catch(_) {}
     document.body.appendChild(dock);
 
     // Clicking minimized pill expands

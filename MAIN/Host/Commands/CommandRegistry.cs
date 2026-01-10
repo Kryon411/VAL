@@ -74,7 +74,53 @@ namespace VAL.Host.Commands
                     (cmd) => { try { ContinuumHost.HandleJson(cmd.RawJson); } catch { } }
                 ));
             }
-        }
+        
+
+// ---- Portal ----
+Register(new CommandSpec(
+    "portal.command.set_enabled",
+    "Portal",
+    new[] { "enabled" },
+    PortalCommandHandlers.HandleSetEnabled
+));
+
+// Accept both command names (old/new) and map to same handler.
+Register(new CommandSpec(
+    "portal.command.open_snip",
+    "Portal",
+    Array.Empty<string>(),
+    PortalCommandHandlers.HandleOpenSnip
+));
+
+Register(new CommandSpec(
+    "portal.command.open_snip_overlay",
+    "Portal",
+    Array.Empty<string>(),
+    PortalCommandHandlers.HandleOpenSnip
+));
+
+Register(new CommandSpec(
+    "portal.command.send_staged",
+    "Portal",
+    Array.Empty<string>(),
+    PortalCommandHandlers.HandleSendStaged
+));
+
+
+Register(new CommandSpec(
+    "portal.command.send",
+    "Portal",
+    Array.Empty<string>(),
+    PortalCommandHandlers.HandleSendStaged
+));
+
+Register(new CommandSpec(
+    "portal.command.sendStaged",
+    "Portal",
+    Array.Empty<string>(),
+    PortalCommandHandlers.HandleSendStaged
+));
+}
 
         private static void Register(CommandSpec spec)
         {
@@ -121,14 +167,23 @@ namespace VAL.Host.Commands
 
                 // If it's required, it must exist (any value kind). Use TryGetString/bool only when needed.
                 try
-                {
-                    if (!cmd.Root.TryGetProperty(field, out _))
-                        return false;
-                }
-                catch
-                {
-                    return false;
-                }
+{
+    // Prefer root-level fields...
+    if (cmd.Root.TryGetProperty(field, out _))
+        continue;
+
+    // ...but allow required fields under a "payload" object too.
+    if (cmd.Root.TryGetProperty("payload", out var payload) &&
+        payload.ValueKind == System.Text.Json.JsonValueKind.Object &&
+        payload.TryGetProperty(field, out _))
+        continue;
+
+    return false;
+}
+catch
+{
+    return false;
+}
             }
 
             return true;

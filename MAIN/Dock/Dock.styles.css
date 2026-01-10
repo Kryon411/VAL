@@ -264,3 +264,15 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+.valdock-count{
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 180, 240, 0.18);
+  background: rgba(4,18,30,0.28);
+  color: rgba(235,245,255,0.72);
+  line-height: 1;
+  user-select: none;
+}
