@@ -23,6 +23,8 @@
   const PORTAL_ENABLED_KEY = "VAL_PortalEnabled";
   const PORTAL_COUNT_KEY   = "VAL_PortalStageCount";
 
+  const ABYSS_QUERY_PENDING_KEY = "VAL_AbyssQueryPending";
+
   function getPortalEnabled(){ return false; } // force Off at boot
   function setPortalEnabled(next){ try { localStorage.setItem(PORTAL_ENABLED_KEY, next ? "1" : "0"); } catch(_) {} }
 
@@ -39,6 +41,15 @@
       const c = Math.max(0, Math.min(10, Number(n)||0));
       localStorage.setItem(PORTAL_COUNT_KEY, String(c));
     } catch(_) {}
+  }
+
+  function getAbyssQueryPending(){
+    try { return readBoolLS(ABYSS_QUERY_PENDING_KEY, false); } catch(_) {}
+    return false;
+  }
+
+  function setAbyssQueryPending(next){
+    try { writeBoolLS(ABYSS_QUERY_PENDING_KEY, !!next); } catch(_) {}
   }
 
 
@@ -264,6 +275,48 @@ function isPreludeNudgeSuppressed(){
       }
     } catch(_) {}
     return false;
+  }
+
+  function readComposerText(){
+    try {
+      const selectors = [
+        "#prompt-textarea",
+        "textarea#prompt-textarea",
+        "textarea[data-testid='prompt-textarea']",
+        "textarea[placeholder*='Message']",
+        "textarea[placeholder*='Send']",
+        "div.ProseMirror[contenteditable='true']",
+        "[role='textbox'][contenteditable='true']",
+        "div[contenteditable='true'][role='textbox']",
+      ];
+
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+
+        if (el instanceof HTMLTextAreaElement) return el.value || "";
+        if (el.isContentEditable) return (el.textContent || "");
+      }
+    } catch(_) {}
+
+    return "";
+  }
+
+  function extractAbyssQuery(text){
+    if (!text) return "";
+    const trimmed = text.trim();
+    if (!trimmed) return "";
+
+    const lower = trimmed.toLowerCase();
+    const prefixes = ["abyss query:", "abyss:", "find:"];
+
+    for (const prefix of prefixes) {
+      if (lower.startsWith(prefix)) {
+        return trimmed.slice(prefix.length).trim();
+      }
+    }
+
+    return trimmed;
   }
 
   function toggle(label, module, initialPressed, tooltipText){
@@ -541,6 +594,69 @@ if (module==="Theme") {
       portalSendBtn
     );
 
+    // Abyss row
+    const rowA = el("div","valdock-row");
+    const abyssHint = el("div","valdock-row-note","Recall/Search");
+    rowA.append(
+      el("div","valdock-row-title","Abyss:"),
+      abyssHint
+    );
+
+    const rowABtns = el("div","valdock-row valdock-actions");
+    const abyssSearchBtn = btn("Search", "primary");
+    const abyssInjectBtn = btn("Inject", "secondary");
+    const abyssLastBtn = btn("Last", "ghost");
+    const abyssFolderBtn = btn("Session Folder", "ghost");
+
+    attachTooltip(abyssSearchBtn, "Inject an Abyss query prompt, then click again to search.");
+    attachTooltip(abyssInjectBtn, "Inject selected results (e.g., 1 or 1,2).");
+    attachTooltip(abyssLastBtn, "Recall the most recent exchange from the latest Truth.log.");
+    attachTooltip(abyssFolderBtn, "Open the folder where this session’s memory is stored.");
+
+    abyssSearchBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+
+      if (!getAbyssQueryPending()) {
+        setAbyssQueryPending(true);
+        try { post({ type:"abyss.command.inject_prompt", chatId: getChatId() }); } catch(_) {}
+        return;
+      }
+
+      const raw = readComposerText();
+      const query = extractAbyssQuery(raw);
+      setAbyssQueryPending(false);
+
+      try { post({ type:"abyss.command.search", chatId: getChatId(), query }); } catch(_) {}
+    }, true);
+
+    abyssInjectBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      let raw = "";
+      try { raw = prompt("Inject Abyss result # (e.g., 1 or 1,2)", "1") || ""; } catch(_) { raw = ""; }
+      if (!raw) return;
+
+      const indices = raw
+        .split(/[\\s,]+/)
+        .map(v => parseInt(v, 10))
+        .filter(v => Number.isFinite(v) && v > 0)
+        .slice(0, 3);
+
+      if (indices.length === 0) return;
+      try { post({ type:"abyss.command.inject", chatId: getChatId(), indices }); } catch(_) {}
+    }, true);
+
+    abyssLastBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      try { post({ type:"abyss.command.last", chatId: getChatId(), count: 2, inject: true }); } catch(_) {}
+    }, true);
+
+    abyssFolderBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      try { post({ type:"continuum.command.open_session_folder", chatId: getChatId() }); } catch(_) {}
+    }, true);
+
+    rowABtns.append(abyssSearchBtn, abyssInjectBtn, abyssLastBtn, abyssFolderBtn);
+
 
     // Void row
     const rowV = el("div","valdock-row");
@@ -582,8 +698,23 @@ if (module==="Theme") {
     const divider0 = el("div","valdock-divider");
     const divider1 = el("div","valdock-divider");
     const divider2 = el("div","valdock-divider");
+    const divider3 = el("div","valdock-divider");
 
-    panel.append(header, rowC, rowBtns, divider0, rowP, divider1, rowV, divider2, rowT, status);
+    panel.append(
+      header,
+      rowC,
+      rowBtns,
+      divider0,
+      rowP,
+      divider1,
+      rowA,
+      rowABtns,
+      divider2,
+      rowV,
+      divider3,
+      rowT,
+      status
+    );
     dock.append(pill, panel);
 
     // Portal safety: always start disarmed, and reset count display.

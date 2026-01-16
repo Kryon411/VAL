@@ -132,6 +132,12 @@
   margin-right: 6px;
 }
 
+.valdock-row-note{
+  font-size: 12px;
+  opacity: 0.7;
+  letter-spacing: 0.02em;
+}
+
 .valdock-btn{
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   appearance: none;

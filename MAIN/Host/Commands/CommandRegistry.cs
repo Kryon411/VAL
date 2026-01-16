@@ -120,6 +120,35 @@ Register(new CommandSpec(
     Array.Empty<string>(),
     PortalCommandHandlers.HandleSendStaged
 ));
+
+// ---- Abyss ----
+Register(new CommandSpec(
+    "abyss.command.search",
+    "Abyss",
+    new[] { "query" },
+    AbyssCommandHandlers.HandleSearch
+));
+
+Register(new CommandSpec(
+    "abyss.command.inject_prompt",
+    "Abyss",
+    Array.Empty<string>(),
+    AbyssCommandHandlers.HandleInjectPrompt
+));
+
+Register(new CommandSpec(
+    "abyss.command.inject",
+    "Abyss",
+    Array.Empty<string>(),
+    AbyssCommandHandlers.HandleInject
+));
+
+Register(new CommandSpec(
+    "abyss.command.last",
+    "Abyss",
+    Array.Empty<string>(),
+    AbyssCommandHandlers.HandleLast
+));
 }
 
         private static void Register(CommandSpec spec)

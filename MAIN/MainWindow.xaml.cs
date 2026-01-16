@@ -13,6 +13,7 @@ using Microsoft.Web.WebView2.Core;
 using VAL.Continuum;
 using VAL.Continuum.Pipeline.Inject;
 using VAL.Host;
+using VAL.Host.Abyss;
 using VAL.Host.Commands;
 using VAL.Host.Portal;
 
@@ -126,6 +127,15 @@ namespace VAL
                     }
                     catch { }
                 };
+            }
+            catch { }
+
+            // ---- Abyss runtime (on-demand Truth.log recall) ----
+            try
+            {
+                AbyssRuntime.Initialize(
+                    postJson: (json) => { try { WebView.CoreWebView2.PostWebMessageAsJson(json); } catch { } }
+                );
             }
             catch { }
 
