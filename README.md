@@ -12,7 +12,7 @@ Everything is **user-invoked**, and all state remains **local**.
 
 ## Screenshots
 
-> *(Recommended)* These screenshots show the Control Centre and overall UI experience.
+> These screenshots show the Control Centre and overall UI experience.
 
 | Control Centre | Main UI |
 |---|---|
