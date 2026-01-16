@@ -1,0 +1,7 @@
+{
+  "name": "Abyss",
+  "enabled": true,
+  "entry": "Abyss.main.js",
+  "styles": "Abyss.styles.css",
+  "description": "On-demand recall/search across local Truth logs."
+}

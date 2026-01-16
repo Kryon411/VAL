@@ -28,6 +28,16 @@ namespace VAL.Host
         ChronicleStarted,
         ChronicleCompleted,
 
+        // Abyss recall/search
+        AbyssSearching,
+        AbyssMatches,
+        AbyssNoMatches,
+        AbyssNoTruthLogs,
+        AbyssNoQuery,
+        AbyssResultsWritten,
+        AbyssInjected,
+        AbyssNoSelection,
+
         // Generic guardrails
         ActionUnavailable,
         OperationInProgress,

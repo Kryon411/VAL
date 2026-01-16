@@ -283,6 +283,130 @@ namespace VAL.Host
                 },
 
                 // -----------------
+                // Abyss recall/search
+                // -----------------
+                {
+                    ToastKey.AbyssSearching,
+                    new ToastDef(
+                        ToastKey.AbyssSearching,
+                        "Abyss: searching…",
+                        null,
+                        ToastManager.ToastDurationBucket.XS,
+                        "abyss",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(1))
+                },
+                {
+                    ToastKey.AbyssMatches,
+                    new ToastDef(
+                        ToastKey.AbyssMatches,
+                        "Abyss: matches ready.",
+                        null,
+                        ToastManager.ToastDurationBucket.M,
+                        "abyss",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(1))
+                },
+                {
+                    ToastKey.AbyssNoMatches,
+                    new ToastDef(
+                        ToastKey.AbyssNoMatches,
+                        "Abyss: no matches found.",
+                        null,
+                        ToastManager.ToastDurationBucket.M,
+                        "abyss",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(1))
+                },
+                {
+                    ToastKey.AbyssNoTruthLogs,
+                    new ToastDef(
+                        ToastKey.AbyssNoTruthLogs,
+                        "Abyss: no Truth.log files found.",
+                        null,
+                        ToastManager.ToastDurationBucket.L,
+                        "abyss",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(2))
+                },
+                {
+                    ToastKey.AbyssNoQuery,
+                    new ToastDef(
+                        ToastKey.AbyssNoQuery,
+                        "Abyss: enter a search query first.",
+                        null,
+                        ToastManager.ToastDurationBucket.S,
+                        "abyss",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(2))
+                },
+                {
+                    ToastKey.AbyssResultsWritten,
+                    new ToastDef(
+                        ToastKey.AbyssResultsWritten,
+                        "Abyss: wrote Abyss.Results.txt",
+                        null,
+                        ToastManager.ToastDurationBucket.S,
+                        "abyss",
+                        ReplaceGroup: false,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(1))
+                },
+                {
+                    ToastKey.AbyssInjected,
+                    new ToastDef(
+                        ToastKey.AbyssInjected,
+                        "Abyss: injected result.",
+                        null,
+                        ToastManager.ToastDurationBucket.S,
+                        "abyss",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(1))
+                },
+                {
+                    ToastKey.AbyssNoSelection,
+                    new ToastDef(
+                        ToastKey.AbyssNoSelection,
+                        "Abyss: choose a result number to inject.",
+                        null,
+                        ToastManager.ToastDurationBucket.S,
+                        "abyss",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(1))
+                },
+
+                // -----------------
                 // Generic / guard rails
                 // -----------------
                 {
