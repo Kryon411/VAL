@@ -23,8 +23,11 @@
   const PORTAL_ENABLED_KEY = "VAL_PortalEnabled";
   const PORTAL_COUNT_KEY   = "VAL_PortalStageCount";
 
-  const ABYSS_QUERY_PENDING_KEY = "VAL_AbyssQueryPending";
-  const ABYSS_EXCLUSIONS_KEY = "VAL_AbyssExcludeChatIds";
+  function emitAbyssCommand(type, detail){
+    try {
+      window.dispatchEvent(new CustomEvent(type, { detail: detail || {} }));
+    } catch(_) {}
+  }
 
   function getPortalEnabled(){ return false; } // force Off at boot
   function setPortalEnabled(next){ try { localStorage.setItem(PORTAL_ENABLED_KEY, next ? "1" : "0"); } catch(_) {} }
@@ -44,14 +47,6 @@
     } catch(_) {}
   }
 
-  function getAbyssQueryPending(){
-    try { return readBoolLS(ABYSS_QUERY_PENDING_KEY, false); } catch(_) {}
-    return false;
-  }
-
-  function setAbyssQueryPending(next){
-    try { writeBoolLS(ABYSS_QUERY_PENDING_KEY, !!next); } catch(_) {}
-  }
 
 
   function readBoolLS(key, fallback){
@@ -67,27 +62,6 @@
     try { localStorage.setItem(key, value ? "1" : "0"); } catch(_) {}
   }
 
-  function loadAbyssExclusions(){
-    try {
-      const raw = localStorage.getItem(ABYSS_EXCLUSIONS_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.map((id)=> String(id || "").trim()).filter(Boolean);
-    } catch(_) {}
-    return [];
-  }
-
-  function saveAbyssExclusions(list){
-    try {
-      const unique = Array.from(new Set((Array.isArray(list) ? list : [])
-        .map((id)=> String(id || "").trim())
-        .filter(Boolean)));
-      localStorage.setItem(ABYSS_EXCLUSIONS_KEY, JSON.stringify(unique));
-      return unique;
-    } catch(_) {}
-    return [];
-  }
 
   function getVoidEnabled(){
     // Source of truth: persisted state. Default OFF when unset.
@@ -273,230 +247,6 @@ function isPreludeNudgeSuppressed(){
     buttonEl.addEventListener("blur", hideTooltip, true);
   }
 
-  // --- Abyss UI ------------------------------------------------------------
-  let abyssSearchOverlay = null;
-  let abyssResultsOverlay = null;
-  let abyssResultsContainer = null;
-  let abyssState = {
-    queryOriginal: "",
-    queryUsed: "",
-    generatedUtc: "",
-    totalMatches: 0,
-    memoryRoot: "",
-    results: []
-  };
-  let abyssExcludeChatIds = loadAbyssExclusions();
-
-  function ensureAbyssSearchOverlay(){
-    if (abyssSearchOverlay) return;
-
-    const overlay = el("div", "valabyss-overlay");
-    const panel = el("div", "valabyss-panel");
-    const header = el("div", "valabyss-header");
-    const title = el("div", "valabyss-title", "Abyss Search");
-    const closeBtn = el("button", "valabyss-close", "×");
-    closeBtn.addEventListener("click", ()=> hideAbyssSearchOverlay(), true);
-    header.append(title, closeBtn);
-
-    const input = document.createElement("input");
-    input.className = "valabyss-input";
-    input.type = "text";
-    input.placeholder = "Ask a question or type keywords…";
-
-    const textarea = document.createElement("textarea");
-    textarea.className = "valabyss-textarea";
-    textarea.placeholder = "Optional extra context (Shift+Enter for newline)…";
-
-    const actions = el("div", "valabyss-actions");
-    const runBtn = el("button", "valabyss-btn primary", "Run");
-    const cancelBtn = el("button", "valabyss-btn ghost", "Cancel");
-    cancelBtn.addEventListener("click", ()=> hideAbyssSearchOverlay(), true);
-
-    function runSearch(){
-      const primary = (input.value || "").trim();
-      const extra = (textarea.value || "").trim();
-      const queryOriginal = extra ? `${primary}\n${extra}`.trim() : primary;
-      if (!queryOriginal) return;
-
-      abyssState.queryOriginal = queryOriginal;
-      try {
-        post({
-          type: "abyss.command.search",
-          chatId: getChatId(),
-          queryOriginal,
-          excludeChatIds: abyssExcludeChatIds,
-          maxResults: 10
-        });
-      } catch(_) {}
-      hideAbyssSearchOverlay();
-    }
-
-    runBtn.addEventListener("click", (e)=>{ e.preventDefault(); runSearch(); }, true);
-    input.addEventListener("keydown", (e)=>{
-      if (e.key === "Enter") { e.preventDefault(); runSearch(); }
-    }, true);
-    textarea.addEventListener("keydown", (e)=>{
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runSearch(); }
-    }, true);
-
-    actions.append(runBtn, cancelBtn);
-    panel.append(header, input, textarea, actions);
-    overlay.append(panel);
-    overlay.addEventListener("click", (e)=>{ if (e.target === overlay) hideAbyssSearchOverlay(); }, true);
-
-    abyssSearchOverlay = overlay;
-    document.body.appendChild(overlay);
-  }
-
-  function showAbyssSearchOverlay(){
-    ensureAbyssSearchOverlay();
-    abyssSearchOverlay.style.display = "flex";
-    try {
-      const input = abyssSearchOverlay.querySelector(".valabyss-input");
-      if (input) input.focus();
-    } catch(_) {}
-  }
-
-  function hideAbyssSearchOverlay(){
-    if (!abyssSearchOverlay) return;
-    abyssSearchOverlay.style.display = "none";
-  }
-
-  function ensureAbyssResultsOverlay(){
-    if (abyssResultsOverlay) return;
-
-    const overlay = el("div", "valabyss-overlay");
-    const panel = el("div", "valabyss-panel wide");
-    const header = el("div", "valabyss-header");
-    const title = el("div", "valabyss-title", "Abyss Results");
-    const closeBtn = el("button", "valabyss-close", "×");
-    closeBtn.addEventListener("click", ()=> hideAbyssResultsOverlay(), true);
-    header.append(title, closeBtn);
-
-    const summary = el("div", "valabyss-summary");
-    const container = el("div", "valabyss-results");
-
-    panel.append(header, summary, container);
-    overlay.append(panel);
-    overlay.addEventListener("click", (e)=>{ if (e.target === overlay) hideAbyssResultsOverlay(); }, true);
-
-    abyssResultsOverlay = overlay;
-    abyssResultsContainer = container;
-    document.body.appendChild(overlay);
-  }
-
-  function hideAbyssResultsOverlay(){
-    if (!abyssResultsOverlay) return;
-    abyssResultsOverlay.style.display = "none";
-  }
-
-  function showAbyssResultsOverlay(){
-    ensureAbyssResultsOverlay();
-    abyssResultsOverlay.style.display = "flex";
-    renderAbyssResults();
-  }
-
-  function shortId(id){
-    if (!id) return "unknown";
-    return id.length > 8 ? id.slice(0, 8) : id;
-  }
-
-  function renderAbyssResults(){
-    if (!abyssResultsOverlay || !abyssResultsContainer) return;
-    const summary = abyssResultsOverlay.querySelector(".valabyss-summary");
-    if (summary) {
-      summary.textContent = `QueryOriginal: ${abyssState.queryOriginal || "—"}\nQueryUsed: ${abyssState.queryUsed || "—"}\nScope: All Chats\nMatches: ${abyssState.totalMatches || 0}`;
-    }
-
-    abyssResultsContainer.textContent = "";
-
-    const results = Array.isArray(abyssState.results) ? abyssState.results : [];
-    if (results.length === 0) {
-      abyssResultsContainer.append(el("div", "valabyss-empty", "No results to display."));
-      return;
-    }
-
-    const grouped = {};
-    for (const r of results) {
-      const cid = (r.chatId || "").toString();
-      if (!grouped[cid]) grouped[cid] = [];
-      grouped[cid].push(r);
-    }
-
-    Object.keys(grouped).forEach((cid)=>{
-      const list = grouped[cid];
-      list.sort((a,b)=> (b.score||0) - (a.score||0));
-      const best = list[0];
-      const groupEl = el("div", "valabyss-group");
-      const groupHeader = el("div", "valabyss-group-header");
-      const groupTitle = el("div", "valabyss-group-title", `Chat ${shortId(cid)} • ${list.length} match(es) • Best score ${best.score || 0}`);
-      const groupPreview = el("div", "valabyss-preview", (best.userText || "").trim());
-
-      const groupActions = el("div", "valabyss-actions");
-      const showBtn = el("button", "valabyss-btn secondary", "Show Matches");
-      const openBtn = el("button", "valabyss-btn ghost", "Open Source");
-      const excludeBtn = el("button", "valabyss-btn ghost", "Exclude");
-
-      const matchesEl = el("div", "valabyss-matches");
-      matchesEl.style.display = "none";
-
-      showBtn.addEventListener("click", ()=>{
-        const next = matchesEl.style.display === "none";
-        matchesEl.style.display = next ? "block" : "none";
-        showBtn.textContent = next ? "Hide Matches" : "Show Matches";
-      }, true);
-
-      openBtn.addEventListener("click", ()=>{
-        try { post({ type: "abyss.command.open_source", chatId: cid, truthPath: best.truthPath || "" }); } catch(_) {}
-      }, true);
-
-      excludeBtn.addEventListener("click", ()=>{
-        if (!cid) return;
-        if (!abyssExcludeChatIds.includes(cid)) abyssExcludeChatIds.push(cid);
-        abyssExcludeChatIds = saveAbyssExclusions(abyssExcludeChatIds);
-        if (abyssState.queryOriginal) {
-          try {
-            post({
-              type: "abyss.command.search",
-              chatId: getChatId(),
-              queryOriginal: abyssState.queryOriginal,
-              excludeChatIds: abyssExcludeChatIds,
-              maxResults: 10
-            });
-          } catch(_) {}
-        }
-      }, true);
-
-      groupActions.append(showBtn, openBtn, excludeBtn);
-      groupHeader.append(groupTitle, groupActions);
-      groupEl.append(groupHeader, groupPreview, matchesEl);
-
-      list.forEach((match)=>{
-        const item = el("div", "valabyss-match");
-        const meta = el("div", "valabyss-meta", `#${match.index} • score ${match.score || 0} • U@${match.approxUserLine || "n/a"} A@${match.approxAssistantLineStart || "n/a"}-${match.approxAssistantLineEnd || "n/a"}`);
-        const preview = el("div", "valabyss-preview", `${match.userText || ""}\n${match.assistantText || ""}`.trim());
-
-        const actions = el("div", "valabyss-actions");
-        const injectBtn = el("button", "valabyss-btn primary", "Inject");
-        const openBtnItem = el("button", "valabyss-btn ghost", "Open Source");
-
-        injectBtn.addEventListener("click", ()=>{
-          try { post({ type: "abyss.command.inject_results", chatId: getChatId(), indices: String(match.index) }); } catch(_) {}
-        }, true);
-
-        openBtnItem.addEventListener("click", ()=>{
-          try { post({ type: "abyss.command.open_source", chatId: match.chatId, truthPath: match.truthPath || "" }); } catch(_) {}
-        }, true);
-
-        actions.append(injectBtn, openBtnItem);
-        item.append(meta, preview, actions);
-        matchesEl.appendChild(item);
-      });
-
-      abyssResultsContainer.appendChild(groupEl);
-    });
-  }
-
 
   // Ensure the ChatGPT composer is focused so host-side Ctrl+V paste lands correctly.
   // We keep selectors broad because ChatGPT's composer can vary (textarea vs contenteditable).
@@ -523,48 +273,7 @@ function isPreludeNudgeSuppressed(){
     } catch(_) {}
     return false;
   }
-
-  function readComposerText(){
-    try {
-      const selectors = [
-        "#prompt-textarea",
-        "textarea#prompt-textarea",
-        "textarea[data-testid='prompt-textarea']",
-        "textarea[placeholder*='Message']",
-        "textarea[placeholder*='Send']",
-        "div.ProseMirror[contenteditable='true']",
-        "[role='textbox'][contenteditable='true']",
-        "div[contenteditable='true'][role='textbox']",
-      ];
-
-      for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (!el) continue;
-
-        if (el instanceof HTMLTextAreaElement) return el.value || "";
-        if (el.isContentEditable) return (el.textContent || "");
-      }
-    } catch(_) {}
-
-    return "";
-  }
-
-  function extractAbyssQuery(text){
-    if (!text) return "";
-    const trimmed = text.trim();
-    if (!trimmed) return "";
-
-    const lower = trimmed.toLowerCase();
-    const prefixes = ["abyss query:", "abyss:", "find:"];
-
-    for (const prefix of prefixes) {
-      if (lower.startsWith(prefix)) {
-        return trimmed.slice(prefix.length).trim();
-      }
-    }
-
-    return trimmed;
-  }
+  try { window.VAL_focusComposerForPaste = focusComposerForPaste; } catch(_) {}
 
   function toggle(label, module, initialPressed, tooltipText){
     const wrap = el("div","valdock-toggle");
@@ -796,22 +505,6 @@ if (module==="Theme") {
               } catch(_) {}
             }
 
-            if ((msg.type || "") === "abyss.results") {
-              try {
-                abyssState = {
-                  queryOriginal: (msg.queryOriginal || "").toString(),
-                  queryUsed: (msg.queryUsed || "").toString(),
-                  generatedUtc: (msg.generatedUtc || "").toString(),
-                  totalMatches: Number(msg.totalMatches || 0),
-                  memoryRoot: (msg.memoryRoot || "").toString(),
-                  results: Array.isArray(msg.results) ? msg.results : []
-                };
-                if (abyssResultsOverlay && abyssResultsOverlay.style.display !== "none") {
-                  renderAbyssResults();
-                }
-              } catch(_) {}
-            }
-
           } catch(_) {}
         });
       }
@@ -867,50 +560,21 @@ if (module==="Theme") {
 
     const rowABtns = el("div","valdock-row valdock-actions");
     const abyssSearchBtn = btn("Search", "primary");
-    const abyssInjectBtn = btn("Inject", "secondary");
     const abyssLastBtn = btn("Last", "ghost");
     const abyssFolderBtn = btn("Session Folder", "ghost");
 
-    attachTooltip(abyssSearchBtn, "Inject an Abyss query prompt, then click again to search.");
-    attachTooltip(abyssInjectBtn, "Inject selected results (e.g., 1 or 1,2).");
+    attachTooltip(abyssSearchBtn, "Open Abyss search and enter a recall query.");
     attachTooltip(abyssLastBtn, "Recall the most recent exchange from the latest Truth.log.");
     attachTooltip(abyssFolderBtn, "Open the folder where this session’s memory is stored.");
 
     abyssSearchBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-
-      if (!getAbyssQueryPending()) {
-        setAbyssQueryPending(true);
-        try { post({ type:"abyss.command.inject_prompt", chatId: getChatId() }); } catch(_) {}
-        return;
-      }
-
-      const raw = readComposerText();
-      const query = extractAbyssQuery(raw);
-      setAbyssQueryPending(false);
-
-      try { post({ type:"abyss.command.search", chatId: getChatId(), query }); } catch(_) {}
-    }, true);
-
-    abyssInjectBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      let raw = "";
-      try { raw = prompt("Inject Abyss result # (e.g., 1 or 1,2)", "1") || ""; } catch(_) { raw = ""; }
-      if (!raw) return;
-
-      const indices = raw
-        .split(/[\\s,]+/)
-        .map(v => parseInt(v, 10))
-        .filter(v => Number.isFinite(v) && v > 0)
-        .slice(0, 3);
-
-      if (indices.length === 0) return;
-      try { post({ type:"abyss.command.inject", chatId: getChatId(), indices }); } catch(_) {}
+      emitAbyssCommand("abyss.command.open_query_ui", { source: "dock" });
     }, true);
 
     abyssLastBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-      try { post({ type:"abyss.command.last", chatId: getChatId(), count: 2, inject: true }); } catch(_) {}
+      try { post({ type:"abyss.command.last", chatId: getChatId(), count: 2, inject: false }); } catch(_) {}
     }, true);
 
     abyssFolderBtn.addEventListener("click",(e)=>{
@@ -918,7 +582,7 @@ if (module==="Theme") {
       try { post({ type:"continuum.command.open_session_folder", chatId: getChatId() }); } catch(_) {}
     }, true);
 
-    rowABtns.append(abyssSearchBtn, abyssInjectBtn, abyssLastBtn, abyssFolderBtn);
+    rowABtns.append(abyssSearchBtn, abyssLastBtn, abyssFolderBtn);
 
 
     // Void row

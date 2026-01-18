@@ -1,1 +1,186 @@
-/* Abyss.styles.css — placeholder for future UI */
+/* Abyss.styles.css — VAL-native recall panel */
+.valabyss-query{
+  position: fixed;
+  top: 96px;
+  right: 24px;
+  width: min(360px, 34vw);
+  z-index: 99990;
+  display: none;
+  pointer-events: none;
+}
+
+.valabyss-query-panel{
+  pointer-events: all;
+  background: rgba(8, 16, 26, 0.94);
+  border: 1px solid rgba(120, 170, 220, 0.22);
+  border-radius: 14px;
+  padding: 14px;
+  color: rgba(236, 244, 255, 0.92);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.valabyss-query-title{
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(232, 240, 255, 0.92);
+}
+
+.valabyss-query-input{
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 160, 200, 0.25);
+  background: rgba(8, 18, 30, 0.9);
+  color: rgba(236, 244, 255, 0.95);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.valabyss-query-input::placeholder{
+  color: rgba(200, 220, 245, 0.5);
+}
+
+.valabyss-query-actions{
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.valabyss-panel{
+  position: fixed;
+  top: 160px;
+  right: 24px;
+  width: min(380px, 36vw);
+  max-height: 70vh;
+  background: rgba(8, 16, 26, 0.96);
+  border: 1px solid rgba(120, 170, 220, 0.2);
+  border-radius: 16px;
+  box-shadow: 0 20px 44px rgba(0,0,0,0.46);
+  color: rgba(236, 244, 255, 0.92);
+  display: none;
+  flex-direction: column;
+  z-index: 99989;
+}
+
+.valabyss-panel-header{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(120, 170, 220, 0.12);
+}
+
+.valabyss-panel-title{
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.valabyss-panel-meta{
+  font-size: 11px;
+  color: rgba(200, 220, 245, 0.65);
+  white-space: pre-line;
+}
+
+.valabyss-panel-actions{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.valabyss-results{
+  padding: 10px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+
+.valabyss-card{
+  border: 1px solid rgba(120, 170, 220, 0.18);
+  border-radius: 12px;
+  background: rgba(12, 22, 34, 0.7);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.valabyss-card.expanded{
+  background: rgba(14, 26, 40, 0.85);
+}
+
+.valabyss-card-title{
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(236, 244, 255, 0.92);
+}
+
+.valabyss-card-preview{
+  font-size: 12px;
+  color: rgba(210, 225, 245, 0.8);
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.valabyss-card.expanded .valabyss-card-preview{
+  -webkit-line-clamp: unset;
+}
+
+.valabyss-card-snippet{
+  display: none;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: rgba(210, 225, 245, 0.82);
+  max-height: 220px;
+  overflow: auto;
+  padding-top: 4px;
+  border-top: 1px solid rgba(120, 170, 220, 0.1);
+}
+
+.valabyss-card.expanded .valabyss-card-snippet{
+  display: block;
+}
+
+.valabyss-card-meta{
+  font-size: 11px;
+  color: rgba(180, 200, 230, 0.7);
+}
+
+.valabyss-card-actions{
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.valabyss-btn{
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  background: rgba(18, 34, 54, 0.9);
+  color: rgba(236, 244, 255, 0.9);
+  font-size: 12px;
+}
+
+.valabyss-btn.primary{
+  background: linear-gradient(135deg, rgba(84, 132, 190, 0.55), rgba(12, 28, 44, 0.9));
+}
+
+.valabyss-btn.ghost{
+  background: rgba(18, 30, 44, 0.6);
+}
+
+.valabyss-empty{
+  font-size: 12px;
+  color: rgba(200, 220, 245, 0.7);
+  padding: 8px 6px;
+}
