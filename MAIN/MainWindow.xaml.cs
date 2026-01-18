@@ -130,15 +130,6 @@ namespace VAL
             }
             catch { }
 
-            // ---- Abyss runtime (on-demand Truth.log recall) ----
-            try
-            {
-                AbyssRuntime.Initialize(
-                    postJson: (json) => { try { WebView.CoreWebView2.PostWebMessageAsJson(json); } catch { } }
-                );
-            }
-            catch { }
-
             WebView.DefaultBackgroundColor = System.Drawing.Color.FromArgb(11, 12, 16);
 
             // Continuum seed dispatch timer (100ms).
@@ -217,6 +208,11 @@ namespace VAL
                 {
                     try { core.PostWebMessageAsJson(json); } catch { }
                 };
+
+                // Abyss uses the same host -> webview post channel as other modules.
+                AbyssRuntime.Initialize(
+                    postJson: (json) => { try { core.PostWebMessageAsJson(json); } catch { } }
+                );
             }
             catch
             {
