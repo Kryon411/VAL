@@ -1,0 +1,8 @@
+{
+  "name": "Abyss",
+  "enabled": true,
+  "entry": "Abyss.main.js",
+  "styles": [
+    "Abyss.styles.css"
+  ]
+}
