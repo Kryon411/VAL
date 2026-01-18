@@ -77,10 +77,31 @@ namespace VAL.Host.Commands
 
             // ---- Abyss ----
             Register(new CommandSpec(
+                "abyss.command.open_query_ui",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleOpenQueryUi
+            ));
+
+            Register(new CommandSpec(
                 "abyss.command.search",
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleSearch
+            ));
+
+            Register(new CommandSpec(
+                "abyss.command.retry_last",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleRetryLast
+            ));
+
+            Register(new CommandSpec(
+                "abyss.command.inject_result",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleInjectResult
             ));
 
             Register(new CommandSpec(
@@ -102,6 +123,20 @@ namespace VAL.Host.Commands
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleOpenSource
+            ));
+
+            Register(new CommandSpec(
+                "abyss.command.clear_results",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleClearResults
+            ));
+
+            Register(new CommandSpec(
+                "abyss.command.disregard",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleDisregard
             ));
 
             Register(new CommandSpec(

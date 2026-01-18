@@ -31,7 +31,7 @@ namespace VAL.Host.Abyss
             SendInjectText(prompt, chatId);
         }
 
-        public static void Search(string? chatId, string query, int maxResults, string? queryOriginal = null)
+        public static void Search(string? chatId, string query, int maxResults, string? queryOriginal = null, IReadOnlyCollection<string>? excludeFingerprints = null)
         {
             if (string.IsNullOrWhiteSpace(query))
             {
@@ -39,6 +39,7 @@ namespace VAL.Host.Abyss
                 return;
             }
 
+            maxResults = Math.Max(1, Math.Min(4, maxResults));
             ToastHub.TryShow(ToastKey.AbyssSearching, chatId: chatId);
 
             Task.Run(() =>
@@ -53,7 +54,7 @@ namespace VAL.Host.Abyss
                     return;
                 }
 
-                var results = AbyssSearch.Search(memoryRoot, query, maxResults);
+                var results = AbyssSearch.Search(memoryRoot, query, maxResults, excludeFingerprints);
                 lock (Gate)
                 {
                     _lastResults = results;
@@ -77,6 +78,26 @@ namespace VAL.Host.Abyss
 
                 EmitResults(chatId);
             });
+        }
+
+        public static void RetryLast(string? chatId, IReadOnlyCollection<string>? excludeFingerprints, int maxResults)
+        {
+            string? query;
+            string? queryOriginal;
+
+            lock (Gate)
+            {
+                query = _lastQuery;
+                queryOriginal = _lastQueryOriginal;
+            }
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                ToastHub.TryShow(ToastKey.AbyssNoQuery, chatId: chatId);
+                return;
+            }
+
+            Search(chatId, query, maxResults, queryOriginal, excludeFingerprints);
         }
 
         public static void FetchLast(string? chatId, int count, bool inject)
@@ -137,6 +158,18 @@ namespace VAL.Host.Abyss
                 return;
             }
 
+            var first = indices.FirstOrDefault();
+            if (first <= 0)
+            {
+                ToastHub.TryShow(ToastKey.AbyssNoSelection, chatId: chatId);
+                return;
+            }
+
+            InjectResult(null, first, chatId);
+        }
+
+        public static void InjectResult(string? id, int? index, string? chatId = null)
+        {
             List<AbyssSearchResult> snapshot;
             lock (Gate)
             {
@@ -149,30 +182,41 @@ namespace VAL.Host.Abyss
                 return;
             }
 
-            var selected = new List<AbyssSearchResult>();
-            foreach (var idx in indices)
-            {
-                if (idx <= 0 || idx > snapshot.Count)
-                    continue;
+            AbyssSearchResult? selected = null;
 
-                selected.Add(snapshot[idx - 1]);
-                if (selected.Count >= 3)
-                    break;
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                foreach (var result in snapshot)
+                {
+                    var fingerprint = AbyssSearch.BuildFingerprint(result.Exchange);
+                    if (string.Equals(fingerprint, id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        selected = result;
+                        break;
+                    }
+                }
             }
 
-            if (selected.Count == 0)
+            if (selected == null && index.HasValue)
+            {
+                var idx = index.Value;
+                if (idx > 0 && idx <= snapshot.Count)
+                    selected = snapshot[idx - 1];
+            }
+
+            if (selected == null)
             {
                 ToastHub.TryShow(ToastKey.AbyssNoSelection, chatId: chatId);
                 return;
             }
 
-            var payload = BuildInjectPayload(selected);
+            var payload = BuildInjectPayload(selected, _lastQueryOriginal ?? _lastQuery ?? string.Empty);
             SendInjectText(payload, chatId);
 
             ToastHub.TryShow(
                 ToastKey.AbyssInjected,
                 chatId: chatId,
-                titleOverride: $"Abyss: injected result #{indices[0]}");
+                titleOverride: "Abyss: injected result");
         }
 
         public static void EmitResults(string? chatId)
@@ -187,8 +231,18 @@ namespace VAL.Host.Abyss
             SendJson(payload);
         }
 
+        public static void ClearResults(string? chatId)
+        {
+            ClearLastResults();
+        }
+
         public static void OpenSource(string? truthPath, string? chatId)
         {
+            if (string.IsNullOrWhiteSpace(truthPath) && !string.IsNullOrWhiteSpace(chatId))
+            {
+                try { truthPath = TruthStorage.GetTruthPath(chatId); } catch { }
+            }
+
             if (string.IsNullOrWhiteSpace(truthPath))
             {
                 ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
@@ -229,19 +283,19 @@ namespace VAL.Host.Abyss
             SendJson(payload);
         }
 
-        private static string BuildInjectPayload(IReadOnlyList<AbyssSearchResult> results)
+        private static string BuildInjectPayload(AbyssSearchResult result, string query)
         {
-            var sb = new StringBuilder();
+            var snippet = BuildSnippet(result.Exchange);
+            var (startLine, endLine) = AbyssSearch.GetLineRange(result.Exchange);
+            var rangeLabel = FormatLineRangeLabel(startLine, endLine);
 
-            foreach (var result in results)
-            {
-                sb.AppendLine("[ABYSS RETRIEVAL]");
-                sb.AppendLine($"Source: {result.Exchange.ChatId}");
-                sb.AppendLine($"Lines: {FormatLineLocator(result.Exchange)}");
-                sb.AppendLine(BuildExcerpt(result.Exchange, 1400));
-                sb.AppendLine("[/ABYSS RETRIEVAL]");
-                sb.AppendLine();
-            }
+            var sb = new StringBuilder();
+            sb.AppendLine("ABYSS RECALL");
+            sb.AppendLine($"Query: {query}".TrimEnd());
+            sb.AppendLine("-----");
+            sb.AppendLine(snippet);
+            sb.AppendLine("-----");
+            sb.AppendLine($"Source: {result.Exchange.ChatId} • Truth.log {rangeLabel}");
 
             return sb.ToString().Trim();
         }
@@ -268,9 +322,11 @@ namespace VAL.Host.Abyss
             {
                 var result = snapshot[i];
                 var exchange = result.Exchange;
-                var userLine = exchange.UserLines.FirstOrDefault();
-                var assistantLineStart = exchange.AssistantLines.FirstOrDefault();
-                var assistantLineEnd = exchange.AssistantLines.LastOrDefault();
+                var (startLine, endLine) = AbyssSearch.GetLineRange(exchange);
+                var fingerprint = AbyssSearch.BuildFingerprint(exchange);
+                var snippet = BuildSnippet(exchange);
+                var preview = BuildPreview(snippet);
+                var title = BuildTitle(exchange);
 
                 results.Add(new
                 {
@@ -278,11 +334,13 @@ namespace VAL.Host.Abyss
                     chatId = exchange.ChatId,
                     truthPath = exchange.TruthPath,
                     score = result.Score,
-                    userText = exchange.UserText,
-                    assistantText = exchange.AssistantText,
-                    approxUserLine = userLine != null ? userLine.LineIndex + 1 : (int?)null,
-                    approxAssistantLineStart = assistantLineStart != null ? assistantLineStart.LineIndex + 1 : (int?)null,
-                    approxAssistantLineEnd = assistantLineEnd != null ? assistantLineEnd.LineIndex + 1 : (int?)null
+                    id = fingerprint,
+                    fingerprint = fingerprint,
+                    title = title,
+                    preview = preview,
+                    snippet = snippet,
+                    startLine = startLine,
+                    endLine = endLine
                 });
             }
 
@@ -293,9 +351,65 @@ namespace VAL.Host.Abyss
                 queryUsed = query ?? string.Empty,
                 generatedUtc = generatedUtc ?? string.Empty,
                 totalMatches = results.Count,
+                resultCount = results.Count,
                 memoryRoot = memoryRoot ?? string.Empty,
                 results = results
             };
+        }
+
+        private static string BuildSnippet(AbyssExchange exchange)
+        {
+            if (exchange == null)
+                return string.Empty;
+
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(exchange.UserText))
+                parts.Add(exchange.UserText.Trim());
+            if (!string.IsNullOrWhiteSpace(exchange.AssistantText))
+                parts.Add(exchange.AssistantText.Trim());
+
+            return string.Join("\n\n", parts).Trim();
+        }
+
+        private static string BuildPreview(string snippet)
+        {
+            if (string.IsNullOrWhiteSpace(snippet))
+                return string.Empty;
+
+            var lines = snippet.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            return string.Join("\n", lines.Take(3)).Trim();
+        }
+
+        private static string BuildTitle(AbyssExchange exchange)
+        {
+            if (exchange == null)
+                return "Abyss Match";
+
+            foreach (var line in exchange.AssistantLines)
+            {
+                var text = line.Text?.Trim();
+                if (!string.IsNullOrWhiteSpace(text))
+                    return text;
+            }
+
+            foreach (var line in exchange.UserLines)
+            {
+                var text = line.Text?.Trim();
+                if (!string.IsNullOrWhiteSpace(text))
+                    return text;
+            }
+
+            return "Abyss Match";
+        }
+
+        private static string FormatLineRangeLabel(int startLine, int endLine)
+        {
+            if (startLine <= 0 || endLine <= 0)
+                return "L?";
+
+            return startLine == endLine
+                ? $"L{startLine}"
+                : $"L{startLine}–L{endLine}";
         }
 
         private static void TrackQuery(string queryUsed, string? queryOriginal, string memoryRoot)

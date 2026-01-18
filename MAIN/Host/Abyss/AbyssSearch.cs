@@ -34,7 +34,7 @@ namespace VAL.Host.Abyss
 
     internal static class AbyssSearch
     {
-        public static List<AbyssSearchResult> Search(string memoryRoot, string query, int maxResults)
+        public static List<AbyssSearchResult> Search(string memoryRoot, string query, int maxResults, IReadOnlyCollection<string>? excludeFingerprints = null)
         {
             var results = new List<AbyssSearchResult>();
             var tokens = Tokenize(query);
@@ -44,12 +44,29 @@ namespace VAL.Host.Abyss
             if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 return results;
 
+            var exclusions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (excludeFingerprints != null)
+            {
+                foreach (var fingerprint in excludeFingerprints)
+                {
+                    if (!string.IsNullOrWhiteSpace(fingerprint))
+                        exclusions.Add(fingerprint.Trim());
+                }
+            }
+
             foreach (var truthPath in EnumerateTruthLogs(memoryRoot))
             {
                 foreach (var exchange in ReadExchanges(truthPath))
                 {
                     var score = ScoreExchange(exchange, tokens);
                     if (score <= 0) continue;
+
+                    if (exclusions.Count > 0)
+                    {
+                        var fingerprint = BuildFingerprint(exchange);
+                        if (exclusions.Contains(fingerprint))
+                            continue;
+                    }
 
                     results.Add(new AbyssSearchResult
                     {
@@ -64,6 +81,41 @@ namespace VAL.Host.Abyss
                 .ThenByDescending(r => r.Exchange.LastWriteUtc)
                 .Take(Math.Max(1, maxResults))
                 .ToList();
+        }
+
+        public static (int startLine, int endLine) GetLineRange(AbyssExchange exchange)
+        {
+            if (exchange == null)
+                return (0, 0);
+
+            var min = int.MaxValue;
+            var max = -1;
+
+            foreach (var line in exchange.UserLines)
+            {
+                min = Math.Min(min, line.LineIndex);
+                max = Math.Max(max, line.LineIndex);
+            }
+
+            foreach (var line in exchange.AssistantLines)
+            {
+                min = Math.Min(min, line.LineIndex);
+                max = Math.Max(max, line.LineIndex);
+            }
+
+            if (max < 0 || min == int.MaxValue)
+                return (0, 0);
+
+            return (min + 1, max + 1);
+        }
+
+        public static string BuildFingerprint(AbyssExchange exchange)
+        {
+            if (exchange == null)
+                return string.Empty;
+
+            var (startLine, endLine) = GetLineRange(exchange);
+            return $"{exchange.ChatId}:{startLine}-{endLine}";
         }
 
         public static List<AbyssExchange> GetLastFromMostRecent(string memoryRoot, int count)
