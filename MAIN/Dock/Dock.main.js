@@ -898,49 +898,6 @@ if (module==="Theme") {
     rowABtns.append(abyssSearchBtn, abyssInjectBtn, abyssLastBtn, abyssFolderBtn);
 
 
-    // Abyss row
-    const rowA = el("div","valdock-row");
-    const abyssSearchBtn = btn("Search", "primary");
-    attachTooltip(abyssSearchBtn, "Search past Truth logs by keyword (Abyss query).");
-    abyssSearchBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { showAbyssSearchOverlay(); } catch(_) {}
-    }, true);
-
-    const abyssLastBtn = btn("Last", "secondary");
-    attachTooltip(abyssLastBtn, "Inject the most recent exchange from the newest Truth log.");
-    abyssLastBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:"abyss.command.last", chatId: getChatId() }); } catch(_) {}
-    }, true);
-
-    const abyssSendBtn = btn("Inject", "ghost");
-    attachTooltip(abyssSendBtn, "Inject a specific Abyss result (e.g., 1 or 1,2).");
-    abyssSendBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      let raw = "";
-      try { raw = window.prompt("Abyss result # to inject (e.g., 1 or 1,2):", "1") || ""; } catch(_) {}
-      if (!raw) return;
-      try { post({ type:"abyss.command.inject_results", chatId: getChatId(), indices: raw }); } catch(_) {}
-    }, true);
-
-    const abyssResultsBtn = btn("Results", "ghost");
-    attachTooltip(abyssResultsBtn, "View the latest Abyss results.");
-    abyssResultsBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:"abyss.command.get_results", chatId: getChatId() }); } catch(_) {}
-      showAbyssResultsOverlay();
-    }, true);
-
-    rowA.append(
-      el("div","valdock-row-title","Abyss: Recall/Search"),
-      abyssSearchBtn,
-      abyssLastBtn,
-      abyssSendBtn,
-      abyssResultsBtn
-    );
-
-
     // Void row
     const rowV = el("div","valdock-row");
     rowV.append(
