@@ -47,14 +47,5 @@ namespace VAL.Host
         TelemetrySessionSizeEarly,
         TelemetrySessionSizeLarge,
         TelemetrySessionSizeVeryLarge,
-
-        // Abyss
-        AbyssSearching,
-        AbyssMatches,
-        AbyssInjected,
-        AbyssResultsWritten,
-        AbyssNoMatches,
-        AbyssNoTruthLogs,
-        AbyssQueryPrompt,
     }
 }
