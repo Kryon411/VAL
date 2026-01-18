@@ -110,82 +110,65 @@ namespace VAL.Host.Commands
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleGetResults
             ));
-        
 
-// ---- Portal ----
-Register(new CommandSpec(
-    "portal.command.set_enabled",
-    "Portal",
-    new[] { "enabled" },
-    PortalCommandHandlers.HandleSetEnabled
-));
+            Register(new CommandSpec(
+                "abyss.command.inject_prompt",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleInjectPrompt
+            ));
 
-// Accept both command names (old/new) and map to same handler.
-Register(new CommandSpec(
-    "portal.command.open_snip",
-    "Portal",
-    Array.Empty<string>(),
-    PortalCommandHandlers.HandleOpenSnip
-));
+            Register(new CommandSpec(
+                "abyss.command.inject",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleInject
+            ));
 
-Register(new CommandSpec(
-    "portal.command.open_snip_overlay",
-    "Portal",
-    Array.Empty<string>(),
-    PortalCommandHandlers.HandleOpenSnip
-));
+            // ---- Portal ----
+            Register(new CommandSpec(
+                "portal.command.set_enabled",
+                "Portal",
+                new[] { "enabled" },
+                PortalCommandHandlers.HandleSetEnabled
+            ));
 
-Register(new CommandSpec(
-    "portal.command.send_staged",
-    "Portal",
-    Array.Empty<string>(),
-    PortalCommandHandlers.HandleSendStaged
-));
+            // Accept both command names (old/new) and map to same handler.
+            Register(new CommandSpec(
+                "portal.command.open_snip",
+                "Portal",
+                Array.Empty<string>(),
+                PortalCommandHandlers.HandleOpenSnip
+            ));
 
+            Register(new CommandSpec(
+                "portal.command.open_snip_overlay",
+                "Portal",
+                Array.Empty<string>(),
+                PortalCommandHandlers.HandleOpenSnip
+            ));
 
-Register(new CommandSpec(
-    "portal.command.send",
-    "Portal",
-    Array.Empty<string>(),
-    PortalCommandHandlers.HandleSendStaged
-));
+            Register(new CommandSpec(
+                "portal.command.send_staged",
+                "Portal",
+                Array.Empty<string>(),
+                PortalCommandHandlers.HandleSendStaged
+            ));
 
-Register(new CommandSpec(
-    "portal.command.sendStaged",
-    "Portal",
-    Array.Empty<string>(),
-    PortalCommandHandlers.HandleSendStaged
-));
+            Register(new CommandSpec(
+                "portal.command.send",
+                "Portal",
+                Array.Empty<string>(),
+                PortalCommandHandlers.HandleSendStaged
+            ));
 
-// ---- Abyss ----
-Register(new CommandSpec(
-    "abyss.command.search",
-    "Abyss",
-    new[] { "query" },
-    AbyssCommandHandlers.HandleSearch
-));
-
-Register(new CommandSpec(
-    "abyss.command.inject_prompt",
-    "Abyss",
-    Array.Empty<string>(),
-    AbyssCommandHandlers.HandleInjectPrompt
-));
-
-Register(new CommandSpec(
-    "abyss.command.inject",
-    "Abyss",
-    Array.Empty<string>(),
-    AbyssCommandHandlers.HandleInject
-));
-
-Register(new CommandSpec(
-    "abyss.command.last",
-    "Abyss",
-    Array.Empty<string>(),
-    AbyssCommandHandlers.HandleLast
-));
-}
+            Register(new CommandSpec(
+                "portal.command.sendStaged",
+                "Portal",
+                Array.Empty<string>(),
+                PortalCommandHandlers.HandleSendStaged
+            ));
+        }
 
         private static void Register(CommandSpec spec)
         {
@@ -232,23 +215,23 @@ Register(new CommandSpec(
 
                 // If it's required, it must exist (any value kind). Use TryGetString/bool only when needed.
                 try
-{
-    // Prefer root-level fields...
-    if (cmd.Root.TryGetProperty(field, out _))
-        continue;
+                {
+                    // Prefer root-level fields...
+                    if (cmd.Root.TryGetProperty(field, out _))
+                        continue;
 
-    // ...but allow required fields under a "payload" object too.
-    if (cmd.Root.TryGetProperty("payload", out var payload) &&
-        payload.ValueKind == System.Text.Json.JsonValueKind.Object &&
-        payload.TryGetProperty(field, out _))
-        continue;
+                    // ...but allow required fields under a "payload" object too.
+                    if (cmd.Root.TryGetProperty("payload", out var payload) &&
+                        payload.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                        payload.TryGetProperty(field, out _))
+                        continue;
 
-    return false;
-}
-catch
-{
-    return false;
-}
+                    return false;
+                }
+                catch
+                {
+                    return false;
+                }
             }
 
             return true;

@@ -12,14 +12,40 @@ namespace VAL.Host.Commands
             try
             {
                 cmd.TryGetString("query", out var query);
+                cmd.TryGetString("queryOriginal", out var queryOriginal);
 
                 var max = 8;
                 if (cmd.TryGetInt("max", out var parsed))
                     max = parsed;
 
-                AbyssRuntime.Search(cmd.ChatId, query ?? string.Empty, max);
+                AbyssRuntime.Search(cmd.ChatId, query ?? string.Empty, max, queryOriginal);
             }
             catch { }
+        }
+
+        public static void HandleInjectResults(HostCommand cmd)
+        {
+            try
+            {
+                var indices = ParseIndices(cmd);
+                AbyssRuntime.InjectResults(indices, cmd.ChatId);
+            }
+            catch { }
+        }
+
+        public static void HandleOpenSource(HostCommand cmd)
+        {
+            try
+            {
+                cmd.TryGetString("truthPath", out var truthPath);
+                AbyssRuntime.OpenSource(truthPath, cmd.ChatId);
+            }
+            catch { }
+        }
+
+        public static void HandleGetResults(HostCommand cmd)
+        {
+            try { AbyssRuntime.EmitResults(cmd.ChatId); } catch { }
         }
 
         public static void HandleInjectPrompt(HostCommand cmd)
@@ -69,11 +95,21 @@ namespace VAL.Host.Commands
                             indices.Add(value);
                     }
                 }
+                else if (cmd.Root.TryGetProperty("indices", out var scalar))
+                {
+                    if (TryGetInt(scalar, out var value))
+                        indices.Add(value);
+                    else if (scalar.ValueKind == JsonValueKind.String)
+                        indices.AddRange(ParseDelimitedIndices(scalar.GetString()));
+                }
             }
             catch { }
 
             if (indices.Count == 0 && cmd.TryGetInt("index", out var single))
                 indices.Add(single);
+
+            if (indices.Count == 0 && cmd.TryGetString("indices", out var raw))
+                indices.AddRange(ParseDelimitedIndices(raw));
 
             return indices;
         }
@@ -98,6 +134,19 @@ namespace VAL.Host.Commands
             }
 
             return false;
+        }
+
+        private static IEnumerable<int> ParseDelimitedIndices(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                yield break;
+
+            var parts = raw.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in parts)
+            {
+                if (int.TryParse(part.Trim(), out var parsed) && parsed > 0)
+                    yield return parsed;
+            }
         }
     }
 }

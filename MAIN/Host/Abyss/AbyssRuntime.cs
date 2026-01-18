@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,10 @@ namespace VAL.Host.Abyss
         private static readonly object Gate = new();
         private static Action<string>? _postJson;
         private static List<AbyssSearchResult> _lastResults = new();
+        private static string? _lastQuery;
+        private static string? _lastQueryOriginal;
+        private static string? _lastMemoryRoot;
+        private static string? _lastGeneratedUtc;
 
         public static void Initialize(Action<string> postJson)
         {
@@ -26,7 +31,7 @@ namespace VAL.Host.Abyss
             SendInjectText(prompt, chatId);
         }
 
-        public static void Search(string? chatId, string query, int maxResults)
+        public static void Search(string? chatId, string query, int maxResults, string? queryOriginal = null)
         {
             if (string.IsNullOrWhiteSpace(query))
             {
@@ -39,10 +44,12 @@ namespace VAL.Host.Abyss
             Task.Run(() =>
             {
                 var memoryRoot = ResolveMemoryRoot();
+                TrackQuery(query, queryOriginal, memoryRoot);
                 if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 {
                     ClearLastResults();
                     ToastHub.TryShow(ToastKey.AbyssNoTruthLogs, chatId: chatId);
+                    EmitResults(chatId);
                     return;
                 }
 
@@ -67,6 +74,8 @@ namespace VAL.Host.Abyss
                 var resultsPath = WriteResultsFile(chatId, query, results);
                 if (!string.IsNullOrWhiteSpace(resultsPath))
                     ToastHub.TryShow(ToastKey.AbyssResultsWritten, chatId: chatId);
+
+                EmitResults(chatId);
             });
         }
 
@@ -77,10 +86,12 @@ namespace VAL.Host.Abyss
             Task.Run(() =>
             {
                 var memoryRoot = ResolveMemoryRoot();
+                TrackQuery("(Last)", null, memoryRoot);
                 if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 {
                     ClearLastResults();
                     ToastHub.TryShow(ToastKey.AbyssNoTruthLogs, chatId: chatId);
+                    EmitResults(chatId);
                     return;
                 }
 
@@ -96,6 +107,7 @@ namespace VAL.Host.Abyss
                 {
                     ClearLastResults();
                     ToastHub.TryShow(ToastKey.AbyssNoMatches, chatId: chatId);
+                    EmitResults(chatId);
                     return;
                 }
 
@@ -107,6 +119,8 @@ namespace VAL.Host.Abyss
                 var resultsPath = WriteResultsFile(chatId, "(Last)", results);
                 if (!string.IsNullOrWhiteSpace(resultsPath))
                     ToastHub.TryShow(ToastKey.AbyssResultsWritten, chatId: chatId);
+
+                EmitResults(chatId);
 
                 if (inject)
                 {
@@ -161,6 +175,42 @@ namespace VAL.Host.Abyss
                 titleOverride: $"Abyss: injected result #{indices[0]}");
         }
 
+        public static void EmitResults(string? chatId)
+        {
+            if (_postJson == null)
+                return;
+
+            var payload = BuildResultsPayload();
+            if (payload == null)
+                return;
+
+            SendJson(payload);
+        }
+
+        public static void OpenSource(string? truthPath, string? chatId)
+        {
+            if (string.IsNullOrWhiteSpace(truthPath))
+            {
+                ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
+                return;
+            }
+
+            try
+            {
+                if (!File.Exists(truthPath))
+                {
+                    ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
+                    return;
+                }
+
+                Process.Start(new ProcessStartInfo { FileName = truthPath, UseShellExecute = true });
+            }
+            catch
+            {
+                ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
+            }
+        }
+
         private static void SendInjectText(string text, string? chatId)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -169,19 +219,14 @@ namespace VAL.Host.Abyss
             if (_postJson == null)
                 return;
 
-            try
+            var payload = new
             {
-                var payload = new
-                {
-                    type = "continuum.inject_text",
-                    chatId = chatId,
-                    text = text
-                };
+                type = "continuum.inject_text",
+                chatId = chatId,
+                text = text
+            };
 
-                var json = JsonSerializer.Serialize(payload);
-                _postJson?.Invoke(json);
-            }
-            catch { }
+            SendJson(payload);
         }
 
         private static string BuildInjectPayload(IReadOnlyList<AbyssSearchResult> results)
@@ -199,6 +244,69 @@ namespace VAL.Host.Abyss
             }
 
             return sb.ToString().Trim();
+        }
+
+        private static object? BuildResultsPayload()
+        {
+            List<AbyssSearchResult> snapshot;
+            string? query;
+            string? queryOriginal;
+            string? memoryRoot;
+            string? generatedUtc;
+
+            lock (Gate)
+            {
+                snapshot = _lastResults.ToList();
+                query = _lastQuery;
+                queryOriginal = _lastQueryOriginal;
+                memoryRoot = _lastMemoryRoot;
+                generatedUtc = _lastGeneratedUtc;
+            }
+
+            var results = new List<object>();
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                var result = snapshot[i];
+                var exchange = result.Exchange;
+                var userLine = exchange.UserLines.FirstOrDefault();
+                var assistantLineStart = exchange.AssistantLines.FirstOrDefault();
+                var assistantLineEnd = exchange.AssistantLines.LastOrDefault();
+
+                results.Add(new
+                {
+                    index = i + 1,
+                    chatId = exchange.ChatId,
+                    truthPath = exchange.TruthPath,
+                    score = result.Score,
+                    userText = exchange.UserText,
+                    assistantText = exchange.AssistantText,
+                    approxUserLine = userLine != null ? userLine.LineIndex + 1 : (int?)null,
+                    approxAssistantLineStart = assistantLineStart != null ? assistantLineStart.LineIndex + 1 : (int?)null,
+                    approxAssistantLineEnd = assistantLineEnd != null ? assistantLineEnd.LineIndex + 1 : (int?)null
+                });
+            }
+
+            return new
+            {
+                type = "abyss.results",
+                queryOriginal = queryOriginal ?? string.Empty,
+                queryUsed = query ?? string.Empty,
+                generatedUtc = generatedUtc ?? string.Empty,
+                totalMatches = results.Count,
+                memoryRoot = memoryRoot ?? string.Empty,
+                results = results
+            };
+        }
+
+        private static void TrackQuery(string queryUsed, string? queryOriginal, string memoryRoot)
+        {
+            lock (Gate)
+            {
+                _lastQuery = queryUsed;
+                _lastQueryOriginal = queryOriginal ?? queryUsed;
+                _lastMemoryRoot = memoryRoot;
+                _lastGeneratedUtc = DateTime.UtcNow.ToString("O");
+            }
         }
 
         private static string? WriteResultsFile(string? chatId, string query, IReadOnlyList<AbyssSearchResult> results)
@@ -261,6 +369,19 @@ namespace VAL.Host.Abyss
             {
                 _lastResults = new List<AbyssSearchResult>();
             }
+        }
+
+        private static void SendJson(object payload)
+        {
+            if (_postJson == null)
+                return;
+
+            try
+            {
+                var json = JsonSerializer.Serialize(payload);
+                _postJson?.Invoke(json);
+            }
+            catch { }
         }
 
         private static string FormatLineLocator(AbyssExchange exchange)
