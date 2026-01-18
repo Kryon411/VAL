@@ -8,6 +8,9 @@
 //  - Per-session position + collapsed state via localStorage
 
 (function () {
+  if (window.__VAL_DOCK_BOOTED__) return;
+  window.__VAL_DOCK_BOOTED__ = true;
+
   console.log("[VAL Dock] script loaded");
 
 

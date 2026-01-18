@@ -6,14 +6,13 @@
   console.log("[VAL Abyss] booted");
 
   const MAX_RESULTS = 4;
-  const DISREGARD_KEY = "VAL_AbyssDisregarded";
 
   const state = {
     lastQuery: "",
     lastQueryOriginal: "",
     generatedUtc: "",
     results: [],
-    disregarded: loadDisregarded(),
+    disregarded: new Set(),
     queryOpen: false,
     panelOpen: false
   };
@@ -58,21 +57,8 @@
     return false;
   }
 
-  function loadDisregarded(){
-    try {
-      const raw = sessionStorage.getItem(DISREGARD_KEY);
-      if (!raw) return new Set();
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return new Set();
-      return new Set(parsed.map((v)=> String(v || "").trim()).filter(Boolean));
-    } catch(_) {}
-    return new Set();
-  }
-
-  function saveDisregarded(){
-    try {
-      sessionStorage.setItem(DISREGARD_KEY, JSON.stringify(Array.from(state.disregarded)));
-    } catch(_) {}
+  function resetDisregarded(){
+    state.disregarded = new Set();
   }
 
   function el(tag, cls, text){
@@ -97,7 +83,7 @@
     queryInput = document.createElement("input");
     queryInput.className = "valabyss-query-input";
     queryInput.type = "text";
-    queryInput.placeholder = "Type your recall question…";
+    queryInput.placeholder = "[ Type your recall question… ]";
 
     const actions = el("div", "valabyss-query-actions");
     const goBtn = el("button", "valabyss-btn primary", "Go");
@@ -106,6 +92,9 @@
     function runSearch(){
       const query = (queryInput?.value || "").trim();
       if (!query) return;
+      if (state.lastQueryOriginal && state.lastQueryOriginal !== query) {
+        resetDisregarded();
+      }
       state.lastQueryOriginal = query;
       state.lastQuery = query;
       console.log("[VAL Abyss] search", query);
@@ -292,7 +281,6 @@
         if (!fingerprint) return;
         console.log("[VAL Abyss] disregard", fingerprint);
         state.disregarded.add(fingerprint);
-        saveDisregarded();
         state.results = state.results.filter((r)=> (r.fingerprint || r.id) !== fingerprint);
         post({ type: "abyss.command.disregard", chatId: getChatId(), fingerprint });
         renderResults();
@@ -310,17 +298,31 @@
   }
 
   function handleHostMessage(msg){
-    if (!msg || typeof msg !== "object") return;
+    if (!msg) return;
+    if (typeof msg === "string") {
+      try { msg = JSON.parse(msg); } catch(_) { return; }
+    }
+    if (typeof msg !== "object") return;
     if ((msg.type || "") !== "abyss.results") return;
 
-    state.lastQuery = (msg.queryUsed || msg.lastQuery || "").toString();
-    state.lastQueryOriginal = (msg.queryOriginal || state.lastQuery || "").toString();
+    const nextQuery = (msg.queryUsed || msg.lastQuery || "").toString();
+    const nextQueryOriginal = (msg.queryOriginal || nextQuery || "").toString();
+    if (state.lastQueryOriginal && nextQueryOriginal && state.lastQueryOriginal !== nextQueryOriginal) {
+      resetDisregarded();
+    }
+    state.lastQuery = nextQuery;
+    state.lastQueryOriginal = nextQueryOriginal;
     state.generatedUtc = (msg.generatedUtc || "").toString();
     const incoming = Array.isArray(msg.results) ? msg.results : [];
     state.results = incoming.filter((result)=> {
       const fingerprint = result?.fingerprint || result?.id;
       return !fingerprint || !state.disregarded.has(fingerprint);
     });
+
+    try {
+      window.__VAL_ABYSS_LAST_RESULTS__ = msg;
+      window.__VAL_ABYSS_LAST_QUERY__ = state.lastQueryOriginal || state.lastQuery || "";
+    } catch(_) {}
 
     showResultsPanel();
     renderResults();
