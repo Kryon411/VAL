@@ -2,263 +2,245 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using VAL.Continuum.Pipeline.Truth;
+using System.Text;
 
 namespace VAL.Host.Abyss
 {
+    internal sealed class AbyssTruthLine
+    {
+        public int LineIndex { get; init; }
+        public char Role { get; init; }
+        public string Text { get; init; } = string.Empty;
+    }
+
+    internal sealed class AbyssExchange
+    {
+        public string ChatId { get; init; } = string.Empty;
+        public string TruthPath { get; init; } = string.Empty;
+        public DateTime LastWriteUtc { get; init; }
+
+        public List<AbyssTruthLine> UserLines { get; } = new();
+        public List<AbyssTruthLine> AssistantLines { get; } = new();
+
+        public string UserText => string.Join("\n", UserLines.Select(l => l.Text));
+        public string AssistantText => string.Join("\n", AssistantLines.Select(l => l.Text));
+    }
+
+    internal sealed class AbyssSearchResult
+    {
+        public AbyssExchange Exchange { get; init; } = new();
+        public int Score { get; init; }
+    }
+
     internal static class AbyssSearch
     {
-        internal sealed class TruthLine
-        {
-            public char Role { get; init; }
-            public int LineNumber { get; init; }
-            public string Text { get; init; } = string.Empty;
-        }
-
-        internal sealed class Exchange
-        {
-            public int UserLineNumber { get; set; }
-            public string UserText { get; set; } = string.Empty;
-            public int AssistantLineStart { get; set; }
-            public int AssistantLineEnd { get; set; }
-            public List<string> AssistantLines { get; } = new List<string>();
-        }
-
-        internal sealed class AbyssSearchResult
-        {
-            public string SessionId { get; init; } = string.Empty;
-            public string SessionFolder { get; init; } = string.Empty;
-            public string TruthPath { get; init; } = string.Empty;
-            public int UserLineNumber { get; init; }
-            public int AssistantLineStart { get; init; }
-            public int AssistantLineEnd { get; init; }
-            public string UserText { get; init; } = string.Empty;
-            public List<string> AssistantLines { get; init; } = new List<string>();
-            public int Score { get; init; }
-            public DateTime LastWriteUtc { get; init; }
-        }
-
-        public static IReadOnlyList<AbyssSearchResult> Search(string chatsRoot, string query, int limit)
+        public static List<AbyssSearchResult> Search(string memoryRoot, string query, int maxResults)
         {
             var results = new List<AbyssSearchResult>();
-            if (string.IsNullOrWhiteSpace(chatsRoot) || !Directory.Exists(chatsRoot))
-                return results;
-
             var tokens = Tokenize(query);
-            if (tokens.Length == 0)
+            if (tokens.Count == 0)
                 return results;
 
-            IEnumerable<string> truthLogs;
-            try
-            {
-                truthLogs = Directory.EnumerateFiles(chatsRoot, TruthStorage.TruthFileName, SearchOption.AllDirectories);
-            }
-            catch
-            {
+            if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 return results;
-            }
 
-            foreach (var truthPath in truthLogs)
+            foreach (var truthPath in EnumerateTruthLogs(memoryRoot))
             {
-                List<TruthLine> lines;
-                try
-                {
-                    lines = ParseTruthLog(truthPath);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (lines.Count == 0)
-                    continue;
-
-                var exchanges = BuildExchanges(lines);
-                if (exchanges.Count == 0)
-                    continue;
-
-                var sessionFolder = new DirectoryInfo(Path.GetDirectoryName(truthPath) ?? string.Empty).Name;
-                var lastWriteUtc = SafeGetLastWriteUtc(truthPath);
-
-                foreach (var exchange in exchanges)
+                foreach (var exchange in ReadExchanges(truthPath))
                 {
                     var score = ScoreExchange(exchange, tokens);
-                    if (score <= 0)
-                        continue;
+                    if (score <= 0) continue;
 
                     results.Add(new AbyssSearchResult
                     {
-                        SessionId = sessionFolder,
-                        SessionFolder = sessionFolder,
-                        TruthPath = truthPath,
-                        UserLineNumber = exchange.UserLineNumber,
-                        AssistantLineStart = exchange.AssistantLineStart,
-                        AssistantLineEnd = exchange.AssistantLineEnd,
-                        UserText = exchange.UserText,
-                        AssistantLines = new List<string>(exchange.AssistantLines),
-                        Score = score,
-                        LastWriteUtc = lastWriteUtc
+                        Exchange = exchange,
+                        Score = score
                     });
                 }
             }
 
             return results
                 .OrderByDescending(r => r.Score)
-                .ThenByDescending(r => r.LastWriteUtc)
-                .Take(Math.Max(1, limit))
+                .ThenByDescending(r => r.Exchange.LastWriteUtc)
+                .Take(Math.Max(1, maxResults))
                 .ToList();
         }
 
-        public static IReadOnlyList<AbyssSearchResult> TakeLastExchanges(string truthPath, int maxExchanges)
+        public static List<AbyssExchange> GetLastFromMostRecent(string memoryRoot, int count)
         {
-            var results = new List<AbyssSearchResult>();
-            if (string.IsNullOrWhiteSpace(truthPath) || !File.Exists(truthPath))
-                return results;
+            var list = new List<AbyssExchange>();
+            if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
+                return list;
 
-            var lines = ParseTruthLog(truthPath);
-            if (lines.Count == 0)
-                return results;
+            var latest = GetMostRecentTruthLog(memoryRoot);
+            if (string.IsNullOrWhiteSpace(latest))
+                return list;
 
-            var exchanges = BuildExchanges(lines);
+            var exchanges = ReadExchanges(latest);
             if (exchanges.Count == 0)
-                return results;
+                return list;
 
-            var sessionFolder = new DirectoryInfo(Path.GetDirectoryName(truthPath) ?? string.Empty).Name;
-            var lastWriteUtc = SafeGetLastWriteUtc(truthPath);
-
-            foreach (var exchange in exchanges.TakeLast(Math.Max(1, maxExchanges)))
+            count = Math.Max(1, Math.Min(3, count));
+            for (int i = Math.Max(0, exchanges.Count - count); i < exchanges.Count; i++)
             {
-                results.Add(new AbyssSearchResult
-                {
-                    SessionId = sessionFolder,
-                    SessionFolder = sessionFolder,
-                    TruthPath = truthPath,
-                    UserLineNumber = exchange.UserLineNumber,
-                    AssistantLineStart = exchange.AssistantLineStart,
-                    AssistantLineEnd = exchange.AssistantLineEnd,
-                    UserText = exchange.UserText,
-                    AssistantLines = new List<string>(exchange.AssistantLines),
-                    Score = 1,
-                    LastWriteUtc = lastWriteUtc
-                });
+                list.Add(exchanges[i]);
             }
 
-            return results;
+            list.Reverse();
+            return list;
         }
 
-        private static List<TruthLine> ParseTruthLog(string truthPath)
+        private static IEnumerable<string> EnumerateTruthLogs(string memoryRoot)
         {
-            var lines = new List<TruthLine>();
+            try
+            {
+                return Directory.EnumerateFiles(memoryRoot, "Truth.log", SearchOption.AllDirectories);
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        private static string? GetMostRecentTruthLog(string memoryRoot)
+        {
+            string? latestPath = null;
+            DateTime latestUtc = DateTime.MinValue;
+
+            foreach (var path in EnumerateTruthLogs(memoryRoot))
+            {
+                try
+                {
+                    var utc = File.GetLastWriteTimeUtc(path);
+                    if (utc > latestUtc)
+                    {
+                        latestUtc = utc;
+                        latestPath = path;
+                    }
+                }
+                catch { }
+            }
+
+            return latestPath;
+        }
+
+        private static List<AbyssExchange> ReadExchanges(string truthPath)
+        {
+            var exchanges = new List<AbyssExchange>();
             if (string.IsNullOrWhiteSpace(truthPath) || !File.Exists(truthPath))
-                return lines;
+                return exchanges;
 
-            var rawLines = File.ReadAllLines(truthPath);
-            for (var i = 0; i < rawLines.Length; i++)
+            var chatId = new DirectoryInfo(Path.GetDirectoryName(truthPath) ?? string.Empty).Name;
+            var lastWriteUtc = DateTime.MinValue;
+            try { lastWriteUtc = File.GetLastWriteTimeUtc(truthPath); } catch { }
+
+            AbyssExchange? current = null;
+            int lineIndex = 0;
+
+            foreach (var rawLine in SafeReadLines(truthPath))
             {
-                var line = rawLines[i] ?? string.Empty;
-                if (line.Length < 2)
+                if (string.IsNullOrWhiteSpace(rawLine))
+                {
+                    lineIndex++;
                     continue;
+                }
 
-                var role = line[0];
-                if (line[1] != '|')
+                if (rawLine.Length < 2 || rawLine[1] != '|')
+                {
+                    lineIndex++;
                     continue;
+                }
 
+                var role = rawLine[0];
                 if (role != 'U' && role != 'A')
+                {
+                    lineIndex++;
                     continue;
+                }
 
-                lines.Add(new TruthLine
+                var payload = rawLine.Length > 2 ? rawLine.Substring(2) : string.Empty;
+                var line = new AbyssTruthLine
                 {
+                    LineIndex = lineIndex,
                     Role = role,
-                    LineNumber = i + 1,
-                    Text = line.Substring(2)
-                });
-            }
+                    Text = payload
+                };
 
-            return lines;
-        }
-
-        private static List<Exchange> BuildExchanges(IReadOnlyList<TruthLine> lines)
-        {
-            var exchanges = new List<Exchange>();
-            Exchange? current = null;
-
-            foreach (var line in lines)
-            {
-                if (line.Role == 'U')
+                if (role == 'U')
                 {
-                    if (current != null)
+                    if (current != null && (current.UserLines.Count > 0 || current.AssistantLines.Count > 0))
                         exchanges.Add(current);
 
-                    current = new Exchange
+                    current = new AbyssExchange
                     {
-                        UserLineNumber = line.LineNumber,
-                        UserText = line.Text
+                        ChatId = chatId,
+                        TruthPath = truthPath,
+                        LastWriteUtc = lastWriteUtc
                     };
-                    continue;
+                    current.UserLines.Add(line);
                 }
-
-                if (line.Role == 'A')
+                else
                 {
-                    current ??= new Exchange();
-                    if (current.AssistantLineStart == 0)
-                        current.AssistantLineStart = line.LineNumber;
-
-                    current.AssistantLineEnd = line.LineNumber;
-                    current.AssistantLines.Add(line.Text);
+                    if (current == null)
+                    {
+                        current = new AbyssExchange
+                        {
+                            ChatId = chatId,
+                            TruthPath = truthPath,
+                            LastWriteUtc = lastWriteUtc
+                        };
+                    }
+                    current.AssistantLines.Add(line);
                 }
+
+                lineIndex++;
             }
 
-            if (current != null)
+            if (current != null && (current.UserLines.Count > 0 || current.AssistantLines.Count > 0))
                 exchanges.Add(current);
 
             return exchanges;
         }
 
-        private static int ScoreExchange(Exchange exchange, IReadOnlyList<string> tokens)
+        private static IEnumerable<string> SafeReadLines(string path)
+        {
+            try { return File.ReadLines(path); }
+            catch { return Array.Empty<string>(); }
+        }
+
+        private static int ScoreExchange(AbyssExchange exchange, IReadOnlyList<string> tokens)
         {
             if (tokens.Count == 0)
                 return 0;
 
-            var combined = string.Concat(
-                exchange.UserText ?? string.Empty,
-                "\n",
-                string.Join("\n", exchange.AssistantLines));
+            var userText = exchange.UserText;
+            var assistantText = exchange.AssistantText;
+            var combined = string.Concat(userText, "\n", assistantText);
 
             var score = 0;
             foreach (var token in tokens)
             {
-                var tokenScore = CountOccurrences(combined, token);
-                if (tokenScore == 0)
+                if (string.IsNullOrWhiteSpace(token))
                     continue;
 
-                score += tokenScore;
-                if (!string.IsNullOrWhiteSpace(exchange.UserText))
-                    score += CountOccurrences(exchange.UserText, token);
+                var hits = CountOccurrences(combined, token);
+                if (hits <= 0) continue;
+
+                score += hits;
+                score += CountOccurrences(userText, token);
             }
 
             return score;
         }
 
-        private static string[] Tokenize(string query)
-        {
-            if (string.IsNullOrWhiteSpace(query))
-                return Array.Empty<string>();
-
-            return query
-                .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(t => t.Trim())
-                .Where(t => t.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
-
         private static int CountOccurrences(string text, string token)
         {
-            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(token))
+            if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(token))
                 return 0;
 
             var count = 0;
             var index = 0;
+
             while (true)
             {
                 index = text.IndexOf(token, index, StringComparison.OrdinalIgnoreCase);
@@ -272,9 +254,44 @@ namespace VAL.Host.Abyss
             return count;
         }
 
-        private static DateTime SafeGetLastWriteUtc(string path)
+        private static List<string> Tokenize(string query)
         {
-            try { return File.GetLastWriteTimeUtc(path); } catch { return DateTime.MinValue; }
+            var tokens = new List<string>();
+            if (string.IsNullOrWhiteSpace(query))
+                return tokens;
+
+            var sb = new StringBuilder();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var ch in query)
+            {
+                if (char.IsLetterOrDigit(ch))
+                {
+                    sb.Append(ch);
+                }
+                else
+                {
+                    FlushToken(sb, tokens, seen);
+                }
+            }
+
+            FlushToken(sb, tokens, seen);
+            return tokens;
+        }
+
+        private static void FlushToken(StringBuilder sb, List<string> tokens, HashSet<string> seen)
+        {
+            if (sb.Length == 0)
+                return;
+
+            var token = sb.ToString();
+            sb.Clear();
+
+            if (token.Length < 2)
+                return;
+
+            if (seen.Add(token))
+                tokens.Add(token);
         }
     }
 }

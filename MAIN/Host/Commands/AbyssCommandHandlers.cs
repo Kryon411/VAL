@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text.Json;
 using VAL.Host.Abyss;
 
 namespace VAL.Host.Commands
@@ -9,65 +11,93 @@ namespace VAL.Host.Commands
         {
             try
             {
-                string? queryOriginal = null;
-                if (cmd.TryGetString("queryOriginal", out var q)) queryOriginal = q;
+                cmd.TryGetString("query", out var query);
 
-                string[]? exclude = null;
-                if (cmd.Root.TryGetProperty("excludeChatIds", out var ex) && ex.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    var list = new System.Collections.Generic.List<string>();
-                    foreach (var item in ex.EnumerateArray())
-                    {
-                        if (item.ValueKind == System.Text.Json.JsonValueKind.String)
-                        {
-                            var v = item.GetString();
-                            if (!string.IsNullOrWhiteSpace(v)) list.Add(v.Trim());
-                        }
-                    }
-                    exclude = list.Count > 0 ? list.ToArray() : null;
-                }
+                var max = 8;
+                if (cmd.TryGetInt("max", out var parsed))
+                    max = parsed;
 
-                int? maxResults = null;
-                if (cmd.TryGetInt("maxResults", out var max)) maxResults = max;
-
-                AbyssRuntime.Search(cmd.ChatId, queryOriginal, exclude, maxResults);
+                AbyssRuntime.Search(cmd.ChatId, query ?? string.Empty, max);
             }
             catch { }
         }
 
-        public static void HandleInjectResults(HostCommand cmd)
+        public static void HandleInjectPrompt(HostCommand cmd)
+        {
+            try { AbyssRuntime.InjectPrompt(cmd.ChatId); } catch { }
+        }
+
+        public static void HandleInject(HostCommand cmd)
         {
             try
             {
-                if (!cmd.TryGetString("indices", out var indices))
-                    return;
-
-                AbyssRuntime.InjectResults(cmd.ChatId, indices);
+                var indices = ParseIndices(cmd);
+                AbyssRuntime.InjectResults(indices, cmd.ChatId);
             }
             catch { }
         }
 
         public static void HandleLast(HostCommand cmd)
         {
-            try { AbyssRuntime.InjectLast(cmd.ChatId); } catch { }
-        }
-
-        public static void HandleOpenSource(HostCommand cmd)
-        {
             try
             {
-                if (!cmd.TryGetString("chatId", out var chatId))
-                    chatId = cmd.ChatId;
+                var count = 2;
+                if (cmd.TryGetInt("count", out var parsed))
+                    count = parsed;
 
-                var truthPath = cmd.TryGetString("truthPath", out var tp) ? tp : null;
-                AbyssRuntime.OpenSource(chatId, truthPath);
+                var inject = false;
+                if (cmd.TryGetBool("inject", out var parsedBool))
+                    inject = parsedBool;
+
+                AbyssRuntime.FetchLast(cmd.ChatId, count, inject);
             }
             catch { }
         }
 
-        public static void HandleGetResults(HostCommand cmd)
+        private static List<int> ParseIndices(HostCommand cmd)
         {
-            try { AbyssRuntime.SendResults(cmd.ChatId); } catch { }
+            var indices = new List<int>();
+
+            try
+            {
+                if (cmd.Root.TryGetProperty("indices", out var arr) &&
+                    arr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var el in arr.EnumerateArray())
+                    {
+                        if (TryGetInt(el, out var value))
+                            indices.Add(value);
+                    }
+                }
+            }
+            catch { }
+
+            if (indices.Count == 0 && cmd.TryGetInt("index", out var single))
+                indices.Add(single);
+
+            return indices;
+        }
+
+        private static bool TryGetInt(JsonElement el, out int value)
+        {
+            value = 0;
+            if (el.ValueKind == JsonValueKind.Number && el.TryGetInt32(out var parsed))
+            {
+                value = parsed;
+                return true;
+            }
+
+            if (el.ValueKind == JsonValueKind.String)
+            {
+                var s = el.GetString();
+                if (!string.IsNullOrWhiteSpace(s) && int.TryParse(s, out parsed))
+                {
+                    value = parsed;
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
