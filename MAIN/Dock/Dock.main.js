@@ -24,6 +24,7 @@
   const PORTAL_COUNT_KEY   = "VAL_PortalStageCount";
 
   const ABYSS_QUERY_PENDING_KEY = "VAL_AbyssQueryPending";
+  const ABYSS_EXCLUSIONS_KEY = "VAL_AbyssExcludeChatIds";
 
   function getPortalEnabled(){ return false; } // force Off at boot
   function setPortalEnabled(next){ try { localStorage.setItem(PORTAL_ENABLED_KEY, next ? "1" : "0"); } catch(_) {} }
@@ -64,6 +65,28 @@
 
   function writeBoolLS(key, value){
     try { localStorage.setItem(key, value ? "1" : "0"); } catch(_) {}
+  }
+
+  function loadAbyssExclusions(){
+    try {
+      const raw = localStorage.getItem(ABYSS_EXCLUSIONS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((id)=> String(id || "").trim()).filter(Boolean);
+    } catch(_) {}
+    return [];
+  }
+
+  function saveAbyssExclusions(list){
+    try {
+      const unique = Array.from(new Set((Array.isArray(list) ? list : [])
+        .map((id)=> String(id || "").trim())
+        .filter(Boolean)));
+      localStorage.setItem(ABYSS_EXCLUSIONS_KEY, JSON.stringify(unique));
+      return unique;
+    } catch(_) {}
+    return [];
   }
 
   function getVoidEnabled(){
@@ -430,7 +453,7 @@ function isPreludeNudgeSuppressed(){
       excludeBtn.addEventListener("click", ()=>{
         if (!cid) return;
         if (!abyssExcludeChatIds.includes(cid)) abyssExcludeChatIds.push(cid);
-        saveAbyssExclusions(abyssExcludeChatIds);
+        abyssExcludeChatIds = saveAbyssExclusions(abyssExcludeChatIds);
         if (abyssState.queryOriginal) {
           try {
             post({
