@@ -74,6 +74,42 @@ namespace VAL.Host.Commands
                     (cmd) => { try { ContinuumHost.HandleJson(cmd.RawJson); } catch { } }
                 ));
             }
+
+            // ---- Abyss ----
+            Register(new CommandSpec(
+                "abyss.command.search",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleSearch
+            ));
+
+            Register(new CommandSpec(
+                "abyss.command.inject_results",
+                "Abyss",
+                new[] { "indices" },
+                AbyssCommandHandlers.HandleInjectResults
+            ));
+
+            Register(new CommandSpec(
+                "abyss.command.last",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleLast
+            ));
+
+            Register(new CommandSpec(
+                "abyss.command.open_source",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleOpenSource
+            ));
+
+            Register(new CommandSpec(
+                "abyss.command.get_results",
+                "Abyss",
+                Array.Empty<string>(),
+                AbyssCommandHandlers.HandleGetResults
+            ));
         
 
 // ---- Portal ----
