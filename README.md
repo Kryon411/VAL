@@ -1,128 +1,102 @@
-# VAL
+# VAL (Virtual Assistant Layer)
 
-**VAL** is a locally run Windows UI layer for **ChatGPT.com**, built with **.NET (WPF)** and Microsoft’s **WebView2 (Edge/Chromium)** runtime.
+VAL is a lightweight Windows desktop shell for running ChatGPT in a clean, controlled UI with **user-invoked, deterministic tools** layered on top.
 
-VAL is designed to improve how people *work with* AI assistants by providing a stable, user-controlled environment with explicit modules for continuity, organization, capture workflows, and context management.
+VAL is designed around a simple philosophy:
 
-VAL does **not** automate behavior.
-It does **not** “act on your behalf.”
-Everything is **user-invoked**, and all state remains **local**.
-
----
-
-## Screenshots
-
-> These screenshots show the Control Centre and overall UI experience.
-
-| Control Centre | Main UI |
-|---|---|
-| ![VAL Control Centre](Assets/Screenshots/control-centre.png) | ![VAL UI](Assets/Screenshots/ui.png) |
+- **Explicit**: features are activated by you (no background automation)
+- **Deterministic**: outputs are reproducible and traceable
+- **Transparent**: actions are visible, inspectable, and file-backed
+- **Modular**: each module is self-contained and can evolve independently
 
 ---
 
-## What VAL is
+## Download / Install
 
-- A **local, per-user Windows application** that hosts ChatGPT.com using WebView2
-- A **controlled UI environment** for explicit, user-invoked modules
-- A tool focused on **continuity, context stability, and workflow polish**
-- A system designed to be **predictable** and **non-creepy by default**
+✅ Download the latest installer from the **Releases** page and run:
 
----
+- `VAL_Setup.exe`
 
-## What VAL is not
-
-- No telemetry
-- No cloud backend
-- No background automation
-- No autonomous agents
-- No silent “memory mining”
-- No data collection beyond what you explicitly initiate
+> Windows may warn that this is an unsigned installer (“Unknown publisher”). This is expected.
 
 ---
 
-## Modules
+## Quick Start
 
-VAL is built around **explicit, user-invoked modules**.
-Modules do **nothing** unless you enable them or trigger their actions.
+1) Launch **VAL**
+2) Open the **Control Centre** (the dock/pill UI)
+3) Use modules as needed (each module is manual + user-invoked)
 
-### Continuum (Continuity)
-Continuum preserves long-running work across sessions and chats.
-
-- Captures structured conversation history locally (`Truth.log`)
-- Produces clean **handoff context** using `Pulse / Prelude / Chronicle`
-- Helps keep deep sessions stable even when chat UI history becomes too large
-
-### Portal (Capture & Stage)
-Portal provides a stable **capture → stage → send** workflow for external content.
-
-- Designed for frictionless screenshot capture and staging
-- User controls exactly what gets staged and when it is sent
-- Resettable buffer (no hidden persistence unless you choose it)
-
-### Void (Noise Suppression)
-Void reduces visual flood in the chat UI.
-
-- Hides rendered **code blocks** and **pasted screenshots**
-- Intended to keep signal readable and the DOM light
-- Display-layer only (no content mutation)
-
-### Theme (Visual Layer)
-Theme controls presentation only.
-
-- No behavior changes
-- Safe to toggle at any time
+If something doesn’t look right after an update:
+- Restart VAL
+- Run the module action again
+- Check the module’s output files (most modules write artifacts beside session data)
 
 ---
 
-## Design principles
+## Modules (Overview)
 
-VAL follows a single unifying rule:
+### Continuum (Continuity / Refresh)
+Continuum is the continuity layer that helps you resume work cleanly across long sessions.
 
-**VAL never acts unless the user explicitly asks it to.**
+Typical actions:
+- **Quick Refresh**: builds a compact “wake-up state” (Essence-M) from the most relevant recent Truth.log context
+- **Deep Refresh**: uses a larger context window for tougher jumps
 
-Additional principles:
-
-- User-invoked by default
-- No background automation
-- Local-first state
-- Predictable, modular behavior
-- No cross-module side effects
-
----
-
-## Installation
-
-Download the installer from the **Releases** section and run it.
-
-- Installs per-user to: `%LOCALAPPDATA%\VAL`
-- No administrator rights required (unless you choose an all-users install)
-
-> **Note:** VAL requires the Microsoft Edge **WebView2 Runtime**.  
-> On most Windows systems it is already installed. If not, Windows will prompt to install it.
-
-> **Note:** VAL is currently **unsigned**.  
-> Windows may display an **“Unknown publisher”** warning on first run.
+Outputs (per session):
+- `Truth.log`
+- `Seed.log`
+- `RestructuredSeed.log`
+- `Essence-M.Pulse.txt`
 
 ---
 
-## Uninstall
+### Abyss (Recall / Search)
+Abyss is VAL’s local recall and search module.
 
-VAL can be removed normally via:
+It searches across your archived session logs and returns **ranked results** with **provenance**, so you can rehydrate context without manually digging through folders.
 
-**Windows Settings → Apps → Installed apps**
-
----
-
-## Project status
-
-VAL **v4.0+** is the first stable public release.
-
-This project is intentionally focused and opinionated. Feedback is welcome, but changes are made selectively to preserve the design philosophy.
+Typical actions:
+- **Search**: enter a recall question and retrieve ranked results
+- **Inject**: inject a selected snippet into the composer
+- **Open Source**: open the source session folder / log
+- **Disregard**: dismiss a specific snippet result and try again
 
 ---
 
-## Support
+### Portal (Capture / Stage)
+Portal is the capture workflow module (built to reduce friction when collecting screenshots or supporting material during a working session).
 
-If you find VAL useful and want to support development, you can leave an optional tip here:
+Typical actions:
+- Capture → stage → send when ready
 
-[ko-fi.com/valv4](https://ko-fi.com/valv4)
+---
+
+### Void (Clean View)
+Void helps keep the UI fast and readable by suppressing high-cost content.
+
+Typical actions:
+- Hide or reduce heavy blocks (e.g. large pasted code or screenshots)
+
+---
+
+## Documentation
+
+For “how-to” steps and module-specific guides, see:
+
+- **Docs/Modules.md**
+
+---
+
+## Project Goals
+
+VAL aims to be:
+- A clean work environment for long AI-assisted sessions
+- A modular foundation you can extend safely over time
+- A tool that improves continuity without inventing “magic memory”
+
+---
+
+## License / Notes
+
+This project is evolving quickly. Expect small behavioral changes between versions as modules are refined.
