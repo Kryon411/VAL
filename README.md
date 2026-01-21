@@ -1,5 +1,9 @@
 # VAL (Virtual Assistant Layer)
 
+## 🚀 Download
+
+➡️ **[Download VAL (Latest Release)](https://github.com/Kryon411/VAL/releases/latest)**
+
 VAL is a lightweight Windows desktop shell for running ChatGPT in a clean, controlled UI with **user-invoked, deterministic tools** layered on top.
 
 VAL is designed around a simple philosophy:
