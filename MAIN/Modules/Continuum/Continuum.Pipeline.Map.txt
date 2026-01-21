@@ -1,0 +1,68 @@
+Continuum — Filtered Pipeline (Truth → Seed → RestructuredSeed → Essence-M → Inject)
+
+Purpose
+Continuum produces a deterministic “wake-up state” (Essence-M.Pulse.txt) from a local Truth.log.
+This is not AI memory. It is a mechanical pipeline that filters, budgets, and formats the most relevant
+recent exchanges so a refreshed chat can resume cleanly with minimal drift.
+
+Primary Entry
+- Pipeline/01_QuickRefresh/QuickRefresh.Flow.cs
+
+Quick Refresh Flow (high level)
+1) Truth Normalize
+   - TruthNormalize.BuildView(chatId)
+   - Reads:  Truth.log
+   - Output: TruthView (normalized messages with stable locators)
+
+2) Filter 1 — Build Seed (slice + filter)
+   - Filter1.BuildSeed(truthView)
+   - Goal: Extract a small, relevant set of recent exchanges with controlled per-message slicing.
+   - Output: Seed.log   (written beside Truth.log in the session folder)
+
+3) Filter 2 — Restructure Seed (budget pack)
+   - Filter2.Restructure(seed.Exchanges)
+   - Goal: Pack exchanges into a reverse-order “wake-up bundle” under a strict character budget,
+           with a stable “Where We Left Off” focus.
+   - Output: RestructuredSeed.log (written beside Truth.log)
+
+4) Essence Build
+   - Essence.BuildEssenceM(chatId, restructuredSeed)
+   - Goal: Convert restructured content into the ESSENCE-M format used for reliable rehydration.
+   - Output: Essence-M.Pulse.txt (final payload)
+
+5) Preamble Injection + Queue
+   - ContinuumPreamble.InjectIntoEssence(...)
+   - EssenceInjectQueue.Enqueue(...)
+   - Goal: Add the context prelude / response rules and enqueue the final text for composer injection.
+
+Per-Session Audit Artifacts (written in the chat session folder)
+- Truth.log                (canonical transcript; append-only)
+- Seed.log                 (Filter 1 output; sliced + filtered exchanges)
+- RestructuredSeed.log     (Filter 2 output; budgeted reverse-order pack)
+- Essence-M.Pulse.txt      (final injected payload)
+
+Key Knobs (tuning constants)
+Filter 1: Pipeline/03_Filter1/Filter1.Rules.cs
+- AssistantSliceTotalChars
+- AssistantSentenceOverflowMaxChars
+- UserSliceMaxChars
+- MaxExchangeChars
+
+Filter 2: Pipeline/04_Filter2/Filter2.Rules.cs
+- BudgetChars
+- WhereWeLeftOffCount
+- OverflowFinishExchangeMaxChars
+
+Locator Standard (provenance)
+- Truth.Normalize.cs assigns TruthMessage.LineIndex (0-based)
+- Seed/Restructured outputs cite TruthLine locators for deterministic provenance and fast source lookup.
+
+Chronicle — Truth Backfill / Rebuild (when Truth.log is missing)
+- Control Centre → Chronicle performs a deterministic UI walk (top→bottom) to rebuild Truth.log.
+- Host resets Truth.log + in-memory de-dupe index first.
+- Capture may be temporarily frozen during scroll movement to prevent out-of-order writes.
+- Output: Chronicle.audit.txt (records start/end and any backup path)
+
+Operational Notes
+- Continuum is designed so missing files/modules are a “skip, not crash” condition.
+- The goal is repeatable, predictable rehydration with minimal hidden behavior.

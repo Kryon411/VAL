@@ -142,6 +142,19 @@ namespace VAL.Host.Abyss
             return list;
         }
 
+        private static string UnescapeTruthPayload(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return string.Empty;
+            // Truth.log may contain literal escape sequences (\n, \r, \t, \" etc).
+            // Convert the common ones so snippets and injected text render correctly.
+            return s
+                .Replace("\\r\\n", "\n")
+                .Replace("\\n", "\n")
+                .Replace("\\r", "\n")
+                .Replace("\\t", "\t")
+                .Replace("\\\"", "\"");
+        }
+
         private static IEnumerable<string> EnumerateTruthLogs(string memoryRoot)
         {
             try
@@ -210,7 +223,7 @@ namespace VAL.Host.Abyss
                     continue;
                 }
 
-                var payload = rawLine.Length > 2 ? rawLine.Substring(2) : string.Empty;
+                var payload = rawLine.Length > 2 ? UnescapeTruthPayload(rawLine.Substring(2)) : string.Empty;
                 var line = new AbyssTruthLine
                 {
                     LineIndex = lineIndex,

@@ -211,7 +211,7 @@ namespace VAL
 
                 // Abyss uses the same host -> webview post channel as other modules.
                 AbyssRuntime.Initialize(
-                    postJson: (json) => { try { core.PostWebMessageAsJson(json); } catch { } }
+                    postJson: (json) => Dispatcher.InvokeAsync(() => { try { core.PostWebMessageAsJson(json); } catch { } })
                 );
             }
             catch
