@@ -142,6 +142,12 @@ namespace VAL.Continuum
         // Prelude prompt: once per new-chat root instance (href-based) to avoid spam on repeated clicks.
         private static string _lastPreludePromptHref = string.Empty;
 
+        // Prelude seeding: if user injects Prelude on the New Chat root, the real /c/<uuid>
+        // chatId does not exist yet. Carry a one-shot marker across the next session.attach so we can
+        // suppress Chronicle prompts for that newly seeded chat.
+        private static bool _pendingPreludeSeedForNextAttach;
+        private static DateTime _pendingPreludeSeedUntilUtc = DateTime.MinValue;
+
 
         // When Pulse opens a new chat automatically, we do NOT want to show the Prelude guidance toast.
         private static DateTime _suppressPreludeToastUntilUtc = DateTime.MinValue;
@@ -156,9 +162,18 @@ namespace VAL.Continuum
         //   (prevents spam when bouncing between chats) *and* then interacts with the composer.
         private static int _toastAttachToken;
         private static string _toastAttachChatId = string.Empty;
-        private static int _toastAttachBaselineTurns = -1;
-        private static bool _toastAttachBaselineInitialized;
         private static DateTime _toastAttachUtc = DateTime.MinValue;
+
+        // Chronicle prompt gating should be per chat (not global), otherwise baseline math can bleed across chat switches.
+        // Baseline is captured on the first composer interaction after attach for a given chatId.
+        private static readonly System.Collections.Generic.Dictionary<string, int> _chronicleBaselineTurnsByChat =
+            new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+
+        // Chronicle prompt should not spam on rapid chat switching. Track last-shown per chat and only re-show after a window.
+        private static readonly System.Collections.Generic.Dictionary<string, System.DateTime> _chroniclePromptLastShownUtcByChat =
+            new System.Collections.Generic.Dictionary<string, System.DateTime>(System.StringComparer.OrdinalIgnoreCase);
+
+        private static readonly System.TimeSpan ChroniclePromptReshowWindow = System.TimeSpan.FromMinutes(30);
         private static bool _toastAttachDwellMet;
         private static bool _toastAttachChronicleShown;
         private static int _toastAttachLastCapturedTurns;
@@ -415,6 +430,19 @@ namespace VAL.Continuum
 
                     // Reset toast intent gates for this attach.
                     _toastAttachToken++;
+
+                    // If Prelude was injected on the New Chat root (session-*), we won't see a marker in Truth.log
+                    // until after the first send. Carry the seed across the first real attach so Chronicle doesn't
+                    // prompt unnecessarily in freshly seeded chats.
+                    if (isValidChat &&
+                        _pendingPreludeSeedForNextAttach &&
+                        _pendingPreludeSeedUntilUtc != DateTime.MinValue &&
+                        nowUtc <= _pendingPreludeSeedUntilUtc)
+                    {
+                        SessionContext.MarkContinuumSeeded(cid);
+                        _pendingPreludeSeedForNextAttach = false;
+                        _pendingPreludeSeedUntilUtc = DateTime.MinValue;
+                    }
                     _toastAttachChatId = cid;
                     _toastAttachUtc = nowUtc;
                     _toastAttachDwellMet = false;
@@ -608,6 +636,26 @@ namespace VAL.Continuum
             };
 
             EssenceInjectQueue.Enqueue(seed);
+
+            // Mark this as a seeded chat for Chronicle prompt suppression.
+            // If we're on the New Chat root, cid will be session-<...>; carry a one-shot flag until the
+            // next real session.attach provides the /c/<uuid> chatId.
+            bool isValidChat =
+                !string.IsNullOrWhiteSpace(cid) &&
+                !cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase);
+
+            lock (Sync)
+            {
+                if (isValidChat)
+                {
+                    SessionContext.MarkContinuumSeeded(cid);
+                }
+                else
+                {
+                    _pendingPreludeSeedForNextAttach = true;
+                    _pendingPreludeSeedUntilUtc = DateTime.UtcNow.AddMinutes(5);
+                }
+            }
         }
 
         // -------------------------
@@ -1053,26 +1101,32 @@ namespace VAL.Continuum
                     }
 
                     attachDwellMet = attachMatch && _toastAttachDwellMet;
-                    chronicleAlreadyShown = !attachMatch || _toastAttachChronicleShown;
+                    // Treat the Chronicle prompt as "already shown recently" for this chat to avoid spam on rapid chat switching.
+                    bool shownRecently = false;
+                    if (_chroniclePromptLastShownUtcByChat.TryGetValue(cid, out var lastShownUtc))
+                    {
+                        shownRecently = (nowUtc - lastShownUtc) < ChroniclePromptReshowWindow;
+                    }
+
+                    chronicleAlreadyShown = !attachMatch || _toastAttachChronicleShown || shownRecently;
                 }
 
                 if (chronicleRunning) return;
 
-                // First composer interaction after attach: capture baseline turns and exit.
+                // First composer interaction after attach (per chat): capture baseline turns and exit.
                 // This prevents lifecycle/guidance toasts from firing on a mere click/focus,
                 // and allows gating on a real user↔assistant exchange (turns +2) instead.
-                if (!_toastAttachBaselineInitialized)
+                int baselineTurns;
+                lock (Sync)
                 {
-                    lock (Sync)
+                    if (!_chronicleBaselineTurnsByChat.TryGetValue(cid, out baselineTurns))
                     {
-                        _toastAttachBaselineTurns = capturedTurns;
-                        _toastAttachBaselineInitialized = true;
+                        _chronicleBaselineTurnsByChat[cid] = capturedTurns;
+                        return;
                     }
-                    return;
                 }
 
-                bool commitReady = capturedTurns >= (_toastAttachBaselineTurns + 2);
-
+                bool commitReady = capturedTurns >= (baselineTurns + 2);
                 if (!commitReady) return;
 
                 // Chronicle prompt is more intrusive: only consider it after the user has dwelled in the chat.
@@ -1123,6 +1177,8 @@ namespace VAL.Continuum
                         {
                             _toastAttachChronicleShown = true;
                         }
+
+                        _chroniclePromptLastShownUtcByChat[cid] = nowUtc;
                     }
                 }
             }
@@ -1447,7 +1503,12 @@ private static void MaybeShowChronicleSuggested(string chatId)
                 WriteChronicleMarker(cid);
                 try { SessionContext.MarkChronicleRebuilt(cid); } catch { }
 
-
+                // This chat no longer needs Chronicle prompting/baseline tracking.
+                lock (Sync)
+                {
+                    _chronicleBaselineTurnsByChat.Remove(cid);
+                    _chroniclePromptLastShownUtcByChat.Remove(cid);
+                }
                 // Replace the sticky "do not send" toast with the completion toast.
                 ToastHub.TryShow(ToastKey.ChronicleCompleted, chatId: cid, bypassLaunchQuiet: true);
 

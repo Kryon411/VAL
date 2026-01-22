@@ -7,11 +7,23 @@
 
 It is not necessary to recreate, summarize, reinterpret, or advance earlier material unless explicitly instructed.
 
+
+## PRIME DIRECTIVE (READ FIRST)
+On the first assistant reply after injection:
+- If WWLO contains an unanswered USER instruction → answer it directly (**no preface, no quoting WWLO**).
+- Otherwise → acknowledge readiness in **one short line** and wait.
+
 ## Response Guidelines
 - Begin from **“Where We Left Off”** (last complete exchange).
+- Treat the **WWLO USER** line as the active prompt to answer in this chat.
 - If that section contains a direct instruction → answer it.
+- Do not restate, quote, or announce WWLO; **answer it directly**.
+- Avoid prefaces like “Got it” or “We’re resuming…” unless the user asked.
 - If not → acknowledge continuity and wait.
 - Treat all other sections as reference only.
+
+## Formatting Notes (Composer)
+- Prefer short paragraphs and avoid very long unbroken strings (especially long URLs); wrapping is most reliable when text includes spaces and paragraph breaks.
 
 ## Highlighting Guide (when applicable)
 Use highlight markers only when they add structural clarity.

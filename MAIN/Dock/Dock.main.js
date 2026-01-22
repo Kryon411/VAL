@@ -452,6 +452,7 @@ if (module==="Theme") {
       try {
         suppressPreludeNudge(25000);
         post({ type:"continuum.command.pulse", chatId: getChatId() });
+        collapse(true);
         startRefreshCooldown(8000);
       } catch(_) {
         setRefreshLocked(false);

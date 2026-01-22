@@ -39,7 +39,9 @@ namespace VAL.Continuum.Pipeline.Filter2
             var howToProceedBody = string.Join("\n", new[]
             {
                 "Proceed from \"WHERE WE LEFT OFF\".",
+                "First assistant reply after injection: if WWLO is already answered, acknowledge readiness in one short line and wait.",
                 "If WWLO contains a direct instruction, answer it.",
+                "Do not restate, quote, or announce WWLO; answer it directly.",
                 "Otherwise acknowledge continuity and wait."
             });
             AppendSection(sb, "HOW TO PROCEED", howToProceedBody);
