@@ -14,13 +14,15 @@ namespace VAL.Host.Services
         private readonly IAppPaths _appPaths;
         private readonly IProcessLauncher _processLauncher;
         private readonly IUiThread _uiThread;
+        private readonly SmokeTestSettings _smokeSettings;
         private int _handling;
 
-        public CrashHandler(IAppPaths appPaths, IProcessLauncher processLauncher, IUiThread uiThread)
+        public CrashHandler(IAppPaths appPaths, IProcessLauncher processLauncher, IUiThread uiThread, SmokeTestSettings smokeSettings)
         {
             _appPaths = appPaths;
             _processLauncher = processLauncher;
             _uiThread = uiThread;
+            _smokeSettings = smokeSettings;
         }
 
         public void Register(Application application)
@@ -74,6 +76,9 @@ namespace VAL.Host.Services
             {
                 // Writing crash report must never throw.
             }
+
+            if (_smokeSettings.Enabled)
+                return;
 
             try
             {
