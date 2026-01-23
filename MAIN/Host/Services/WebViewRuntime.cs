@@ -5,21 +5,25 @@ using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using VAL.Host;
+using Microsoft.Extensions.Options;
+using VAL.Host.Options;
 
 namespace VAL.Host.Services
 {
     public sealed class WebViewRuntime : IWebViewRuntime
     {
         private readonly IAppPaths _appPaths;
+        private readonly WebViewOptions _webViewOptions;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private Task? _initTask;
         private bool _eventsWired;
 
         public CoreWebView2? Core { get; private set; }
 
-        public WebViewRuntime(IAppPaths appPaths)
+        public WebViewRuntime(IAppPaths appPaths, IOptions<WebViewOptions> webViewOptions)
         {
             _appPaths = appPaths;
+            _webViewOptions = webViewOptions.Value;
         }
 
         public event Action<string>? WebMessageJsonReceived;
@@ -96,9 +100,21 @@ namespace VAL.Host.Services
             await control.EnsureCoreWebView2Async(env);
 
             Core = control.CoreWebView2;
-            Core.Settings.AreDevToolsEnabled = true;
+            Core.Settings.AreDevToolsEnabled = _webViewOptions.AllowDevTools;
             Core.Settings.IsStatusBarEnabled = false;
             Core.Settings.IsWebMessageEnabled = true;
+
+            if (!string.IsNullOrWhiteSpace(_webViewOptions.UserAgentOverride))
+            {
+                try
+                {
+                    Core.Settings.UserAgent = _webViewOptions.UserAgentOverride;
+                }
+                catch
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "Failed to apply user agent override.");
+                }
+            }
 
             if (!_eventsWired)
             {
@@ -111,6 +127,9 @@ namespace VAL.Host.Services
 
         private void HandleNewWindowRequested(CoreWebView2NewWindowRequestedEventArgs e)
         {
+            if (!_webViewOptions.BlockNewWindow)
+                return;
+
             try
             {
                 e.NewWindow = Core;

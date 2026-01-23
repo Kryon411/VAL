@@ -1,7 +1,10 @@
 using System;
+using System.IO;
 using System.Windows;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
 using VAL.Host.WebMessaging;
@@ -20,8 +23,33 @@ namespace VAL
             {
                 // Fully-qualify Host to avoid accidentally binding to the VAL.Host namespace.
                 host = global::Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
-                    .ConfigureServices(services =>
+                    .ConfigureAppConfiguration((context, config) =>
                     {
+                        var localConfigPath = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "VAL",
+                            "config.json");
+
+                        config.AddEnvironmentVariables(prefix: "VAL__");
+                        config.AddJsonFile(localConfigPath, optional: true, reloadOnChange: false);
+                    })
+                    .ConfigureServices((context, services) =>
+                    {
+                        services.AddOptions<ValOptions>()
+                            .Bind(context.Configuration.GetSection(ValOptions.SectionName))
+                            .PostConfigure(options => options.ApplyDefaults())
+                            .Validate(options => !string.IsNullOrWhiteSpace(options.DataRoot), "Val options must include a data root.");
+
+                        services.AddOptions<WebViewOptions>()
+                            .Bind(context.Configuration.GetSection(WebViewOptions.SectionName))
+                            .PostConfigure(options => options.ApplyDefaults())
+                            .Validate(options => !string.IsNullOrWhiteSpace(options.StartUrl), "WebView options must include a start URL.");
+
+                        services.AddOptions<ModuleOptions>()
+                            .Bind(context.Configuration.GetSection(ModuleOptions.SectionName))
+                            .PostConfigure(options => options.ApplyDefaults())
+                            .Validate(options => options.EnabledModules != null, "Module options must include module list.");
+
                         services.AddSingleton<IModuleLoader, ModuleLoaderAdapter>();
                         services.AddSingleton<ISessionContext, SessionContextAdapter>();
                         services.AddSingleton<IOperationCoordinator, OperationCoordinatorAdapter>();

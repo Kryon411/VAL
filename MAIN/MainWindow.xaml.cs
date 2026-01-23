@@ -3,8 +3,10 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using Microsoft.Extensions.Options;
 using VAL.Host;
 using VAL.Host.Services;
+using VAL.Host.Options;
 using VAL.ViewModels;
 
 namespace VAL
@@ -14,6 +16,7 @@ namespace VAL
         private readonly IToastService _toastService;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly MainWindowViewModel _viewModel;
+        private readonly WebViewOptions _webViewOptions;
 
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
@@ -23,11 +26,13 @@ namespace VAL
         public MainWindow(
             IToastService toastService,
             IWebViewRuntime webViewRuntime,
-            MainWindowViewModel viewModel)
+            MainWindowViewModel viewModel,
+            IOptions<WebViewOptions> webViewOptions)
         {
             _toastService = toastService;
             _webViewRuntime = webViewRuntime;
             _viewModel = viewModel;
+            _webViewOptions = webViewOptions.Value;
 
             InitializeComponent();
             DataContext = _viewModel;
@@ -101,7 +106,13 @@ namespace VAL
                 ValLog.Warn("MainWindow", "View model initialization failed.");
             }
 
-            WebView.Source = new Uri("https://chatgpt.com");
+            if (!Uri.TryCreate(_webViewOptions.StartUrl, UriKind.Absolute, out var startUri))
+            {
+                ValLog.Warn("MainWindow", "Invalid StartUrl configured. Falling back to default.");
+                startUri = new Uri(WebViewOptions.DefaultStartUrl);
+            }
+
+            WebView.Source = startUri;
         }
     }
 }
