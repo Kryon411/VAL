@@ -26,6 +26,24 @@ namespace VAL.Host
         // Idempotency guard: prevent duplicate module injection (especially across navigations).
         private static readonly HashSet<string> _loadedConfigPaths = new(StringComparer.OrdinalIgnoreCase);
         private static readonly object _loadLock = new();
+        private static readonly object _statusLock = new();
+        private static readonly Dictionary<string, ModuleStatusInfo> _moduleStatuses = new(StringComparer.OrdinalIgnoreCase);
+
+        public sealed class ModuleStatusInfo
+        {
+            public ModuleStatusInfo(string name, string configPath, string status, string? reason)
+            {
+                Name = name;
+                ConfigPath = configPath;
+                Status = status;
+                Reason = reason;
+            }
+
+            public string Name { get; }
+            public string ConfigPath { get; }
+            public string Status { get; }
+            public string? Reason { get; }
+        }
 
         private sealed class ModuleConfig
         {
@@ -41,6 +59,28 @@ namespace VAL.Host
 
             // Optional: additional scripts to load (in order). If present, these are loaded.
             public string[]? scripts { get; set; }
+        }
+
+        public static IReadOnlyList<ModuleStatusInfo> GetModuleStatusSnapshot()
+        {
+            lock (_statusLock)
+            {
+                return _moduleStatuses.Values
+                    .OrderBy(status => status.Name, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(status => status.ConfigPath, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+        }
+
+        private static void UpdateModuleStatus(string configPath, string moduleName, string status, string? reason)
+        {
+            if (string.IsNullOrWhiteSpace(configPath) || string.IsNullOrWhiteSpace(moduleName))
+                return;
+
+            lock (_statusLock)
+            {
+                _moduleStatuses[configPath] = new ModuleStatusInfo(moduleName, configPath, status, reason);
+            }
         }
 
         private static string ResolveAppRoot()
@@ -151,9 +191,26 @@ namespace VAL.Host
                         jsonCfg,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 }
-                catch
+                catch (JsonException ex)
                 {
-                    ValLog.Warn("ModuleLoader", $"Failed to parse module config: {configPath}");
+                    var location = ex.LineNumber.HasValue
+                        ? $" Line {ex.LineNumber.Value}, Position {ex.BytePositionInLine}."
+                        : string.Empty;
+                    var reason = ex.LineNumber.HasValue
+                        ? $"Config parse error (line {ex.LineNumber.Value}, position {ex.BytePositionInLine})"
+                        : "Config parse error";
+                    UpdateModuleStatus(configPath, moduleNameFromFile, "Disabled", reason);
+                    ValLog.Warn(
+                        "ModuleLoader",
+                        $"Failed to parse module config: {configPath}. {ex.Message}.{location} Module disabled due to config error.");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    UpdateModuleStatus(configPath, moduleNameFromFile, "Disabled", "Config parse error");
+                    ValLog.Warn(
+                        "ModuleLoader",
+                        $"Failed to parse module config: {configPath}. {ex.Message}. Module disabled due to config error.");
                     return;
                 }
 
@@ -276,6 +333,8 @@ namespace VAL.Host
                         // ignore
                     }
                 }
+
+                UpdateModuleStatus(configPath, moduleName, "Loaded", null);
             }
 
             try

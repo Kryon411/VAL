@@ -5,6 +5,7 @@ using System.Windows;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
+using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
 
@@ -110,6 +111,26 @@ namespace VAL.ViewModels
                 foreach (var module in moduleOptions.EnabledModules)
                 {
                     builder.AppendLine($"- {module}");
+                }
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("Modules Status");
+            builder.AppendLine("-------------------------------");
+            var moduleStatuses = ModuleLoader.GetModuleStatusSnapshot();
+            if (moduleStatuses.Count == 0)
+            {
+                builder.AppendLine("(no module status available yet)");
+            }
+            else
+            {
+                foreach (var status in moduleStatuses)
+                {
+                    var reasonSuffix = string.IsNullOrWhiteSpace(status.Reason)
+                        ? string.Empty
+                        : $" (reason: {status.Reason})";
+                    builder.AppendLine($"- {status.Name}: {status.Status}{reasonSuffix}");
+                    builder.AppendLine($"  Path: {status.ConfigPath}");
                 }
             }
 
