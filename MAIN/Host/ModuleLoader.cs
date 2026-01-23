@@ -26,6 +26,22 @@ namespace VAL.Host
         // Idempotency guard: prevent duplicate module injection (especially across navigations).
         private static readonly HashSet<string> _loadedConfigPaths = new(StringComparer.OrdinalIgnoreCase);
         private static readonly object _loadLock = new();
+        private static readonly object _statusLock = new();
+        private static readonly Dictionary<string, ModuleStatusInfo> _moduleStatuses = new(StringComparer.OrdinalIgnoreCase);
+
+        public sealed class ModuleStatusInfo
+        {
+            public ModuleStatusInfo(string name, string status, string path)
+            {
+                Name = name;
+                Status = status;
+                Path = path;
+            }
+
+            public string Name { get; }
+            public string Status { get; }
+            public string Path { get; }
+        }
 
         private sealed class ModuleConfig
         {
@@ -41,6 +57,46 @@ namespace VAL.Host
 
             // Optional: additional scripts to load (in order). If present, these are loaded.
             public string[]? scripts { get; set; }
+        }
+
+        public static IReadOnlyList<ModuleStatusInfo> GetModuleStatuses()
+        {
+            lock (_statusLock)
+            {
+                return _moduleStatuses.Values
+                    .OrderBy(status => status.Name, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(status => status.Path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+        }
+
+        private static void RecordModuleStatus(string configPath, string moduleName, string status)
+        {
+            if (string.IsNullOrWhiteSpace(configPath) || string.IsNullOrWhiteSpace(moduleName))
+                return;
+
+            lock (_statusLock)
+            {
+                _moduleStatuses[configPath] = new ModuleStatusInfo(moduleName, status, configPath);
+            }
+        }
+
+        private static string FormatConfigExceptionDetails(Exception exception)
+        {
+            if (exception is JsonException jsonException)
+            {
+                var message = jsonException.Message;
+                if (jsonException.LineNumber.HasValue || jsonException.BytePositionInLine.HasValue)
+                {
+                    var line = jsonException.LineNumber?.ToString() ?? "?";
+                    var position = jsonException.BytePositionInLine?.ToString() ?? "?";
+                    message += $" (Line {line}, Position {position})";
+                }
+
+                return message;
+            }
+
+            return exception.Message;
         }
 
         private static string ResolveAppRoot()
@@ -151,9 +207,11 @@ namespace VAL.Host
                         jsonCfg,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 }
-                catch
+                catch (Exception ex)
                 {
-                    ValLog.Warn("ModuleLoader", $"Failed to parse module config: {configPath}");
+                    var details = FormatConfigExceptionDetails(ex);
+                    ValLog.Warn("ModuleLoader", $"Failed to parse module config: {configPath}. {details} Module disabled due to config error.");
+                    RecordModuleStatus(configPath, moduleNameFromFile, "Disabled (config parse error)");
                     return;
                 }
 
@@ -276,6 +334,8 @@ namespace VAL.Host
                         // ignore
                     }
                 }
+
+                RecordModuleStatus(configPath, moduleName, "Loaded");
             }
 
             try
