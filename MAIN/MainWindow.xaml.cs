@@ -4,7 +4,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -14,13 +13,18 @@ using VAL.Continuum;
 using VAL.Continuum.Pipeline.Inject;
 using VAL.Host;
 using VAL.Host.Abyss;
-using VAL.Host.Commands;
 using VAL.Host.Portal;
+using VAL.Host.Services;
 
 namespace VAL
 {
     public partial class MainWindow : Window
     {
+        private readonly IOperationCoordinator _operationCoordinator;
+        private readonly IToastService _toastService;
+        private readonly IModuleLoader _moduleLoader;
+        private readonly ICommandDispatcher _commandDispatcher;
+
         private CoreWebView2? _modulesInitializedForCore = null;
         private int _modulesInitInFlight = 0;
 
@@ -33,8 +37,17 @@ namespace VAL
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
-        public MainWindow()
+        public MainWindow(
+            IOperationCoordinator operationCoordinator,
+            IToastService toastService,
+            IModuleLoader moduleLoader,
+            ICommandDispatcher commandDispatcher)
         {
+            _operationCoordinator = operationCoordinator;
+            _toastService = toastService;
+            _moduleLoader = moduleLoader;
+            _commandDispatcher = commandDispatcher;
+
             InitializeComponent();
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
@@ -44,14 +57,14 @@ namespace VAL
         {
             try
             {
-                if (!OperationCoordinator.IsBusy)
+                if (!_operationCoordinator.IsBusy)
                     return;
 
-                var opId = OperationCoordinator.CurrentOperationId;
+                var opId = _operationCoordinator.CurrentOperationId;
                 if (opId != 0 && opId == _lastExitWarnedOperationId)
                 {
                     // Warned already for this operation; allow exit.
-                    OperationCoordinator.RequestCancel();
+                    _operationCoordinator.RequestCancel();
                     return;
                 }
 
@@ -71,7 +84,7 @@ namespace VAL
                 }
 
                 // Best-effort cancel so guarded operations can stop at safe boundaries.
-                OperationCoordinator.RequestCancel();
+                _operationCoordinator.RequestCancel();
             }
             catch
             {
@@ -86,7 +99,7 @@ namespace VAL
             WindowState = WindowState.Maximized;
 
             // ToastHub centralizes toast policy/gating, ToastManager remains the renderer.
-            ToastHub.Initialize(this);
+            _toastService.Initialize(this);
 
             var hwnd = new WindowInteropHelper(this).Handle;
             if (hwnd != IntPtr.Zero)
@@ -152,7 +165,7 @@ namespace VAL
             WebView.CoreWebView2.WebMessageReceived += (_, e3) =>
             {
                 // Single router for all WebView -> Host messages.
-                HostCommandRouter.Handle(e3.WebMessageAsJson);
+                _commandDispatcher.HandleWebMessage(e3.WebMessageAsJson);
             };
 
 
@@ -204,7 +217,7 @@ namespace VAL
 
             try
             {
-                await ModuleLoader.Initialize(core);
+                await _moduleLoader.InitializeAsync(core);
                 _modulesInitializedForCore = core;
 
                 // Allow ContinuumHost to post command messages back into the WebView (e.g., capture flush preflight).
@@ -238,19 +251,9 @@ namespace VAL
             {
                 try
                 {
-                    var payload = new
-                    {
-                        type = "continuum.inject_text",
-                        chatId = seed.ChatId,
-                        mode = seed.Mode,
-                        text = seed.EssenceText,
-                        sourceFile = seed.SourceFileName,
-                        essenceFile = seed.EssenceFileName,
-                        openNewChat = seed.OpenNewChat
-                    };
-
-                    var json = JsonSerializer.Serialize(payload);
-                    WebView.CoreWebView2.PostWebMessageAsJson(json);
+                    var json = _commandDispatcher.CreateContinuumInjectPayload(seed);
+                    if (!string.IsNullOrWhiteSpace(json))
+                        WebView.CoreWebView2.PostWebMessageAsJson(json);
                 }
                 catch
                 {
