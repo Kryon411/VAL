@@ -10,11 +10,17 @@ namespace VAL.Host.Services
 {
     public sealed class WebViewRuntime : IWebViewRuntime
     {
+        private readonly IAppPaths _appPaths;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private Task? _initTask;
         private bool _eventsWired;
 
         public CoreWebView2? Core { get; private set; }
+
+        public WebViewRuntime(IAppPaths appPaths)
+        {
+            _appPaths = appPaths;
+        }
 
         public event Action<string>? WebMessageJsonReceived;
         public event Action? NavigationCompleted;
@@ -83,11 +89,7 @@ namespace VAL.Host.Services
         private async Task InitializeCoreAsync(WebView2 control)
         {
             // Profile root (isolated WebView2 user data)
-            var userData = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "VAL",
-                "Profile"
-            );
+            var userData = _appPaths.ProfileRoot;
             Directory.CreateDirectory(userData);
 
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userData);
