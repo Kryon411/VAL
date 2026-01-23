@@ -14,7 +14,34 @@
   console.log("[VAL Dock] script loaded");
 
 
-  function post(msg){ try{ window.chrome?.webview?.postMessage(msg); }catch(e){} }
+  function toEnvelope(message){
+    if (!message || typeof message !== "object") return message;
+    const type = (message.type || "").toString();
+    if (!type) return message;
+    if (type === "command" || type === "event" || type === "log") return message;
+    return {
+      type: "command",
+      name: type,
+      payload: message,
+      chatId: message.chatId,
+      source: "dock"
+    };
+  }
+
+  function unwrapEnvelope(message){
+    if (!message || typeof message !== "object") return message;
+    if ((message.type === "command" || message.type === "event" || message.type === "log") && message.name) {
+      const payload = (message.payload && typeof message.payload === "object" && !Array.isArray(message.payload))
+        ? { ...message.payload }
+        : {};
+      if (!payload.chatId && message.chatId) payload.chatId = message.chatId;
+      payload.type = message.name;
+      return payload;
+    }
+    return message;
+  }
+
+  function post(msg){ try{ window.chrome?.webview?.postMessage(toEnvelope(msg)); }catch(e){} }
 
   // Persisted module flags (so Control Centre reflects real module state on load)
   const VOID_ENABLED_KEY = "VAL_VoidEnabled";
@@ -496,8 +523,13 @@ if (module==="Theme") {
       if (window.chrome?.webview?.addEventListener) {
         window.chrome.webview.addEventListener("message", (ev)=>{
           try {
-            const msg = ev && ev.data;
+            let msg = ev && ev.data;
+            if (!msg) return;
+            if (typeof msg === "string") {
+              try { msg = JSON.parse(msg); } catch(_) { return; }
+            }
             if (!msg || typeof msg !== "object") return;
+            msg = unwrapEnvelope(msg);
             if ((msg.type || "") === "continuum.chronicle.start") setChronicleBusy(true);
             if ((msg.type || "") === "portal.stage.count") {
               try {

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
+using VAL.Host.WebMessaging;
 
 namespace VAL
 {
@@ -26,6 +27,7 @@ namespace VAL
                         services.AddSingleton<IToastService, ToastServiceAdapter>();
                         services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
                         services.AddSingleton<IWebViewRuntime, WebViewRuntime>();
+                        services.AddSingleton<IWebMessageSender, WebMessageSender>();
 
                         services.AddSingleton<MainWindow>();
                         services.AddSingleton<App>();

@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using VAL.Host.WebMessaging;
 using System.Threading;
 using System.Threading.Tasks;
 using VAL.Host;
@@ -18,7 +19,7 @@ namespace VAL.Continuum
         /// Host -> Web post hook (wired by MainWindow after WebView is ready).
         /// ContinuumHost stays decoupled from WebView2 types by using this delegate.
         /// </summary>
-        public static Action<string>? PostToWebJson { get; set; }
+        public static Action<MessageEnvelope>? PostToWebMessage { get; set; }
 
         // Best-effort UI context captured from the WebMessageReceived thread (usually UI/Dispatcher).
         private static SynchronizationContext? _uiCtx;
@@ -193,14 +194,27 @@ namespace VAL.Continuum
             if (string.IsNullOrWhiteSpace(json))
                 return;
 
-            Msg? msg = null;
-            try { msg = JsonSerializer.Deserialize<Msg>(json); }
-            catch { return; }
-
-            if (msg == null || string.IsNullOrWhiteSpace(msg.type))
+            if (!MessageEnvelope.TryParse(json, out var envelope))
                 return;
 
-            var type = msg.type!.Trim();
+            var type = envelope.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(type))
+                return;
+
+            Msg? msg = null;
+            if (envelope.Payload.HasValue && envelope.Payload.Value.ValueKind == JsonValueKind.Object)
+            {
+                try { msg = envelope.Payload.Value.Deserialize<Msg>(); } catch { msg = null; }
+            }
+
+            if (msg == null)
+                msg = new Msg();
+
+            if (string.IsNullOrWhiteSpace(msg.type))
+                msg.type = type;
+
+            if (string.IsNullOrWhiteSpace(msg.chatId) && !string.IsNullOrWhiteSpace(envelope.ChatId))
+                msg.chatId = envelope.ChatId;
 
             // Authoritative session context update.
             SessionContext.Observe(type, msg.chatId);
@@ -466,9 +480,17 @@ namespace VAL.Continuum
             // Ack to the client so its attach watchdog can stop deterministically.
             try
             {
-                var post = PostToWebJson;
+                var post = PostToWebMessage;
                 if (post != null && !string.IsNullOrWhiteSpace(cid))
-                    post(JsonSerializer.Serialize(new { type = "continuum.session.attached", chatId = cid }));
+                {
+                    post(new MessageEnvelope
+                    {
+                        Type = "event",
+                        Name = "continuum.session.attached",
+                        ChatId = cid,
+                        Payload = JsonSerializer.SerializeToElement(new { chatId = cid })
+                    });
+                }
             }
             catch { }
 
@@ -900,7 +922,7 @@ namespace VAL.Continuum
         {
             try
             {
-                var post = PostToWebJson;
+                var post = PostToWebMessage;
                 if (post == null) return false;
 
                 var reqId = Guid.NewGuid().ToString("N");
@@ -912,15 +934,18 @@ namespace VAL.Continuum
                     _pendingFlushRequestedUtc = DateTime.UtcNow;
                 }
 
-                var payload = new
+                post(new MessageEnvelope
                 {
-                    type = "continuum.capture.flush",
-                    chatId = chatId,
-                    requestId = reqId,
-                    reason = "pulse"
-                };
-
-                post(JsonSerializer.Serialize(payload));
+                    Type = "command",
+                    Name = "continuum.capture.flush",
+                    ChatId = chatId,
+                    Payload = JsonSerializer.SerializeToElement(new
+                    {
+                        chatId = chatId,
+                        requestId = reqId,
+                        reason = "pulse"
+                    })
+                });
 
                 // Fallback: if the client never ACKs, proceed after a short timeout.
                 _ = Task.Run(async () =>
@@ -1255,7 +1280,7 @@ private static void MaybeShowChronicleSuggested(string chatId)
                 OperationCoordinator.RequestCancel();
 
                 // Ask the client to stop its scroll+scan loop.
-                var post = PostToWebJson;
+                var post = PostToWebMessage;
                 if (post == null) return;
 
                 var cid = SessionContext.ResolveChatId(chatId);
@@ -1264,14 +1289,17 @@ private static void MaybeShowChronicleSuggested(string chatId)
                 string rid;
                 lock (Sync) { rid = _chronicleRequestId ?? string.Empty; }
 
-                var payload = new
+                post(new MessageEnvelope
                 {
-                    type = "continuum.chronicle.cancel",
-                    chatId = cid,
-                    requestId = rid
-                };
-
-                post(JsonSerializer.Serialize(payload));
+                    Type = "command",
+                    Name = "continuum.chronicle.cancel",
+                    ChatId = cid,
+                    Payload = JsonSerializer.SerializeToElement(new
+                    {
+                        chatId = cid,
+                        requestId = rid
+                    })
+                });
             }
             catch { }
         }
@@ -1366,7 +1394,7 @@ private static void MaybeShowChronicleSuggested(string chatId)
             // Ask the client to run a deterministic scroll+scan capture from top->bottom.
             try
             {
-                var post = PostToWebJson;
+                var post = PostToWebMessage;
                 if (post == null)
                 {
                     // Ensure any sticky Chronicle toast is dismissed on failure.
@@ -1385,15 +1413,18 @@ private static void MaybeShowChronicleSuggested(string chatId)
                 string rid;
                 lock (Sync) { rid = _chronicleRequestId ?? Guid.NewGuid().ToString("N"); }
 
-                var payload = new
+                post(new MessageEnvelope
                 {
-                    type = "continuum.chronicle.start",
-                    chatId = cid,
-                    requestId = rid,
-                    mode = "full"
-                };
-
-                post(JsonSerializer.Serialize(payload));
+                    Type = "command",
+                    Name = "continuum.chronicle.start",
+                    ChatId = cid,
+                    Payload = JsonSerializer.SerializeToElement(new
+                    {
+                        chatId = cid,
+                        requestId = rid,
+                        mode = "full"
+                    })
+                });
                 // Sticky instruction toast: remains visible until Chronicle completes (then replaced).
                 ToastHub.TryShow(ToastKey.ChronicleStarted, chatId: cid, bypassLaunchQuiet: true);
             }

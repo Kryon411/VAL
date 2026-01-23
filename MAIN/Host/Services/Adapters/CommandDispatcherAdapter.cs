@@ -1,33 +1,39 @@
 using System.Text.Json;
 using VAL.Continuum.Pipeline.Inject;
 using VAL.Host.Commands;
+using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Services.Adapters
 {
     public sealed class CommandDispatcherAdapter : ICommandDispatcher
     {
-        public void HandleWebMessage(string json)
+        public void HandleWebMessageJson(string json)
         {
-            HostCommandRouter.Handle(json);
+            HostCommandRouter.HandleWebMessageJson(json);
         }
 
-        public string? CreateContinuumInjectPayload(EssenceInjectController.InjectSeed seed)
+        public MessageEnvelope? CreateContinuumInjectEnvelope(EssenceInjectController.InjectSeed seed)
         {
             if (seed == null || string.IsNullOrWhiteSpace(seed.EssenceText))
                 return null;
 
-            var payload = new
+            var payload = JsonSerializer.SerializeToElement(new
             {
-                type = "continuum.inject_text",
                 chatId = seed.ChatId,
                 mode = seed.Mode,
                 text = seed.EssenceText,
                 sourceFile = seed.SourceFileName,
                 essenceFile = seed.EssenceFileName,
                 openNewChat = seed.OpenNewChat
-            };
+            });
 
-            return JsonSerializer.Serialize(payload);
+            return new MessageEnvelope
+            {
+                Type = "command",
+                Name = "continuum.inject_text",
+                ChatId = seed.ChatId,
+                Payload = payload
+            };
         }
     }
 }
