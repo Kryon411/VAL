@@ -29,11 +29,14 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/publish | Out-Null
-          Copy-Item -Path Modules -Destination artifacts/publish/Modules -Recurse -Force
-          if (Test-Path Dock) {
-            Copy-Item -Path Dock -Destination artifacts/publish/Dock -Recurse -Force
+          Copy-Item -Path "MAIN/Modules" -Destination "artifacts/publish/Modules" -Recurse -Force
+          if (Test-Path "MAIN/Dock") {
+            Copy-Item -Path "MAIN/Dock" -Destination "artifacts/publish/Dock" -Recurse -Force
           }
-          Copy-Item -Path appsettings.json -Destination artifacts/publish/appsettings.json -Force
+          Copy-Item -Path "MAIN/appsettings.json" -Destination "artifacts/publish/appsettings.json" -Force
+          if (Test-Path "MAIN/appsettings.Development.json") {
+            Copy-Item -Path "MAIN/appsettings.Development.json" -Destination "artifacts/publish/appsettings.Development.json" -Force
+          }
 
       - name: Run smoke
         shell: pwsh
