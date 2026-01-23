@@ -17,6 +17,7 @@ namespace VAL.ViewModels
         private readonly IContinuumPump _continuumPump;
         private readonly IProcessLauncher _processLauncher;
         private readonly IAppPaths _appPaths;
+        private readonly IDiagnosticsWindowService _diagnosticsWindowService;
 
         private long _lastExitWarnedOperationId;
         private bool _isDockOpen;
@@ -30,7 +31,8 @@ namespace VAL.ViewModels
             IModuleRuntimeService moduleRuntimeService,
             IContinuumPump continuumPump,
             IProcessLauncher processLauncher,
-            IAppPaths appPaths)
+            IAppPaths appPaths,
+            IDiagnosticsWindowService diagnosticsWindowService)
         {
             _operationCoordinator = operationCoordinator;
             _commandDispatcher = commandDispatcher;
@@ -39,12 +41,14 @@ namespace VAL.ViewModels
             _continuumPump = continuumPump;
             _processLauncher = processLauncher;
             _appPaths = appPaths;
+            _diagnosticsWindowService = diagnosticsWindowService;
 
             ToggleDockCommand = new RelayCommand(() => IsDockOpen = !IsDockOpen);
             OpenLogsFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.LogsRoot));
             OpenDataFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.DataRoot));
             OpenModulesFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.ModulesRoot));
             OpenProfileFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.ProfileRoot));
+            OpenDiagnosticsCommand = new RelayCommand(() => _diagnosticsWindowService.ShowDiagnostics());
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -54,6 +58,7 @@ namespace VAL.ViewModels
         public ICommand OpenDataFolderCommand { get; }
         public ICommand OpenModulesFolderCommand { get; }
         public ICommand OpenProfileFolderCommand { get; }
+        public ICommand OpenDiagnosticsCommand { get; }
 
         public bool IsDockOpen
         {
