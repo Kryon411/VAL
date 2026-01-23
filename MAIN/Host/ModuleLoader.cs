@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
+using VAL.Host.Options;
 
 namespace VAL.Host
 {
@@ -111,12 +112,19 @@ namespace VAL.Host
             return exeDir;
         }
 
-        public static async Task Initialize(CoreWebView2 core)
+        public static async Task Initialize(CoreWebView2 core, string? modulesRoot, ModuleOptions? moduleOptions = null)
         {
             if (core == null)
                 return;
 
-            string baseDir = ResolveAppRoot();
+            var enabledModules = moduleOptions?.EnabledModules ?? Array.Empty<string>();
+            var enabledSet = enabledModules.Length > 0
+                ? new HashSet<string>(enabledModules.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()), StringComparer.OrdinalIgnoreCase)
+                : null;
+
+            string baseDir = string.IsNullOrWhiteSpace(modulesRoot)
+                ? ResolveAppRoot()
+                : modulesRoot;
 
             // MAIN layout:
             //  - Dock\Dock.module.json  (core UI)
@@ -127,7 +135,7 @@ namespace VAL.Host
                 Path.Combine(baseDir, "Modules")
             };
 
-            static async Task LoadModuleConfig(CoreWebView2 coreWebView2, string moduleDir, string configPath, string moduleNameFromFile)
+            async Task LoadModuleConfig(CoreWebView2 coreWebView2, string moduleDir, string configPath, string moduleNameFromFile)
             {
                 if (string.IsNullOrWhiteSpace(moduleDir) || string.IsNullOrWhiteSpace(configPath))
                     return;
@@ -158,6 +166,13 @@ namespace VAL.Host
 
                 if (string.IsNullOrWhiteSpace(moduleName))
                     return;
+
+                if (enabledSet != null &&
+                    !enabledSet.Contains(moduleName) &&
+                    !enabledSet.Contains(moduleNameFromFile))
+                {
+                    return;
+                }
 
                 // Determine entry + scripts
                 var entryRel = string.IsNullOrWhiteSpace(cfg.entry)

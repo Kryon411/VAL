@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using Microsoft.Extensions.Options;
+using VAL.Host.Options;
 
 namespace VAL.Host.Services
 {
@@ -10,12 +13,31 @@ namespace VAL.Host.Services
         public string ModulesRoot { get; }
         public string ProfileRoot { get; }
 
-        public AppPaths()
+        public AppPaths(IOptions<ValOptions> options)
         {
-            DataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VAL");
-            LogsRoot = Path.Combine(DataRoot, "Logs");
-            ProfileRoot = Path.Combine(DataRoot, "Profile");
-            ModulesRoot = ResolveModulesRoot();
+            var warnings = new List<string>();
+            var config = options.Value;
+
+            var defaultDataRoot = ValOptions.DefaultDataRoot;
+            var defaultModulesRoot = ResolveModulesRoot();
+
+            DataRoot = NormalizePath(config.DataRoot, defaultDataRoot, "DataRoot", warnings, defaultDataRoot);
+            LogsRoot = NormalizePath(config.LogsPath, Path.Combine(DataRoot, ValOptions.DefaultLogsPath), "LogsPath", warnings, DataRoot);
+            ProfileRoot = NormalizePath(config.ProfilePath, Path.Combine(DataRoot, ValOptions.DefaultProfilePath), "ProfilePath", warnings, DataRoot);
+            ModulesRoot = NormalizePath(config.ModulesPath, defaultModulesRoot, "ModulesPath", warnings, defaultModulesRoot);
+
+            var logFile = Path.Combine(LogsRoot, "VAL.log");
+            ValLog.Configure(logFile, config.EnableVerboseLogging);
+
+            ValLog.Verbose(nameof(AppPaths), $"Resolved DataRoot: {DataRoot}");
+            ValLog.Verbose(nameof(AppPaths), $"Resolved LogsRoot: {LogsRoot}");
+            ValLog.Verbose(nameof(AppPaths), $"Resolved ProfileRoot: {ProfileRoot}");
+            ValLog.Verbose(nameof(AppPaths), $"Resolved ModulesRoot: {ModulesRoot}");
+
+            foreach (var warning in warnings)
+            {
+                ValLog.Warn(nameof(AppPaths), warning);
+            }
         }
 
         private static string ResolveModulesRoot()
@@ -84,6 +106,35 @@ namespace VAL.Host.Services
             }
 
             return exeDir;
+        }
+
+        private static string NormalizePath(string? value, string fallback, string label, List<string> warnings, string? basePath)
+        {
+            var candidate = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            candidate = Environment.ExpandEnvironmentVariables(candidate);
+
+            if (!Path.IsPathRooted(candidate) && !string.IsNullOrWhiteSpace(basePath))
+            {
+                candidate = Path.Combine(basePath, candidate);
+            }
+
+            try
+            {
+                return Path.GetFullPath(candidate);
+            }
+            catch
+            {
+                warnings.Add($"Invalid path for {label}. Falling back to {fallback}.");
+                try
+                {
+                    return Path.GetFullPath(fallback);
+                }
+                catch
+                {
+                    warnings.Add($"Fallback path for {label} is invalid: {fallback}.");
+                    return fallback;
+                }
+            }
         }
     }
 }
