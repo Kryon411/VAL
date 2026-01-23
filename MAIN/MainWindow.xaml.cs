@@ -14,6 +14,7 @@ using VAL.Host;
 using VAL.Host.Abyss;
 using VAL.Host.Portal;
 using VAL.Host.Services;
+using VAL.Host.WebMessaging;
 
 namespace VAL
 {
@@ -24,6 +25,7 @@ namespace VAL
         private readonly IModuleLoader _moduleLoader;
         private readonly ICommandDispatcher _commandDispatcher;
         private readonly IWebViewRuntime _webViewRuntime;
+        private readonly IWebMessageSender _webMessageSender;
 
         private CoreWebView2? _modulesInitializedForCore = null;
         private int _modulesInitInFlight = 0;
@@ -42,13 +44,15 @@ namespace VAL
             IToastService toastService,
             IModuleLoader moduleLoader,
             ICommandDispatcher commandDispatcher,
-            IWebViewRuntime webViewRuntime)
+            IWebViewRuntime webViewRuntime,
+            IWebMessageSender webMessageSender)
         {
             _operationCoordinator = operationCoordinator;
             _toastService = toastService;
             _moduleLoader = moduleLoader;
             _commandDispatcher = commandDispatcher;
             _webViewRuntime = webViewRuntime;
+            _webMessageSender = webMessageSender;
 
             InitializeComponent();
             Loaded += MainWindow_Loaded;
@@ -117,7 +121,7 @@ namespace VAL
             try
             {
                 PortalRuntime.Initialize(
-                    postJson: (json) => _webViewRuntime.PostJson(json),
+                    messageSender: _webMessageSender,
                     focusWebView: () =>
                     {
                         try { WebView.Focus(); } catch { }
@@ -158,7 +162,7 @@ namespace VAL
             _webViewRuntime.WebMessageJsonReceived += (json) =>
             {
                 // Single router for all WebView -> Host messages.
-                _commandDispatcher.HandleWebMessage(json);
+                _commandDispatcher.HandleWebMessageJson(json);
             };
 
             // Best-effort init: register module scripts as early as possible so first-run login flows
@@ -187,15 +191,10 @@ namespace VAL
                 _modulesInitializedForCore = core;
 
                 // Allow ContinuumHost to post command messages back into the WebView (e.g., capture flush preflight).
-                ContinuumHost.PostToWebJson = (json) =>
-                {
-                    try { core.PostWebMessageAsJson(json); } catch { }
-                };
+                ContinuumHost.PostToWebMessage = _webMessageSender.Send;
 
                 // Abyss uses the same host -> webview post channel as other modules.
-                AbyssRuntime.Initialize(
-                    postJson: (json) => Dispatcher.InvokeAsync(() => { try { core.PostWebMessageAsJson(json); } catch { } })
-                );
+                AbyssRuntime.Initialize(_webMessageSender);
             }
             catch
             {
@@ -217,9 +216,9 @@ namespace VAL
             {
                 try
                 {
-                    var json = _commandDispatcher.CreateContinuumInjectPayload(seed);
-                    if (!string.IsNullOrWhiteSpace(json))
-                        _webViewRuntime.PostJson(json);
+                    var envelope = _commandDispatcher.CreateContinuumInjectEnvelope(seed);
+                    if (envelope != null)
+                        _webMessageSender.Send(envelope);
                 }
                 catch
                 {

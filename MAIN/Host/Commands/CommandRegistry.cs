@@ -213,8 +213,10 @@ namespace VAL.Host.Commands
             Specs[spec.Type.Trim()] = spec;
         }
 
-        public static bool TryDispatch(HostCommand cmd)
+        public static bool TryDispatch(HostCommand cmd, out Exception? exception)
         {
+            exception = null;
+
             if (string.IsNullOrWhiteSpace(cmd.Type))
                 return false;
 
@@ -224,16 +226,32 @@ namespace VAL.Host.Commands
                 if (!ValidateRequiredFields(cmd, spec.RequiredFields))
                     return false;
 
-                try { spec.Handler(cmd); } catch { }
-                return true;
+                try
+                {
+                    spec.Handler(cmd);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    return false;
+                }
             }
 
             // 2) Forward-compat routing: any Continuum command we haven't catalogued yet.
             //    ContinuumHost remains defensive and will ignore unknown types safely.
             if (cmd.Type.StartsWith("continuum.", StringComparison.OrdinalIgnoreCase))
             {
-                try { ContinuumHost.HandleJson(cmd.RawJson); } catch { }
-                return true;
+                try
+                {
+                    ContinuumHost.HandleJson(cmd.RawJson);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                    return false;
+                }
             }
 
             return false;

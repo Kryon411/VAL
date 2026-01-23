@@ -17,8 +17,35 @@
     panelOpen: false
   };
 
+  function toEnvelope(message){
+    if (!message || typeof message !== "object") return message;
+    const type = (message.type || "").toString();
+    if (!type) return message;
+    if (type === "command" || type === "event" || type === "log") return message;
+    return {
+      type: "command",
+      name: type,
+      payload: message,
+      chatId: message.chatId,
+      source: "abyss"
+    };
+  }
+
+  function unwrapEnvelope(message){
+    if (!message || typeof message !== "object") return message;
+    if ((message.type === "command" || message.type === "event" || message.type === "log") && message.name) {
+      const payload = (message.payload && typeof message.payload === "object" && !Array.isArray(message.payload))
+        ? { ...message.payload }
+        : {};
+      if (!payload.chatId && message.chatId) payload.chatId = message.chatId;
+      payload.type = message.name;
+      return payload;
+    }
+    return message;
+  }
+
   function post(msg){
-    try { window.chrome?.webview?.postMessage(msg); } catch(_) {}
+    try { window.chrome?.webview?.postMessage(toEnvelope(msg)); } catch(_) {}
   }
 
   function getChatId(){
@@ -303,6 +330,7 @@
       try { msg = JSON.parse(msg); } catch(_) { return; }
     }
     if (typeof msg !== "object") return;
+    msg = unwrapEnvelope(msg);
     if ((msg.type || "") !== "abyss.results") return;
 
     const nextQuery = (msg.queryUsed || msg.lastQuery || "").toString();

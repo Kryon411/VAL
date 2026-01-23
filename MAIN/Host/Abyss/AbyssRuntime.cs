@@ -7,22 +7,23 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using VAL.Continuum.Pipeline.Truth;
+using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Abyss
 {
     internal static class AbyssRuntime
     {
         private static readonly object Gate = new();
-        private static Action<string>? _postJson;
+        private static IWebMessageSender? _messageSender;
         private static List<AbyssSearchResult> _lastResults = new();
         private static string? _lastQuery;
         private static string? _lastQueryOriginal;
         private static string? _lastMemoryRoot;
         private static string? _lastGeneratedUtc;
 
-        public static void Initialize(Action<string> postJson)
+        public static void Initialize(IWebMessageSender messageSender)
         {
-            _postJson = postJson;
+            _messageSender = messageSender;
         }
 
         public static void InjectPrompt(string? chatId)
@@ -221,14 +222,14 @@ namespace VAL.Host.Abyss
 
         public static void EmitResults(string? chatId)
         {
-            if (_postJson == null)
+            if (_messageSender == null)
                 return;
 
             var payload = BuildResultsPayload();
             if (payload == null)
                 return;
 
-            SendJson(payload);
+            SendEnvelope("event", "abyss.results", payload);
         }
 
         public static void ClearResults(string? chatId)
@@ -270,17 +271,10 @@ namespace VAL.Host.Abyss
             if (string.IsNullOrWhiteSpace(text))
                 return;
 
-            if (_postJson == null)
+            if (_messageSender == null)
                 return;
 
-            var payload = new
-            {
-                type = "continuum.inject_text",
-                chatId = chatId,
-                text = text
-            };
-
-            SendJson(payload);
+            SendEnvelope("command", "continuum.inject_text", new { chatId = chatId, text = text }, chatId);
         }
 
         private static string BuildInjectPayload(AbyssSearchResult result, string query)
@@ -485,15 +479,20 @@ namespace VAL.Host.Abyss
             }
         }
 
-        private static void SendJson(object payload)
+        private static void SendEnvelope(string type, string name, object payload, string? chatId = null)
         {
-            if (_postJson == null)
+            if (_messageSender == null)
                 return;
 
             try
             {
-                var json = JsonSerializer.Serialize(payload);
-                _postJson?.Invoke(json);
+                _messageSender.Send(new MessageEnvelope
+                {
+                    Type = type,
+                    Name = name,
+                    ChatId = chatId,
+                    Payload = JsonSerializer.SerializeToElement(payload)
+                });
             }
             catch { }
         }

@@ -1,5 +1,7 @@
 using System;
 using System.Text.Json;
+using VAL.Host;
+using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Commands
 {
@@ -15,41 +17,52 @@ namespace VAL.Host.Commands
     /// </summary>
     public static class HostCommandRouter
     {
-        public static void Handle(string? json)
+        public static void HandleWebMessageJson(string? json)
         {
             if (string.IsNullOrWhiteSpace(json))
                 return;
 
-            try
+            if (!MessageEnvelope.TryParse(json, out var envelope))
+                return;
+
+            if (!string.Equals(envelope.Type, "command", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var commandName = envelope.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(commandName))
             {
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                if (!root.TryGetProperty("type", out var typeEl) || typeEl.ValueKind != JsonValueKind.String)
-                    return;
-
-                var type = (typeEl.GetString() ?? string.Empty).Trim();
-                if (string.IsNullOrWhiteSpace(type))
-                    return;
-
-                string? chatId = null;
-                try
-                {
-                    if (root.TryGetProperty("chatId", out var chatEl) && chatEl.ValueKind == JsonValueKind.String)
-                        chatId = chatEl.GetString();
-                }
-                catch { /* ignore */ }
-
-                // Central session tracking.
-                SessionContext.Observe(type, chatId);
-
-                var cmd = new HostCommand(type, json, chatId, root);
-                CommandRegistry.TryDispatch(cmd);
+                ValLog.Warn(nameof(HostCommandRouter), "Web message missing command name.");
+                return;
             }
-            catch
+
+            // Central session tracking.
+            SessionContext.Observe(commandName, envelope.ChatId);
+
+            var payload = envelope.Payload;
+            if (payload.HasValue && payload.Value.ValueKind == JsonValueKind.Object)
             {
-                // Never let malformed JSON break the host.
+                var cmd = new HostCommand(commandName, json, envelope.ChatId, payload.Value);
+                Dispatch(cmd);
+                return;
             }
+
+            using var emptyDoc = JsonDocument.Parse("{}");
+            var fallbackCmd = new HostCommand(commandName, json, envelope.ChatId, emptyDoc.RootElement);
+            Dispatch(fallbackCmd);
+        }
+
+        private static void Dispatch(HostCommand cmd)
+        {
+            if (CommandRegistry.TryDispatch(cmd, out var error))
+                return;
+
+            if (error != null)
+            {
+                ValLog.Warn(nameof(HostCommandRouter), $"Handler error for '{cmd.Type}': {error.GetType().Name}.");
+                return;
+            }
+
+            ValLog.Warn(nameof(HostCommandRouter), $"Unknown command '{cmd.Type}'.");
         }
     }
 }

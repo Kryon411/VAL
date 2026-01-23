@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using System.Windows.Media.Imaging;
+using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Portal
 {
@@ -21,7 +23,7 @@ namespace VAL.Host.Portal
 
         private static DispatcherTimer? _clipTimer;
 
-        private static Action<string>? _postJson;   // host -> webview
+        private static IWebMessageSender? _messageSender;   // host -> webview
         private static Action? _focusWebView;       // ensure webview focused before paste
 
         private static uint _lastClipSeq = 0;
@@ -67,9 +69,9 @@ private static void RememberSig(string sig)
         private const byte VK_LSHIFT = 0xA0;
         private const uint KEYEVENTF_KEYUP = 0x0002;
 
-        public static void Initialize(Action<string> postJson, Action focusWebView)
+        public static void Initialize(IWebMessageSender messageSender, Action focusWebView)
         {
-            _postJson = postJson;
+            _messageSender = messageSender;
             _focusWebView = focusWebView;
         }
 
@@ -357,7 +359,12 @@ private static void RememberSig(string sig)
         {
             try
             {
-                _postJson?.Invoke($"{{\"type\":\"portal.stage.count\",\"count\":{PortalStaging.Count}}}");
+                _messageSender?.Send(new MessageEnvelope
+                {
+                    Type = "event",
+                    Name = "portal.stage.count",
+                    Payload = JsonSerializer.SerializeToElement(new { count = PortalStaging.Count })
+                });
             }
             catch { }
         }
@@ -366,7 +373,12 @@ private static void RememberSig(string sig)
         {
             try
             {
-                _postJson?.Invoke("{\"type\":\"portal.stage.cleared\"}");
+                _messageSender?.Send(new MessageEnvelope
+                {
+                    Type = "event",
+                    Name = "portal.stage.cleared",
+                    Payload = JsonSerializer.SerializeToElement(new { })
+                });
             }
             catch { }
         }
@@ -375,19 +387,14 @@ private static void RememberSig(string sig)
         {
             try
             {
-                var safe = JsonEscape(message ?? "");
-                _postJson?.Invoke($"{{\"type\":\"portal.debug\",\"message\":\"{safe}\"}}");
+                _messageSender?.Send(new MessageEnvelope
+                {
+                    Type = "log",
+                    Name = "portal.debug",
+                    Payload = JsonSerializer.SerializeToElement(new { message = message ?? string.Empty })
+                });
             }
             catch { }
-        }
-
-        private static string JsonEscape(string s)
-        {
-            return s
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "")
-                .Replace("\n", "\\n");
         }
 
         private static void RegisterHotkey()
