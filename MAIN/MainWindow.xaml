@@ -7,7 +7,7 @@
         Background="#0B0C10" WindowStyle="SingleBorderWindow">
     <Window.InputBindings>
         <KeyBinding Key="D"
-                    Modifiers="Control,Alt"
+                    Modifiers="Control+Alt"
                     Command="{Binding OpenDiagnosticsCommand}" />
     </Window.InputBindings>
     <Grid Background="#0B0C10">
