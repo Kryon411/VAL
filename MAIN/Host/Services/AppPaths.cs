@@ -8,6 +8,7 @@ namespace VAL.Host.Services
 {
     public sealed class AppPaths : IAppPaths
     {
+        public string ContentRoot { get; }
         public string DataRoot { get; }
         public string LogsRoot { get; }
         public string ModulesRoot { get; }
@@ -18,17 +19,19 @@ namespace VAL.Host.Services
             var warnings = new List<string>();
             var config = options.Value;
 
+            ContentRoot = ResolveContentRoot(warnings);
             var defaultDataRoot = ValOptions.DefaultDataRoot;
-            var defaultModulesRoot = ResolveModulesRoot();
+            var defaultModulesRoot = Path.Combine(ContentRoot, "Modules");
 
             DataRoot = NormalizePath(config.DataRoot, defaultDataRoot, "DataRoot", warnings, defaultDataRoot);
             LogsRoot = NormalizePath(config.LogsPath, Path.Combine(DataRoot, ValOptions.DefaultLogsPath), "LogsPath", warnings, DataRoot);
             ProfileRoot = NormalizePath(config.ProfilePath, Path.Combine(DataRoot, ValOptions.DefaultProfilePath), "ProfilePath", warnings, DataRoot);
-            ModulesRoot = NormalizePath(config.ModulesPath, defaultModulesRoot, "ModulesPath", warnings, defaultModulesRoot);
+            ModulesRoot = NormalizePath(config.ModulesPath, defaultModulesRoot, "ModulesPath", warnings, ContentRoot);
 
             var logFile = Path.Combine(LogsRoot, "VAL.log");
             ValLog.Configure(logFile, config.EnableVerboseLogging);
 
+            ValLog.Verbose(nameof(AppPaths), $"Resolved ContentRoot: {ContentRoot}");
             ValLog.Verbose(nameof(AppPaths), $"Resolved DataRoot: {DataRoot}");
             ValLog.Verbose(nameof(AppPaths), $"Resolved LogsRoot: {LogsRoot}");
             ValLog.Verbose(nameof(AppPaths), $"Resolved ProfileRoot: {ProfileRoot}");
@@ -40,72 +43,27 @@ namespace VAL.Host.Services
             }
         }
 
-        private static string ResolveModulesRoot()
+        private static string ResolveContentRoot(List<string> warnings)
         {
-            string exeDir = AppContext.BaseDirectory;
-            string cwd = Directory.GetCurrentDirectory();
-
-            static string FindWithModules(string startDir, int maxUp)
-            {
-                string dir = startDir;
-                for (int i = 0; i <= maxUp; i++)
-                {
-                    if (Directory.Exists(Path.Combine(dir, "Modules")))
-                        return dir;
-
-                    var parent = Directory.GetParent(dir);
-                    if (parent == null)
-                        break;
-
-                    dir = parent.FullName;
-                }
-
-                return startDir;
-            }
-
             try
             {
-                var fromExe = FindWithModules(exeDir, 6);
-                if (Directory.Exists(Path.Combine(fromExe, "Modules")))
-                    return fromExe;
+                var exePath = Environment.ProcessPath;
+                var exeDir = string.IsNullOrWhiteSpace(exePath) ? null : Path.GetDirectoryName(exePath);
+                var candidate = exeDir ?? AppContext.BaseDirectory;
+                return Path.GetFullPath(candidate);
             }
             catch
             {
-                ValLog.Warn(nameof(AppPaths), "Failed to resolve modules root from executable directory.");
-            }
-
-            try
-            {
-                string dir = exeDir;
-                for (int i = 0; i < 10; i++)
+                warnings.Add("Failed to resolve content root from executable path. Falling back to AppContext.BaseDirectory.");
+                try
                 {
-                    var parent = Directory.GetParent(dir);
-                    if (parent == null)
-                        break;
-
-                    dir = parent.FullName;
-                    var candidate = Path.Combine(dir, "PRODUCT");
-                    if (Directory.Exists(Path.Combine(candidate, "Modules")))
-                        return candidate;
+                    return Path.GetFullPath(AppContext.BaseDirectory);
+                }
+                catch
+                {
+                    return AppContext.BaseDirectory;
                 }
             }
-            catch
-            {
-                ValLog.Warn(nameof(AppPaths), "Failed to resolve modules root from sibling PRODUCT directory.");
-            }
-
-            try
-            {
-                var fromCwd = FindWithModules(cwd, 6);
-                if (Directory.Exists(Path.Combine(fromCwd, "Modules")))
-                    return fromCwd;
-            }
-            catch
-            {
-                ValLog.Warn(nameof(AppPaths), "Failed to resolve modules root from current directory.");
-            }
-
-            return exeDir;
         }
 
         private static string NormalizePath(string? value, string fallback, string label, List<string> warnings, string? basePath)

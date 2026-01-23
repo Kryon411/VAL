@@ -20,7 +20,7 @@ namespace VAL.Host.Services.Adapters
 
         public Task InitializeAsync(CoreWebView2 core)
         {
-            return ModuleLoader.Initialize(core, _appPaths.ModulesRoot, _moduleOptions);
+            return ModuleLoader.Initialize(core, _appPaths.ModulesRoot, _appPaths.ContentRoot, _moduleOptions);
         }
     }
 }

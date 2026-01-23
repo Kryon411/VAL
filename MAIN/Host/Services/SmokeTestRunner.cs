@@ -130,6 +130,7 @@ namespace VAL.Host.Services
             {
                 ValidateOptions(result);
                 ValidateLogSystem(result);
+                ValidateModulesRoot(result);
 
                 result.AvailableWebViewRuntimeVersion = TryGetWebViewRuntimeVersion(out var runtimeException);
                 if (runtimeException != null)
@@ -202,6 +203,41 @@ namespace VAL.Host.Services
                 result.LogAppendSucceeded = false;
                 throw new SmokeTestFailureException(40, "Failed to append to log file.", ex);
             }
+        }
+
+        private void ValidateModulesRoot(SmokeTestResult result)
+        {
+            if (string.IsNullOrWhiteSpace(_appPaths.ModulesRoot))
+            {
+                throw new SmokeTestFailureException(30, "ModulesRoot is not configured.");
+            }
+
+            if (!Directory.Exists(_appPaths.ModulesRoot))
+            {
+                throw new SmokeTestFailureException(30, $"ModulesRoot does not exist: {_appPaths.ModulesRoot}");
+            }
+
+            try
+            {
+                var hasModuleFiles = Directory
+                    .EnumerateFiles(_appPaths.ModulesRoot, "*.module.json", SearchOption.AllDirectories)
+                    .Any();
+
+                if (!hasModuleFiles)
+                {
+                    throw new SmokeTestFailureException(30, $"No module manifests found under {_appPaths.ModulesRoot}");
+                }
+            }
+            catch (SmokeTestFailureException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new SmokeTestFailureException(30, $"Failed to inspect ModulesRoot: {_appPaths.ModulesRoot}", ex);
+            }
+
+            result.ModulesRootReady = true;
         }
 
         private async Task WaitForWebViewAsync(SmokeTestResult result, CancellationToken token)
@@ -381,6 +417,7 @@ namespace VAL.Host.Services
 
             builder.AppendLine();
             builder.AppendLine("Paths");
+            builder.AppendLine($"ContentRoot: {_appPaths.ContentRoot}");
             builder.AppendLine($"DataRoot: {_appPaths.DataRoot}");
             builder.AppendLine($"LogsRoot: {_appPaths.LogsRoot}");
             builder.AppendLine($"ModulesRoot: {_appPaths.ModulesRoot}");
@@ -447,6 +484,7 @@ namespace VAL.Host.Services
             public bool WebViewReady { get; set; }
             public bool LogAppendSucceeded { get; set; }
             public bool MessageSenderWired { get; set; }
+            public bool ModulesRootReady { get; set; }
             public IReadOnlyList<ModuleLoader.ModuleStatusInfo>? ModuleStatuses { get; set; }
             public ValOptions? ValOptions { get; set; }
             public WebViewOptions? WebViewOptions { get; set; }

@@ -99,76 +99,22 @@ namespace VAL.Host
             return exception.Message;
         }
 
-        private static string ResolveAppRoot()
+        private static string ResolveContentRoot()
         {
-            // Stable root regardless of WorkingDirectory.
-            // Priority:
-            // 1) A directory (or parent) that contains "Modules"
-            // 2) A sibling "PRODUCT" directory that contains "Modules"
-            // 3) CurrentDirectory (or parent) that contains "Modules"
-            // 4) AppContext.BaseDirectory
-            string exeDir = AppContext.BaseDirectory;
-            string cwd = Directory.GetCurrentDirectory();
-
-            static string FindWithModules(string startDir, int maxUp)
-            {
-                try
-                {
-                    string dir = startDir;
-                    for (int i = 0; i <= maxUp; i++)
-                    {
-                        if (Directory.Exists(Path.Combine(dir, "Modules")))
-                            return dir;
-
-                        var parent = Directory.GetParent(dir);
-                        if (parent == null) break;
-                        dir = parent.FullName;
-                    }
-                }
-                catch { }
-
-                return startDir;
-            }
-
-            // 1) exeDir or parents
             try
             {
-                var fromExe = FindWithModules(exeDir, 6);
-                if (Directory.Exists(Path.Combine(fromExe, "Modules")))
-                    return fromExe;
+                var exePath = Environment.ProcessPath;
+                var exeDir = string.IsNullOrWhiteSpace(exePath) ? null : Path.GetDirectoryName(exePath);
+                var candidate = exeDir ?? AppContext.BaseDirectory;
+                return Path.GetFullPath(candidate);
             }
-            catch { }
-
-            // 2) look for sibling PRODUCT
-            try
+            catch
             {
-                string dir = exeDir;
-                for (int i = 0; i < 10; i++)
-                {
-                    var parent = Directory.GetParent(dir);
-                    if (parent == null) break;
-                    dir = parent.FullName;
-
-                    var candidate = Path.Combine(dir, "PRODUCT");
-                    if (Directory.Exists(Path.Combine(candidate, "Modules")))
-                        return candidate;
-                }
+                return AppContext.BaseDirectory;
             }
-            catch { }
-
-            // 3) cwd or parents
-            try
-            {
-                var fromCwd = FindWithModules(cwd, 6);
-                if (Directory.Exists(Path.Combine(fromCwd, "Modules")))
-                    return fromCwd;
-            }
-            catch { }
-
-            return exeDir;
         }
 
-        public static async Task Initialize(CoreWebView2 core, string? modulesRoot, ModuleOptions? moduleOptions = null)
+        public static async Task Initialize(CoreWebView2 core, string? modulesRoot, string? contentRoot, ModuleOptions? moduleOptions = null)
         {
             if (core == null)
                 return;
@@ -178,17 +124,22 @@ namespace VAL.Host
                 ? new HashSet<string>(enabledModules.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()), StringComparer.OrdinalIgnoreCase)
                 : null;
 
-            string baseDir = string.IsNullOrWhiteSpace(modulesRoot)
-                ? ResolveAppRoot()
+            var resolvedContentRoot = string.IsNullOrWhiteSpace(contentRoot)
+                ? ResolveContentRoot()
+                : contentRoot;
+            var resolvedModulesRoot = string.IsNullOrWhiteSpace(modulesRoot)
+                ? Path.Combine(resolvedContentRoot, "Modules")
                 : modulesRoot;
+
+            ValLog.Info("ModuleLoader", $"Resolved ModulesRoot: {resolvedModulesRoot}");
 
             // MAIN layout:
             //  - Dock\Dock.module.json  (core UI)
             //  - Modules\**\*.module.json (feature modules)
             var rootsToScan = new List<string>
             {
-                Path.Combine(baseDir, "Dock"),
-                Path.Combine(baseDir, "Modules")
+                Path.Combine(resolvedContentRoot, "Dock"),
+                resolvedModulesRoot
             };
 
             async Task LoadModuleConfig(CoreWebView2 coreWebView2, string moduleDir, string configPath, string moduleNameFromFile)
