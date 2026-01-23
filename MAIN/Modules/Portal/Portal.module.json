@@ -2,7 +2,5 @@
   "name": "Portal",
   "enabled": true,
   "entry": "Portal.main.js",
-  "styles": [
-    "Portal.styles.css"
-  ]
+  "styles": "Portal.styles.css"
 }
