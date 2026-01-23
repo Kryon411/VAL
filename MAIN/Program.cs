@@ -58,12 +58,17 @@ namespace VAL
                         services.AddSingleton<IAppPaths, AppPaths>();
                         services.AddSingleton<IProcessLauncher, ProcessLauncher>();
                         services.AddSingleton<IUiThread, UiThread>();
+                        services.AddSingleton<IBuildInfo, BuildInfo>();
+                        services.AddSingleton<ICrashHandler, CrashHandler>();
+                        services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
                         services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
                         services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
                         services.AddSingleton<IContinuumPump, ContinuumPump>();
                         services.AddSingleton<IWebViewRuntime, WebViewRuntime>();
                         services.AddSingleton<IWebMessageSender, WebMessageSender>();
 
+                        services.AddTransient<DiagnosticsViewModel>();
+                        services.AddTransient<DiagnosticsWindow>();
                         services.AddSingleton<MainWindowViewModel>();
                         services.AddSingleton<MainWindow>();
                         services.AddSingleton<App>();
@@ -74,6 +79,8 @@ namespace VAL
 
                 // App is code-only (no InitializeComponent). MainWindow is created in App.OnStartup.
                 var app = host.Services.GetRequiredService<App>();
+                var crashHandler = host.Services.GetRequiredService<ICrashHandler>();
+                crashHandler.Register(app);
                 app.Run();
             }
             catch (Exception ex)
