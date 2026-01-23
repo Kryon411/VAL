@@ -1,0 +1,70 @@
+name: Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish (win-x64)
+        run: dotnet publish MAIN/VAL.csproj -c Release -r win-x64 -o artifacts/publish
+
+      - name: Stage runtime content
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/publish | Out-Null
+          Copy-Item -Path Modules -Destination artifacts/publish/Modules -Recurse -Force
+          if (Test-Path Dock) {
+            Copy-Item -Path Dock -Destination artifacts/publish/Dock -Recurse -Force
+          }
+          Copy-Item -Path appsettings.json -Destination artifacts/publish/appsettings.json -Force
+
+      - name: Run smoke
+        shell: pwsh
+        run: |
+          & ".\artifacts\publish\VAL.exe" --smoke --smoke-report-path ".\artifacts\SmokeReport.txt"
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            Write-Error "Smoke test failed with exit code $exitCode"
+            exit $exitCode
+          }
+
+      - name: Collect crash logs
+        shell: pwsh
+        run: |
+          $logRoot = Join-Path $env:LOCALAPPDATA "VAL\Logs"
+          if (Test-Path $logRoot) {
+            if (Test-Path (Join-Path $logRoot "CrashReport.txt")) {
+              Copy-Item -Path (Join-Path $logRoot "CrashReport.txt") -Destination artifacts/CrashReport.txt -Force
+            }
+            if (Test-Path (Join-Path $logRoot "VAL.log")) {
+              Copy-Item -Path (Join-Path $logRoot "VAL.log") -Destination artifacts/VAL.log -Force
+            }
+          }
+
+      - name: Upload smoke artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-artifacts
+          path: |
+            artifacts/SmokeReport.txt
+            artifacts/CrashReport.txt
+            artifacts/VAL.log
+            artifacts/publish/**
+          if-no-files-found: warn
