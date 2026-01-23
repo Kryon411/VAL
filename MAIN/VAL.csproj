@@ -19,9 +19,27 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
+  <!--
+    Phase 1 (DI Host) is currently using Program.Main as the SINGLE entry point.
+    That means App.xaml must NOT participate as a WPF ApplicationDefinition, or WPF may generate
+    a second entry point and/or require InitializeComponent() on App.
+
+    If App.xaml exists, keep it as a plain file (None) so it can be re-enabled later.
+  -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Remove="App.xaml" />
+    <None Include="App.xaml" Condition="Exists('App.xaml')" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3595.46" />
+
+    <!-- DI Host / Composition Root dependencies -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

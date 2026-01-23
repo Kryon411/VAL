@@ -16,7 +16,8 @@ namespace VAL
 
             try
             {
-                host = Host.CreateDefaultBuilder()
+                // Fully-qualify Host to avoid accidentally binding to the VAL.Host namespace.
+                host = global::Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
                     .ConfigureServices(services =>
                     {
                         services.AddSingleton<IModuleLoader, ModuleLoaderAdapter>();
@@ -24,6 +25,7 @@ namespace VAL
                         services.AddSingleton<IOperationCoordinator, OperationCoordinatorAdapter>();
                         services.AddSingleton<IToastService, ToastServiceAdapter>();
                         services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
+
                         services.AddSingleton<MainWindow>();
                         services.AddSingleton<App>();
                     })
@@ -31,8 +33,8 @@ namespace VAL
 
                 host.Start();
 
+                // App is code-only (no InitializeComponent). MainWindow is created in App.OnStartup.
                 var app = host.Services.GetRequiredService<App>();
-                app.InitializeComponent();
                 app.Run();
             }
             catch (Exception ex)
