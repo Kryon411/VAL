@@ -15,12 +15,21 @@ namespace VAL.Host
         {
         }
 
+        // Convenience entry point for callers that don't carry an ILog instance.
+        // NOTE: static/instance is NOT part of the C# member signature, so we cannot also expose
+        // a public instance method named Warn(category, message) with the same parameters.
         public static void Warn(string category, string message)
         {
-            Instance.Warn(category, message);
+            Instance.WarnCore(category, message);
         }
 
-        public void Warn(string category, string message)
+        // ILog implementation (explicit) to avoid colliding with the static Warn method above.
+        void ILog.Warn(string category, string message)
+        {
+            WarnCore(category, message);
+        }
+
+        private void WarnCore(string category, string message)
         {
             if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(message))
                 return;
