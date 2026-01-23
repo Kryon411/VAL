@@ -25,6 +25,7 @@ namespace VAL
                         services.AddSingleton<IOperationCoordinator, OperationCoordinatorAdapter>();
                         services.AddSingleton<IToastService, ToastServiceAdapter>();
                         services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
+                        services.AddSingleton<IWebViewRuntime, WebViewRuntime>();
 
                         services.AddSingleton<MainWindow>();
                         services.AddSingleton<App>();

@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,6 +23,7 @@ namespace VAL
         private readonly IToastService _toastService;
         private readonly IModuleLoader _moduleLoader;
         private readonly ICommandDispatcher _commandDispatcher;
+        private readonly IWebViewRuntime _webViewRuntime;
 
         private CoreWebView2? _modulesInitializedForCore = null;
         private int _modulesInitInFlight = 0;
@@ -41,12 +41,14 @@ namespace VAL
             IOperationCoordinator operationCoordinator,
             IToastService toastService,
             IModuleLoader moduleLoader,
-            ICommandDispatcher commandDispatcher)
+            ICommandDispatcher commandDispatcher,
+            IWebViewRuntime webViewRuntime)
         {
             _operationCoordinator = operationCoordinator;
             _toastService = toastService;
             _moduleLoader = moduleLoader;
             _commandDispatcher = commandDispatcher;
+            _webViewRuntime = webViewRuntime;
 
             InitializeComponent();
             Loaded += MainWindow_Loaded;
@@ -108,28 +110,19 @@ namespace VAL
                 DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
             }
 
-            // Profile root (isolated WebView2 user data)
-            var userData = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "VAL",
-                "Profile"
-            );
-            Directory.CreateDirectory(userData);
-
-            var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userData);
-            await WebView.EnsureCoreWebView2Async(env);
-
-            WebView.CoreWebView2.Settings.AreDevToolsEnabled = true;
-            WebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
-            WebView.CoreWebView2.Settings.IsWebMessageEnabled = true;
+            await _webViewRuntime.InitializeAsync(WebView);
 
 
             // ---- Portal runtime (armed-only hotkey + clipboard staging) ----
             try
             {
                 PortalRuntime.Initialize(
-                    postJson: (json) => { try { WebView.CoreWebView2.PostWebMessageAsJson(json); } catch { } },
-                    focusWebView: () => { try { WebView.Focus(); } catch { } try { _ = WebView.CoreWebView2.ExecuteScriptAsync("(()=>{try{const selectors=['form textarea','textarea[placeholder]','div[contenteditable=\"true\"][role=\"textbox\"]','div.ProseMirror[contenteditable=\"true\"]','div[contenteditable=\"true\"][data-slate-editor=\"true\"]'];for(const s of selectors){  const el=document.querySelector(s);  if(el){ try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true; }}// fallback: find any visible contenteditable in the bottom composer regionconst cands=[...document.querySelectorAll('div[contenteditable=\"true\"]')].filter(e=>{  const r=e.getBoundingClientRect();  return r.width>100 && r.height>20 && r.bottom> (window.innerHeight*0.55);});if(cands.length){  const el=cands[cands.length-1];  try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true;}}catch(e){} return false;})()"); } catch { } }
+                    postJson: (json) => _webViewRuntime.PostJson(json),
+                    focusWebView: () =>
+                    {
+                        try { WebView.Focus(); } catch { }
+                        _ = _webViewRuntime.ExecuteScriptAsync("(()=>{try{const selectors=['form textarea','textarea[placeholder]','div[contenteditable=\"true\"][role=\"textbox\"]','div.ProseMirror[contenteditable=\"true\"]','div[contenteditable=\"true\"][data-slate-editor=\"true\"]'];for(const s of selectors){  const el=document.querySelector(s);  if(el){ try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true; }}// fallback: find any visible contenteditable in the bottom composer regionconst cands=[...document.querySelectorAll('div[contenteditable=\"true\"]')].filter(e=>{  const r=e.getBoundingClientRect();  return r.width>100 && r.height>20 && r.bottom> (window.innerHeight*0.55);});if(cands.length){  const el=cands[cands.length-1];  try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true;}}catch(e){} return false;})()");
+                    }
                 );
 
                 this.SourceInitialized += (_, __) =>
@@ -157,42 +150,15 @@ namespace VAL
             _continuumTimer.Tick += ContinuumTimer_Tick;
             _continuumTimer.Start();
 
-            WebView.CoreWebView2.NavigationCompleted += async (_, __) =>
+            _webViewRuntime.NavigationCompleted += async () =>
             {
                 try { await EnsureModulesInitializedAsync(); } catch { ValLog.Warn("MainWindow", "Module initialization failed after navigation."); }
             };
 
-            WebView.CoreWebView2.WebMessageReceived += (_, e3) =>
+            _webViewRuntime.WebMessageJsonReceived += (json) =>
             {
                 // Single router for all WebView -> Host messages.
-                _commandDispatcher.HandleWebMessage(e3.WebMessageAsJson);
-            };
-
-
-            // Keep all auth popups / window.open navigations inside the same WebView instance.
-            // This prevents the login flow from spawning an un-initialized WebView where VAL modules are missing.
-            WebView.CoreWebView2.NewWindowRequested += (_, e4) =>
-            {
-                try
-                {
-                    e4.NewWindow = WebView.CoreWebView2;
-                    e4.Handled = true;
-                }
-                catch
-                {
-                    try
-                    {
-                        e4.Handled = true;
-
-                        var uri = e4.Uri;
-                        if (!string.IsNullOrWhiteSpace(uri))
-                            WebView.CoreWebView2.Navigate(uri);
-                    }
-                    catch
-                    {
-                        // Never let window routing break the host.
-                    }
-                }
+                _commandDispatcher.HandleWebMessage(json);
             };
 
             // Best-effort init: register module scripts as early as possible so first-run login flows
@@ -204,7 +170,7 @@ namespace VAL
 
         private async Task EnsureModulesInitializedAsync()
         {
-            var core = WebView?.CoreWebView2;
+            var core = _webViewRuntime.Core;
             if (core == null) return;
 
             // Per-Core guard: if WebView2 re-initializes (rare) or a login flow attempts to spawn a new instance,
@@ -244,7 +210,7 @@ namespace VAL
         }
         private void ContinuumTimer_Tick(object? sender, EventArgs e)
         {
-            if (WebView?.CoreWebView2 == null) return;
+            if (_webViewRuntime.Core == null) return;
 
             var seed = EssenceInjectQueue.Dequeue();
             if (seed != null)
@@ -253,7 +219,7 @@ namespace VAL
                 {
                     var json = _commandDispatcher.CreateContinuumInjectPayload(seed);
                     if (!string.IsNullOrWhiteSpace(json))
-                        WebView.CoreWebView2.PostWebMessageAsJson(json);
+                        _webViewRuntime.PostJson(json);
                 }
                 catch
                 {
