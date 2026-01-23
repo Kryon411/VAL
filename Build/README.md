@@ -13,3 +13,9 @@ Optional:
 ```powershell
 .\Build\Publish_Release.ps1 -RuntimeIdentifier win-x64 -SelfContained
 ```
+
+Smoke test example:
+
+```powershell
+VAL.exe --smoke --smoke-timeout-ms=20000
+```

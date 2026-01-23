@@ -15,9 +15,11 @@ namespace VAL
     public static class Program
     {
         [STAThread]
-        public static void Main()
+        public static void Main(string[] args)
         {
             IHost? host = null;
+            var smokeSettings = SmokeTestSettings.FromArgs(args);
+            SmokeTestState? smokeState = null;
 
             try
             {
@@ -66,6 +68,9 @@ namespace VAL
                         services.AddSingleton<IContinuumPump, ContinuumPump>();
                         services.AddSingleton<IWebViewRuntime, WebViewRuntime>();
                         services.AddSingleton<IWebMessageSender, WebMessageSender>();
+                        services.AddSingleton(smokeSettings);
+                        services.AddSingleton<SmokeTestState>();
+                        services.AddSingleton<SmokeTestRunner>();
 
                         services.AddTransient<DiagnosticsViewModel>();
                         services.AddTransient<DiagnosticsWindow>();
@@ -81,11 +86,31 @@ namespace VAL
                 var app = host.Services.GetRequiredService<App>();
                 var crashHandler = host.Services.GetRequiredService<ICrashHandler>();
                 crashHandler.Register(app);
+
+                if (smokeSettings.Enabled)
+                {
+                    var smokeRunner = host.Services.GetRequiredService<SmokeTestRunner>();
+                    smokeState = host.Services.GetRequiredService<SmokeTestState>();
+                    smokeRunner.Register(app, smokeState);
+                }
+
                 app.Run();
+
+                if (smokeSettings.Enabled && smokeState != null)
+                {
+                    Environment.ExitCode = smokeState.Completion.Task.GetAwaiter().GetResult();
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Application startup failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (smokeSettings.Enabled)
+                {
+                    Environment.ExitCode = 40;
+                }
+                else
+                {
+                    MessageBox.Show($"Application startup failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
             finally
             {
