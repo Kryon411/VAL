@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
 using VAL.Host.WebMessaging;
+using VAL.ViewModels;
 
 namespace VAL
 {
@@ -26,9 +27,16 @@ namespace VAL
                         services.AddSingleton<IOperationCoordinator, OperationCoordinatorAdapter>();
                         services.AddSingleton<IToastService, ToastServiceAdapter>();
                         services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
+                        services.AddSingleton<IAppPaths, AppPaths>();
+                        services.AddSingleton<IProcessLauncher, ProcessLauncher>();
+                        services.AddSingleton<IUiThread, UiThread>();
+                        services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
+                        services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
+                        services.AddSingleton<IContinuumPump, ContinuumPump>();
                         services.AddSingleton<IWebViewRuntime, WebViewRuntime>();
                         services.AddSingleton<IWebMessageSender, WebMessageSender>();
 
+                        services.AddSingleton<MainWindowViewModel>();
                         services.AddSingleton<MainWindow>();
                         services.AddSingleton<App>();
                     })
