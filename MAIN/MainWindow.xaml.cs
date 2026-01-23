@@ -76,6 +76,7 @@ namespace VAL
             catch
             {
                 // Never block close due to a guardrail failure.
+                ValLog.Warn("MainWindow", "Close guard failed.");
             }
         }
 
@@ -128,7 +129,10 @@ namespace VAL
                     catch { }
                 };
             }
-            catch { }
+            catch
+            {
+                ValLog.Warn("MainWindow", "Portal runtime initialization failed.");
+            }
 
             WebView.DefaultBackgroundColor = System.Drawing.Color.FromArgb(11, 12, 16);
 
@@ -142,7 +146,7 @@ namespace VAL
 
             WebView.CoreWebView2.NavigationCompleted += async (_, __) =>
             {
-                try { await EnsureModulesInitializedAsync(); } catch { }
+                try { await EnsureModulesInitializedAsync(); } catch { ValLog.Warn("MainWindow", "Module initialization failed after navigation."); }
             };
 
             WebView.CoreWebView2.WebMessageReceived += (_, e3) =>
@@ -218,6 +222,7 @@ namespace VAL
             {
                 // Keep host resilient; allow retry on the next navigation.
                 _modulesInitializedForCore = null;
+                ValLog.Warn("MainWindow", "Module initialization failed.");
             }
             finally
             {

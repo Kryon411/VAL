@@ -145,6 +145,7 @@ namespace VAL.Host
                 }
                 catch
                 {
+                    ValLog.Warn("ModuleLoader", $"Failed to parse module config: {configPath}");
                     return;
                 }
 
@@ -303,12 +304,14 @@ namespace VAL.Host
                     catch
                     {
                         // keep loading remaining modules
+                        ValLog.Warn("ModuleLoader", $"Module load failed: {configPath}");
                     }
                 }
             }
             catch
             {
                 // Enumeration failure should never prevent VAL from running.
+                ValLog.Warn("ModuleLoader", "Module discovery failed.");
             }
         }
     }
