@@ -10,6 +10,7 @@ on:
 jobs:
   smoke:
     runs-on: windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,14 +29,39 @@ jobs:
       - name: Stage runtime content
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts/publish | Out-Null
-          Copy-Item -Path "MAIN/Modules" -Destination "artifacts/publish/Modules" -Recurse -Force
-          if (Test-Path "MAIN/Dock") {
-            Copy-Item -Path "MAIN/Dock" -Destination "artifacts/publish/Dock" -Recurse -Force
-          }
-          Copy-Item -Path "MAIN/appsettings.json" -Destination "artifacts/publish/appsettings.json" -Force
+          # Ensure clean staging targets (prevents nested folders like Modules\Modules or Dock\Dock)
+          $publishRoot = "artifacts/publish"
+
+          if (-not (Test-Path $publishRoot)) { throw "Publish output not found: $publishRoot" }
+
+          # Always reset these to avoid residue across reruns
+          Remove-Item -Recurse -Force (Join-Path $publishRoot "Modules") -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force (Join-Path $publishRoot "Dock")    -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force (Join-Path $publishRoot "Icons")   -ErrorAction SilentlyContinue
+
+          New-Item -ItemType Directory -Force -Path (Join-Path $publishRoot "Modules") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $publishRoot "Dock")    | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $publishRoot "Icons")   | Out-Null
+
+          # ---- Modules ----
+          $modulesSrc = "MAIN/Modules"
+          if (Test-Path "MAIN/Modules/Modules") { $modulesSrc = "MAIN/Modules/Modules" }
+
+          Copy-Item -Path (Join-Path $modulesSrc "*") -Destination (Join-Path $publishRoot "Modules") -Recurse -Force
+
+          # ---- Dock ----
+          $dockSrc = "MAIN/Dock"
+          if (Test-Path "MAIN/Dock/Dock") { $dockSrc = "MAIN/Dock/Dock" }
+
+          Copy-Item -Path (Join-Path $dockSrc "*") -Destination (Join-Path $publishRoot "Dock") -Recurse -Force
+
+          # ---- Icons ----
+          Copy-Item -Path "MAIN/Icons/*" -Destination (Join-Path $publishRoot "Icons") -Recurse -Force
+
+          # ---- Config ----
+          Copy-Item -Path "MAIN/appsettings.json" -Destination (Join-Path $publishRoot "appsettings.json") -Force
           if (Test-Path "MAIN/appsettings.Development.json") {
-            Copy-Item -Path "MAIN/appsettings.Development.json" -Destination "artifacts/publish/appsettings.Development.json" -Force
+            Copy-Item -Path "MAIN/appsettings.Development.json" -Destination (Join-Path $publishRoot "appsettings.Development.json") -Force
           }
 
       - name: Run smoke
@@ -43,11 +69,11 @@ jobs:
         working-directory: artifacts/publish
         run: |
           $artifactsRoot = Resolve-Path ".."
-          $smokeReport = Join-Path $artifactsRoot "SmokeReport.txt"
-          $smokeRun    = Join-Path $artifactsRoot "SmokeRun.txt"
+          $smokeReport  = Join-Path $artifactsRoot "SmokeReport.txt"
+          $smokeRun     = Join-Path $artifactsRoot "SmokeRun.txt"
 
           # Run and capture console output for debugging
-          & ".\VAL.exe" --smoke --smoke-report-path "$smokeReport" 2>&1 | Tee-Object -FilePath $smokeRun
+          & .\VAL.exe --smoke --smoke-report-path "$smokeReport" 2>&1 | Tee-Object -FilePath $smokeRun
           $exitCode = $LASTEXITCODE
 
           # Ensure SmokeReport exists even if the app didn't write it
