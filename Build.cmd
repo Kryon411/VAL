@@ -10,6 +10,26 @@ REM ============================================================
 REM Always run relative to this script location
 cd /d "%~dp0"
 
+REM ---- Argument handling ---------------------------------------------------
+set "MANIFEST_ONLY=0"
+
+if /i "%~1"=="--manifest" (
+  set "MANIFEST_ONLY=1"
+)
+
+if %MANIFEST_ONLY%==1 (
+  echo.
+  echo Updating manifest...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Update-Manifest.ps1" -RootPath "%~dp0" -OutFile "%~dp0MAIN\Manifest.txt"
+  if %errorlevel% neq 0 (
+    echo ERROR: Manifest update failed.
+    exit /b 1
+  )
+
+  echo Manifest updated.
+  exit /b 0
+)
+
 echo.
 echo ========================================
 echo           VAL BUILD (Release)
@@ -72,5 +92,15 @@ echo.
 echo Output: %cd%\PRODUCT
 echo Run:    PRODUCT\VAL.exe
 echo.
+
+echo Updating manifest...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Update-Manifest.ps1" -RootPath "%~dp0" -OutFile "%~dp0MAIN\Manifest.txt"
+if %errorlevel% neq 0 (
+  echo ERROR: Manifest update failed.
+  pause
+  exit /b 1
+)
+echo Manifest updated.
+
 pause
 exit /b 0
