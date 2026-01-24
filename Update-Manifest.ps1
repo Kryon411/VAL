@@ -1,9 +1,10 @@
 param(
     [string]$RootPath = $PSScriptRoot,
-    [string]$OutFile = "$PSScriptRoot\\MAIN\\Manifest.txt"
+    [string]$OutFile = "$PSScriptRoot\\MAIN\\Manifest.txt",
+    [switch]$IncludeGenerated
 )
 
-$resolvedRoot = (Resolve-Path -Path $RootPath).Path
+$resolvedRoot = [System.IO.Path]::GetFullPath((Resolve-Path -Path $RootPath).Path)
 
 $excludedDirs = @(
     '.git',
@@ -62,26 +63,32 @@ function Get-AllFiles {
     }
 }
 
+$normalizedRoot = $resolvedRoot -replace '/', '\'
+
 $treeLines = @()
 Add-TreeLines -Path $resolvedRoot -Indent '' -Lines ([ref]$treeLines)
 
 $allFiles = @()
 Get-AllFiles -Path $resolvedRoot -Files ([ref]$allFiles)
 $sortedFiles = $allFiles | Sort-Object @{ Expression = { $_.ToLowerInvariant() } }
+$normalizedFiles = $sortedFiles | ForEach-Object { $_ -replace '/', '\' }
 
 $nl = "`r`n"
 $lines = @(
     '===== TREE MANIFEST =====',
-    "Root: $resolvedRoot",
-    "Generated: $(Get-Date -Format s)",
-    ''
+    "Root: $normalizedRoot"
 )
 
+if ($IncludeGenerated) {
+    $lines += "Generated: $(Get-Date -Format s)"
+}
+
+$lines += ''
 $lines += $treeLines
 $lines += ''
 $lines += '===== FULL PATH MANIFEST ====='
 $lines += ''
-$lines += $sortedFiles
+$lines += $normalizedFiles
 
 $encoding = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($OutFile, ($lines -join $nl), $encoding)
