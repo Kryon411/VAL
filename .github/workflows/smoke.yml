@@ -10,6 +10,7 @@ on:
 jobs:
   smoke:
     runs-on: windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,7 +21,7 @@ jobs:
           dotnet-version: 8.x
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore MAIN/VAL.csproj
 
       - name: Publish (win-x64)
         run: dotnet publish MAIN/VAL.csproj -c Release -r win-x64 -o artifacts/publish
@@ -28,24 +29,65 @@ jobs:
       - name: Stage runtime content
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts/publish | Out-Null
-          Copy-Item -Path Modules -Destination artifacts/publish/Modules -Recurse -Force
-          if (Test-Path Dock) {
-            Copy-Item -Path Dock -Destination artifacts/publish/Dock -Recurse -Force
+          # Ensure clean staging targets (prevents nested folders like Modules\Modules or Dock\Dock)
+          $publishRoot = "artifacts/publish"
+
+          if (-not (Test-Path $publishRoot)) { throw "Publish output not found: $publishRoot" }
+
+          # Always reset these to avoid residue across reruns
+          Remove-Item -Recurse -Force (Join-Path $publishRoot "Modules") -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force (Join-Path $publishRoot "Dock")    -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force (Join-Path $publishRoot "Icons")   -ErrorAction SilentlyContinue
+
+          New-Item -ItemType Directory -Force -Path (Join-Path $publishRoot "Modules") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $publishRoot "Dock")    | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $publishRoot "Icons")   | Out-Null
+
+          # ---- Modules ----
+          $modulesSrc = "MAIN/Modules"
+          if (Test-Path "MAIN/Modules/Modules") { $modulesSrc = "MAIN/Modules/Modules" }
+
+          Copy-Item -Path (Join-Path $modulesSrc "*") -Destination (Join-Path $publishRoot "Modules") -Recurse -Force
+
+          # ---- Dock ----
+          $dockSrc = "MAIN/Dock"
+          if (Test-Path "MAIN/Dock/Dock") { $dockSrc = "MAIN/Dock/Dock" }
+
+          Copy-Item -Path (Join-Path $dockSrc "*") -Destination (Join-Path $publishRoot "Dock") -Recurse -Force
+
+          # ---- Icons ----
+          Copy-Item -Path "MAIN/Icons/*" -Destination (Join-Path $publishRoot "Icons") -Recurse -Force
+
+          # ---- Config ----
+          Copy-Item -Path "MAIN/appsettings.json" -Destination (Join-Path $publishRoot "appsettings.json") -Force
+          if (Test-Path "MAIN/appsettings.Development.json") {
+            Copy-Item -Path "MAIN/appsettings.Development.json" -Destination (Join-Path $publishRoot "appsettings.Development.json") -Force
           }
-          Copy-Item -Path appsettings.json -Destination artifacts/publish/appsettings.json -Force
 
       - name: Run smoke
         shell: pwsh
+        working-directory: artifacts/publish
         run: |
-          & ".\artifacts\publish\VAL.exe" --smoke --smoke-report-path ".\artifacts\SmokeReport.txt"
+          $artifactsRoot = Resolve-Path ".."
+          $smokeReport  = Join-Path $artifactsRoot "SmokeReport.txt"
+          $smokeRun     = Join-Path $artifactsRoot "SmokeRun.txt"
+
+          # Run and capture console output for debugging
+          & .\VAL.exe --smoke --smoke-report-path "$smokeReport" 2>&1 | Tee-Object -FilePath $smokeRun
           $exitCode = $LASTEXITCODE
+
+          # Ensure SmokeReport exists even if the app didn't write it
+          if (-not (Test-Path $smokeReport)) {
+            "SmokeReport.txt was not written by VAL.exe. See SmokeRun.txt for console output." | Out-File -FilePath $smokeReport -Encoding utf8
+          }
+
           if ($exitCode -ne 0) {
             Write-Error "Smoke test failed with exit code $exitCode"
             exit $exitCode
           }
 
       - name: Collect crash logs
+        if: always()
         shell: pwsh
         run: |
           $logRoot = Join-Path $env:LOCALAPPDATA "VAL\Logs"
@@ -59,11 +101,13 @@ jobs:
           }
 
       - name: Upload smoke artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: smoke-artifacts
           path: |
             artifacts/SmokeReport.txt
+            artifacts/SmokeRun.txt
             artifacts/CrashReport.txt
             artifacts/VAL.log
             artifacts/publish/**
