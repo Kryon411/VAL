@@ -20,7 +20,7 @@ jobs:
           dotnet-version: 8.x
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore MAIN/VAL.csproj
 
       - name: Publish (win-x64)
         run: dotnet publish MAIN/VAL.csproj -c Release -r win-x64 -o artifacts/publish
