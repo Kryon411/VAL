@@ -85,7 +85,7 @@ namespace VAL.ViewModels
             builder.AppendLine("WebView");
             builder.AppendLine("-------------------------------");
             builder.AppendLine($"StartUrl: {webViewOptions.StartUrl}");
-            builder.AppendLine($"AllowDevTools: {webViewOptions.AllowDevTools}");
+            builder.AppendLine($"AllowDevTools: {webViewOptions.EffectiveAllowDevTools}");
             builder.AppendLine($"BlockNewWindow: {webViewOptions.BlockNewWindow}");
             builder.AppendLine($"UserAgentOverride: {(string.IsNullOrWhiteSpace(webViewOptions.UserAgentOverride) ? "(none)" : webViewOptions.UserAgentOverride)}");
             builder.AppendLine($"WebView2 Runtime: {GetWebView2Version()}");

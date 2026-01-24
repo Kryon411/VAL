@@ -228,9 +228,10 @@ namespace VAL.Host
                         await coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(script);
                         await coreWebView2.ExecuteScriptAsync(script);
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         // Do not fail module load chain for one broken module.
+                        ValLog.Warn("ModuleLoader", $"Script load failed for module '{moduleName}': {ex.GetType().Name}: {ex.Message}");
                     }
                 }
 
@@ -280,9 +281,10 @@ namespace VAL.Host
                         await coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(js);
                         await coreWebView2.ExecuteScriptAsync(js);
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         // ignore
+                        ValLog.Warn("ModuleLoader", $"Style injection failed for module '{moduleName}': {ex.GetType().Name}: {ex.Message}");
                     }
                 }
 
@@ -327,10 +329,11 @@ namespace VAL.Host
                         var moduleNameFromFile = fileName.Substring(0, fileName.Length - ".module.json".Length);
                         await LoadModuleConfig(core, moduleDir, configPath, moduleNameFromFile);
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         // keep loading remaining modules
-                        ValLog.Warn("ModuleLoader", $"Module load failed: {configPath}");
+                        ValLog.Warn("ModuleLoader", $"Module load failed: {configPath}. {ex.GetType().Name}: {ex.Message}");
+                        ValLog.Error("ModuleLoader", ex.ToString());
                     }
                 }
             }

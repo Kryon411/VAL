@@ -10,6 +10,18 @@ namespace VAL.Host.Options
         public bool BlockNewWindow { get; set; } = true;
         public string? UserAgentOverride { get; set; }
 
+        public bool EffectiveAllowDevTools
+        {
+            get
+            {
+#if DEBUG
+                return AllowDevTools;
+#else
+                return false;
+#endif
+            }
+        }
+
         public void ApplyDefaults()
         {
             if (string.IsNullOrWhiteSpace(StartUrl))
