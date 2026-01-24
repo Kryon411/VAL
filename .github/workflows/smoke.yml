@@ -10,6 +10,10 @@ on:
 jobs:
   smoke:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,48 +24,53 @@ jobs:
           dotnet-version: 8.x
 
       - name: Restore
-        run: dotnet restore MAIN/VAL.csproj
+        run: dotnet restore .\MAIN\VAL.csproj
 
       - name: Publish (win-x64)
-        run: dotnet publish MAIN/VAL.csproj -c Release -r win-x64 -o artifacts/publish
+        run: dotnet publish .\MAIN\VAL.csproj -c Release -r win-x64 -o .\artifacts\publish --no-restore
 
       - name: Stage runtime content
-        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts/publish | Out-Null
-          Copy-Item -Path "MAIN/Modules" -Destination "artifacts/publish/Modules" -Recurse -Force
-          if (Test-Path "MAIN/Dock") {
-            Copy-Item -Path "MAIN/Dock" -Destination "artifacts/publish/Dock" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path .\artifacts\publish | Out-Null
+          Copy-Item -Path ".\MAIN\Modules" -Destination ".\artifacts\publish\Modules" -Recurse -Force
+          if (Test-Path ".\MAIN\Dock") {
+            Copy-Item -Path ".\MAIN\Dock" -Destination ".\artifacts\publish\Dock" -Recurse -Force
           }
-          Copy-Item -Path "MAIN/appsettings.json" -Destination "artifacts/publish/appsettings.json" -Force
-          if (Test-Path "MAIN/appsettings.Development.json") {
-            Copy-Item -Path "MAIN/appsettings.Development.json" -Destination "artifacts/publish/appsettings.Development.json" -Force
+          Copy-Item -Path ".\MAIN\appsettings.json" -Destination ".\artifacts\publish\appsettings.json" -Force
+          if (Test-Path ".\MAIN\appsettings.Development.json") {
+            Copy-Item -Path ".\MAIN\appsettings.Development.json" -Destination ".\artifacts\publish\appsettings.Development.json" -Force
           }
 
       - name: Run smoke
-        shell: pwsh
+        working-directory: .\artifacts\publish
         run: |
-          & ".\artifacts\publish\VAL.exe" --smoke --smoke-report-path ".\artifacts\SmokeReport.txt"
+          & ".\VAL.exe" --smoke --smoke-report-path "..\SmokeReport.txt"
           $exitCode = $LASTEXITCODE
+
+          # Print the report (if any) to the job log for quick diagnosis
+          if (Test-Path "..\SmokeReport.txt") {
+            Get-Content "..\SmokeReport.txt" -Tail 200
+          }
+
           if ($exitCode -ne 0) {
-            Write-Error "Smoke test failed with exit code $exitCode"
-            exit $exitCode
+            throw "Smoke test failed with exit code $exitCode"
           }
 
       - name: Collect crash logs
-        shell: pwsh
+        if: always()
         run: |
           $logRoot = Join-Path $env:LOCALAPPDATA "VAL\Logs"
           if (Test-Path $logRoot) {
             if (Test-Path (Join-Path $logRoot "CrashReport.txt")) {
-              Copy-Item -Path (Join-Path $logRoot "CrashReport.txt") -Destination artifacts/CrashReport.txt -Force
+              Copy-Item -Path (Join-Path $logRoot "CrashReport.txt") -Destination .\artifacts\CrashReport.txt -Force
             }
             if (Test-Path (Join-Path $logRoot "VAL.log")) {
-              Copy-Item -Path (Join-Path $logRoot "VAL.log") -Destination artifacts/VAL.log -Force
+              Copy-Item -Path (Join-Path $logRoot "VAL.log") -Destination .\artifacts\VAL.log -Force
             }
           }
 
       - name: Upload smoke artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: smoke-artifacts
