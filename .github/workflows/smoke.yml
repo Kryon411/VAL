@@ -10,11 +10,6 @@ on:
 jobs:
   smoke:
     runs-on: windows-latest
-
-    defaults:
-      run:
-        shell: pwsh
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,68 +26,51 @@ jobs:
         run: dotnet publish MAIN/VAL.csproj -c Release -r win-x64 -o artifacts/publish
 
       - name: Stage runtime content
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts/publish | Out-Null
-
-          # Copy runtime folders your app expects at runtime (only if they exist in the repo).
-          $folders = @("Modules", "Dock", "Icons", "Images", "Themes", "Assets")
-          foreach ($f in $folders) {
-            $src = Join-Path "MAIN" $f
-            $dst = Join-Path "artifacts/publish" $f
-            if (Test-Path $src) {
-              Copy-Item -Path $src -Destination $dst -Recurse -Force
-            }
+          Copy-Item -Path "MAIN/Modules" -Destination "artifacts/publish/Modules" -Recurse -Force
+          if (Test-Path "MAIN/Dock") {
+            Copy-Item -Path "MAIN/Dock" -Destination "artifacts/publish/Dock" -Recurse -Force
           }
-
-          # Copy config files
-          if (Test-Path "MAIN/appsettings.json") {
-            Copy-Item -Path "MAIN/appsettings.json" -Destination "artifacts/publish/appsettings.json" -Force
-          }
+          Copy-Item -Path "MAIN/appsettings.json" -Destination "artifacts/publish/appsettings.json" -Force
           if (Test-Path "MAIN/appsettings.Development.json") {
             Copy-Item -Path "MAIN/appsettings.Development.json" -Destination "artifacts/publish/appsettings.Development.json" -Force
           }
 
       - name: Run smoke
-        id: run_smoke
+        shell: pwsh
         working-directory: artifacts/publish
-        continue-on-error: true
         run: |
-          $reportPath = Join-Path ".." "SmokeReport.txt"
+          $artifactsRoot = Resolve-Path ".."
+          $smokeReport = Join-Path $artifactsRoot "SmokeReport.txt"
+          $smokeRun    = Join-Path $artifactsRoot "SmokeRun.txt"
 
-          & ".\VAL.exe" --smoke --smoke-report-path $reportPath
+          # Run and capture console output for debugging
+          & ".\VAL.exe" --smoke --smoke-report-path "$smokeReport" 2>&1 | Tee-Object -FilePath $smokeRun
           $exitCode = $LASTEXITCODE
 
-          "exitCode=$exitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "VAL smoke exit code: $exitCode"
+          # Ensure SmokeReport exists even if the app didn't write it
+          if (-not (Test-Path $smokeReport)) {
+            "SmokeReport.txt was not written by VAL.exe. See SmokeRun.txt for console output." | Out-File -FilePath $smokeReport -Encoding utf8
+          }
 
-      - name: Dump SmokeReport.txt
-        if: always()
-        run: |
-          $p = "artifacts/SmokeReport.txt"
-          if (Test-Path $p) {
-            Write-Host "===== SmokeReport.txt ====="
-            Get-Content -Path $p -Raw | Write-Host
-            Write-Host "==========================="
-          } else {
-            Write-Host "No SmokeReport.txt found at $p"
+          if ($exitCode -ne 0) {
+            Write-Error "Smoke test failed with exit code $exitCode"
+            exit $exitCode
           }
 
       - name: Collect crash logs
         if: always()
+        shell: pwsh
         run: |
           $logRoot = Join-Path $env:LOCALAPPDATA "VAL\Logs"
-
           if (Test-Path $logRoot) {
-            New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-
-            $crash = Join-Path $logRoot "CrashReport.txt"
-            if (Test-Path $crash) {
-              Copy-Item -Path $crash -Destination artifacts/CrashReport.txt -Force
+            if (Test-Path (Join-Path $logRoot "CrashReport.txt")) {
+              Copy-Item -Path (Join-Path $logRoot "CrashReport.txt") -Destination artifacts/CrashReport.txt -Force
             }
-
-            $valLog = Join-Path $logRoot "VAL.log"
-            if (Test-Path $valLog) {
-              Copy-Item -Path $valLog -Destination artifacts/VAL.log -Force
+            if (Test-Path (Join-Path $logRoot "VAL.log")) {
+              Copy-Item -Path (Join-Path $logRoot "VAL.log") -Destination artifacts/VAL.log -Force
             }
           }
 
@@ -103,26 +81,8 @@ jobs:
           name: smoke-artifacts
           path: |
             artifacts/SmokeReport.txt
+            artifacts/SmokeRun.txt
             artifacts/CrashReport.txt
             artifacts/VAL.log
             artifacts/publish/**
           if-no-files-found: warn
-
-      - name: Fail if smoke failed
-        if: always()
-        run: |
-          $raw = "${{ steps.run_smoke.outputs.exitCode }}"
-          $code = 1
-          if ([int]::TryParse($raw, [ref]$code)) {
-            # parsed
-          } else {
-            Write-Host "Could not parse exit code from '$raw' — defaulting to 1"
-            $code = 1
-          }
-
-          if ($code -ne 0) {
-            Write-Error "Smoke failed (exit code $code). See SmokeReport.txt / artifacts for details."
-            exit $code
-          }
-
-          Write-Host "Smoke passed."
