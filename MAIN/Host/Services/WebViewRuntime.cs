@@ -100,7 +100,7 @@ namespace VAL.Host.Services
             await control.EnsureCoreWebView2Async(env);
 
             Core = control.CoreWebView2;
-            Core.Settings.AreDevToolsEnabled = _webViewOptions.AllowDevTools;
+            Core.Settings.AreDevToolsEnabled = _webViewOptions.EffectiveAllowDevTools;
             Core.Settings.IsStatusBarEnabled = false;
             Core.Settings.IsWebMessageEnabled = true;
 

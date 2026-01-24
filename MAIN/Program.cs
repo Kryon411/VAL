@@ -1,9 +1,9 @@
 using System;
 using System.IO;
-using System.Windows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
@@ -20,6 +20,11 @@ namespace VAL
             IHost? host = null;
             var smokeSettings = SmokeTestSettings.FromArgs(args);
             SmokeTestState? smokeState = null;
+            var localConfigPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VAL",
+                "config.json");
+            var safeBoot = new SafeBoot(localConfigPath, smokeSettings);
 
             try
             {
@@ -27,11 +32,6 @@ namespace VAL
                 host = global::Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
                     .ConfigureAppConfiguration((context, config) =>
                     {
-                        var localConfigPath = Path.Combine(
-                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                            "VAL",
-                            "config.json");
-
                         config.AddEnvironmentVariables(prefix: "VAL__");
                         config.AddJsonFile(localConfigPath, optional: true, reloadOnChange: false);
                     })
@@ -82,6 +82,11 @@ namespace VAL
 
                 host.Start();
 
+                var appPaths = host.Services.GetRequiredService<IAppPaths>();
+                var buildInfo = host.Services.GetRequiredService<IBuildInfo>();
+                var webViewOptions = host.Services.GetRequiredService<IOptions<WebViewOptions>>().Value;
+                safeBoot.LogStartupInfo(buildInfo, appPaths, webViewOptions);
+
                 // App is code-only (no InitializeComponent). MainWindow is created in App.OnStartup.
                 var app = host.Services.GetRequiredService<App>();
                 var crashHandler = host.Services.GetRequiredService<ICrashHandler>();
@@ -103,14 +108,7 @@ namespace VAL
             }
             catch (Exception ex)
             {
-                if (smokeSettings.Enabled)
-                {
-                    Environment.ExitCode = 40;
-                }
-                else
-                {
-                    MessageBox.Show($"Application startup failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                safeBoot.HandleFatalStartupException(ex);
             }
             finally
             {

@@ -69,10 +69,11 @@ namespace VAL.Host.Services
                 ContinuumHost.PostToWebMessage = _webMessageSender.Send;
                 AbyssRuntime.Initialize(_webMessageSender);
             }
-            catch
+            catch (System.Exception ex)
             {
                 _modulesInitializedForCore = null;
-                ValLog.Warn(nameof(ModuleRuntimeService), "Module initialization failed.");
+                ValLog.Warn(nameof(ModuleRuntimeService), $"Module initialization failed. {ex.GetType().Name}: {ex.Message}");
+                ValLog.Error(nameof(ModuleRuntimeService), ex.ToString());
             }
             finally
             {
