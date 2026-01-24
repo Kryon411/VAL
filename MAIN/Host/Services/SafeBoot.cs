@@ -34,8 +34,9 @@ namespace VAL.Host.Services
             if (!string.IsNullOrWhiteSpace(buildInfo.BuildDate))
                 ValLog.Info(Category, $"BuildDateUtc: {buildInfo.BuildDate}");
 
+            var appSettingsPath = Path.Combine(appPaths.ContentRoot, "appsettings.json");
             ValLog.Info(Category, $"ContentRoot: {appPaths.ContentRoot}");
-            ValLog.Info(Category, $"ConfigPath.AppSettings: {Path.Combine(appPaths.ContentRoot, \"appsettings.json\")}");
+            ValLog.Info(Category, $"ConfigPath.AppSettings: {appSettingsPath}");
             ValLog.Info(Category, $"ConfigPath.LocalOverride: {_localConfigPath}");
             ValLog.Info(Category, $"DevToolsEnabled: {webViewOptions.EffectiveAllowDevTools}");
             ValLog.Info(Category, $"SafeBootFallbackUsed: {FallbackUsed}");
