@@ -1,94 +1,76 @@
 param(
     [string]$RootPath = $PSScriptRoot,
-    [string]$OutFile = "$PSScriptRoot\\MAIN\\Manifest.txt",
+    [string]$OutFile = "$PSScriptRoot\MAIN\Manifest.txt",
     [switch]$IncludeGenerated
 )
 
-$resolvedRoot = [System.IO.Path]::GetFullPath((Resolve-Path -Path $RootPath).Path)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
+# Normalize paths
+$rootFull = (Resolve-Path -LiteralPath $RootPath).Path
+$outFull  = (Resolve-Path -LiteralPath (Split-Path -Parent $OutFile) -ErrorAction SilentlyContinue)
+if (-not $outFull) {
+    # Create the parent dir if missing
+    $parent = Split-Path -Parent $OutFile
+    if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+}
+$outFull = (Resolve-Path -LiteralPath (Split-Path -Parent $OutFile)).Path
+$outFull = Join-Path $outFull (Split-Path -Leaf $OutFile)
+
+# Exclusions (skip common build noise and generated outputs)
 $excludedDirs = @(
-    '.git',
-    '.vs',
-    'bin',
-    'obj',
-    'node_modules',
-    'InstallerOutput',
-    'Artifacts'
+    ".git", ".github", ".vs",
+    "bin", "obj", "node_modules",
+    "InstallerOutput", "Artifacts", "artifacts",
+    ".artifacts", ".cache", ".tmp", "tmp"
 )
 
-function Get-SortedDirectories {
-    param([string]$Path)
-
-    Get-ChildItem -LiteralPath $Path -Directory -Force |
-        Where-Object { $excludedDirs -notcontains $_.Name } |
-        Sort-Object @{ Expression = { $_.Name.ToLowerInvariant() } }
+function Should-ExcludePath([string]$fullPath) {
+    foreach ($d in $excludedDirs) {
+        $needle = [System.IO.Path]::DirectorySeparatorChar + $d + [System.IO.Path]::DirectorySeparatorChar
+        if ($fullPath.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
+        # Also exclude if the path ends exactly with "\<dir>"
+        $endNeedle = [System.IO.Path]::DirectorySeparatorChar + $d
+        if ($fullPath.EndsWith($endNeedle, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
 }
 
-function Get-SortedFiles {
-    param([string]$Path)
+# Walk files deterministically
+$files = Get-ChildItem -LiteralPath $rootFull -Recurse -File -Force -ErrorAction Stop |
+    Where-Object { -not (Should-ExcludePath $_.FullName) }
 
-    Get-ChildItem -LiteralPath $Path -File -Force |
-        Sort-Object @{ Expression = { $_.Name.ToLowerInvariant() } }
-}
+$treeLines = $files |
+    ForEach-Object {
+        $rel = $_.FullName.Substring($rootFull.Length).TrimStart('\','/')
+        $rel -replace '\\','/'
+    } |
+    Sort-Object { $_.ToLowerInvariant() }
 
-function Add-TreeLines {
-    param(
-        [string]$Path,
-        [string]$Indent,
-        [ref]$Lines
-    )
+$fullLines = $files |
+    ForEach-Object { $_.FullName } |
+    Sort-Object { $_.ToLowerInvariant() }
 
-    foreach ($directory in (Get-SortedDirectories -Path $Path)) {
-        $Lines.Value += "${Indent}${directory.Name}/"
-        Add-TreeLines -Path $directory.FullName -Indent "${Indent}  " -Lines $Lines
-    }
-
-    foreach ($file in (Get-SortedFiles -Path $Path)) {
-        $Lines.Value += "${Indent}${file.Name}"
-    }
-}
-
-function Get-AllFiles {
-    param(
-        [string]$Path,
-        [ref]$Files
-    )
-
-    foreach ($file in (Get-SortedFiles -Path $Path)) {
-        $Files.Value += $file.FullName
-    }
-
-    foreach ($directory in (Get-SortedDirectories -Path $Path)) {
-        Get-AllFiles -Path $directory.FullName -Files $Files
-    }
-}
-
-$normalizedRoot = $resolvedRoot -replace '/', '\'
-
-$treeLines = @()
-Add-TreeLines -Path $resolvedRoot -Indent '' -Lines ([ref]$treeLines)
-
-$allFiles = @()
-Get-AllFiles -Path $resolvedRoot -Files ([ref]$allFiles)
-$sortedFiles = $allFiles | Sort-Object @{ Expression = { $_.ToLowerInvariant() } }
-$normalizedFiles = $sortedFiles | ForEach-Object { $_ -replace '/', '\' }
-
-$nl = "`r`n"
-$lines = @(
-    '===== TREE MANIFEST =====',
-    "Root: $normalizedRoot"
-)
-
+# Build manifest content (always overwrites)
+$sb = New-Object System.Text.StringBuilder
+[void]$sb.AppendLine("# VAL MANIFEST")
+[void]$sb.AppendLine("# Root: $rootFull")
+[void]$sb.AppendLine("# GeneratedBy: Update-Manifest.ps1")
 if ($IncludeGenerated) {
-    $lines += "Generated: $(Get-Date -Format s)"
+    # NOTE: This makes the file change every run. Use only when you WANT that.
+    [void]$sb.AppendLine("# GeneratedAtUtc: $(Get-Date -AsUTC -Format 'yyyy-MM-ddTHH:mm:ssZ')")
 }
+[void]$sb.AppendLine("")
+[void]$sb.AppendLine("=== TREE MANIFEST ===")
+foreach ($l in $treeLines) { [void]$sb.AppendLine($l) }
+[void]$sb.AppendLine("")
+[void]$sb.AppendLine("=== FULL PATH MANIFEST ===")
+foreach ($l in $fullLines) { [void]$sb.AppendLine($l) }
 
-$lines += ''
-$lines += $treeLines
-$lines += ''
-$lines += '===== FULL PATH MANIFEST ====='
-$lines += ''
-$lines += $normalizedFiles
-
-$encoding = New-Object System.Text.UTF8Encoding($false)
-[System.IO.File]::WriteAllText($OutFile, ($lines -join $nl), $encoding)
+# Normalize CRLF and write UTF-8 (no BOM) deterministically
+$content = ($sb.ToString() -replace "`r?`n", "`r`n")
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($outFull, $content, $utf8NoBom)

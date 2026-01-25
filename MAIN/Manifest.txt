@@ -1,191 +1,275 @@
-Folder PATH listing
-Volume serial number is A439-1115
-C:\USERS\VAULT\ONEDRIVE\DESKTOP\VAL.V4.2.0
-|   Build.cmd
-|   
-\---MAIN
-    |   MainWindow.xaml
-    |   MainWindow.xaml.cs
-    |   Manifest.txt
-    |   Program.cs
-    |   VAL.csproj
-    |   
-    +---Dock
-    |       Dock.main.js
-    |       Dock.module.json
-    |       Dock.styles.css
-    |       
-    +---Host
-    |   |   ChatOrigin.cs
-    |   |   ModuleLoader.cs
-    |   |   OperationCoordinator.cs
-    |   |   SessionContext.cs
-    |   |   ToastArchitectureMap.md
-    |   |   ToastDefinition.cs
-    |   |   ToastHub.cs
-    |   |   ToastKey.cs
-    |   |   ToastManager.cs
-    |   |   
-    |   +---Abyss
-    |   |       AbyssRuntime.cs
-    |   |       AbyssSearch.cs
-    |   |       
-    |   +---Commands
-    |   |       AbyssCommandHandlers.cs
-    |   |       CommandRegistry.cs
-    |   |       CommandSpec.cs
-    |   |       HostCommand.cs
-    |   |       HostCommandRegistryguide.md
-    |   |       HostCommandRouter.cs
-    |   |       PortalCommandHandlers.cs
-    |   |       VoidCommandHandlers.cs
-    |   |       
-    |   \---Portal
-    |           PortalHostRouter.cs
-    |           PortalRuntime.cs
-    |           PortalStaging.cs
-    |           
-    +---Icons
-    |       VAL_Blue_Lens.ico
-    |       
-    \---Modules
-        +---Abyss
-        |       Abyss.main.js
-        |       Abyss.module.json
-        |       Abyss.styles.css
-        |       
-        +---Continuum
-        |   |   Context.Prelude.txt
-        |   |   Context.txt
-        |   |   Continuum.Pipeline.Map.txt
-        |   |   
-        |   +---Client
-        |   |       Continuum.Client.js
-        |   |       Continuum.Client.module.json
-        |   |       
-        |   \---Pipeline
-        |       +---00_Common
-        |       |       AtomicFile.cs
-        |       |       ContinuumContext.cs
-        |       |       ContinuumHost.cs
-        |       |       ContinuumPreamble.cs
-        |       |       ToastLedger.cs
-        |       |       
-        |       +---01_QuickRefresh
-        |       |       QuickRefresh.Commands.cs
-        |       |       QuickRefresh.Entry.cs
-        |       |       QuickRefresh.Flow.cs
-        |       |       
-        |       +---02_Truth
-        |       |       Truth.Messages.cs
-        |       |       Truth.Normalize.cs
-        |       |       Truth.Storage.cs
-        |       |       
-        |       +---03_Filter1
-        |       |       Filter1.BuildSeed.cs
-        |       |       Filter1.Rules.cs
-        |       |       
-        |       +---04_Essence
-        |       |       Essence.Assemble.cs
-        |       |       Essence.Build.cs
-        |       |       Essence.Clean.cs
-        |       |       
-        |       +---04_Filter2
-        |       |       Filter2.Restructure.cs
-        |       |       Filter2.Rules.cs
-        |       |       
-        |       +---05_Inject
-        |       |       Essence.Inject.Controller.cs
-        |       |       Essence.Inject.Queue.cs
-        |       |       
-        |       \---06_Telemetry
-        |               Telemetry.ThresholdMonitor.cs
-        |               
-        +---Portal
-        |       Portal.main.js
-        |       Portal.module.json
-        |       Portal.styles.css
-        |       
-        +---VALTheme
-        |       VALTheme.main.js
-        |       VALTheme.module.json
-        |       VALTheme.theme.css
-        |       
-        \---Void
-                Void.main.js
-                Void.module.json
-                Void.styles.css
-                
+# VAL MANIFEST
+# Root: C:\Users\Vault\OneDrive\Desktop\VAL
+# GeneratedBy: Update-Manifest.ps1
 
-===== FULL PATH MANIFEST =====
+=== TREE MANIFEST ===
+.gitignore
+Assets/Screenshots/control-centre.png
+Assets/Screenshots/ui.png
+Build.cmd
+Build/Publish_Release.cmd
+Build/Publish_Release.ps1
+Build/README.md
+Build/ReleaseChecklist.md
+Directory.Build.props
+Docs/Modules.md
+MAIN/App.xaml
+MAIN/App.xaml.cs
+MAIN/appsettings.Development.json
+MAIN/appsettings.json
+MAIN/CrashWindow.xaml
+MAIN/CrashWindow.xaml.cs
+MAIN/DiagnosticsWindow.xaml
+MAIN/DiagnosticsWindow.xaml.cs
+MAIN/Dock/Dock.main.js
+MAIN/Dock/Dock.module.json
+MAIN/Dock/Dock.styles.css
+MAIN/Host/Abyss/AbyssRuntime.cs
+MAIN/Host/Abyss/AbyssSearch.cs
+MAIN/Host/ChatOrigin.cs
+MAIN/Host/Commands/AbyssCommandHandlers.cs
+MAIN/Host/Commands/CommandRegistry.cs
+MAIN/Host/Commands/CommandSpec.cs
+MAIN/Host/Commands/HostCommand.cs
+MAIN/Host/Commands/HostCommandRegistryguide.md
+MAIN/Host/Commands/HostCommandRouter.cs
+MAIN/Host/Commands/PortalCommandHandlers.cs
+MAIN/Host/Commands/VoidCommandHandlers.cs
+MAIN/Host/ILog.cs
+MAIN/Host/ModuleLoader.cs
+MAIN/Host/OperationCoordinator.cs
+MAIN/Host/Options/ModuleOptions.cs
+MAIN/Host/Options/ValOptions.cs
+MAIN/Host/Options/WebViewOptions.cs
+MAIN/Host/Portal/PortalHostRouter.cs
+MAIN/Host/Portal/PortalRuntime.cs
+MAIN/Host/Portal/PortalStaging.cs
+MAIN/Host/Services/Adapters/CommandDispatcherAdapter.cs
+MAIN/Host/Services/Adapters/ModuleLoaderAdapter.cs
+MAIN/Host/Services/Adapters/OperationCoordinatorAdapter.cs
+MAIN/Host/Services/Adapters/SessionContextAdapter.cs
+MAIN/Host/Services/Adapters/ToastServiceAdapter.cs
+MAIN/Host/Services/AppPaths.cs
+MAIN/Host/Services/BuildInfo.cs
+MAIN/Host/Services/ContinuumPump.cs
+MAIN/Host/Services/CrashHandler.cs
+MAIN/Host/Services/DiagnosticsWindowService.cs
+MAIN/Host/Services/IAppPaths.cs
+MAIN/Host/Services/IBuildInfo.cs
+MAIN/Host/Services/ICommandDispatcher.cs
+MAIN/Host/Services/IContinuumPump.cs
+MAIN/Host/Services/ICrashHandler.cs
+MAIN/Host/Services/IDiagnosticsWindowService.cs
+MAIN/Host/Services/IModuleLoader.cs
+MAIN/Host/Services/IModuleRuntimeService.cs
+MAIN/Host/Services/IOperationCoordinator.cs
+MAIN/Host/Services/IPortalRuntimeService.cs
+MAIN/Host/Services/IProcessLauncher.cs
+MAIN/Host/Services/ISessionContext.cs
+MAIN/Host/Services/IToastService.cs
+MAIN/Host/Services/IUiThread.cs
+MAIN/Host/Services/IWebViewRuntime.cs
+MAIN/Host/Services/ModuleRuntimeService.cs
+MAIN/Host/Services/PortalRuntimeService.cs
+MAIN/Host/Services/ProcessLauncher.cs
+MAIN/Host/Services/SafeBoot.cs
+MAIN/Host/Services/SmokeTestRunner.cs
+MAIN/Host/Services/SmokeTestSettings.cs
+MAIN/Host/Services/SmokeTestState.cs
+MAIN/Host/Services/UiThread.cs
+MAIN/Host/Services/WebViewRuntime.cs
+MAIN/Host/SessionContext.cs
+MAIN/Host/ToastArchitectureMap.md
+MAIN/Host/ToastDefinition.cs
+MAIN/Host/ToastHub.cs
+MAIN/Host/ToastKey.cs
+MAIN/Host/ToastManager.cs
+MAIN/Host/ValLog.cs
+MAIN/Host/WebMessaging/IWebMessageSender.cs
+MAIN/Host/WebMessaging/MessageEnvelope.cs
+MAIN/Host/WebMessaging/WebMessageSender.cs
+MAIN/Icons/VAL_Blue_Lens.ico
+MAIN/MainWindow.xaml
+MAIN/MainWindow.xaml.cs
+MAIN/Manifest.txt
+MAIN/Modules/Abyss/Abyss.main.js
+MAIN/Modules/Abyss/Abyss.module.json
+MAIN/Modules/Abyss/Abyss.styles.css
+MAIN/Modules/Continuum/Client/Continuum.Client.js
+MAIN/Modules/Continuum/Client/Continuum.Client.module.json
+MAIN/Modules/Continuum/Context.Prelude.txt
+MAIN/Modules/Continuum/Context.txt
+MAIN/Modules/Continuum/Continuum.Pipeline.Map.txt
+MAIN/Modules/Continuum/Pipeline/00_Common/AtomicFile.cs
+MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumContext.cs
+MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumHost.cs
+MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumPreamble.cs
+MAIN/Modules/Continuum/Pipeline/00_Common/ToastLedger.cs
+MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Commands.cs
+MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Entry.cs
+MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Flow.cs
+MAIN/Modules/Continuum/Pipeline/02_Truth/Truth.Messages.cs
+MAIN/Modules/Continuum/Pipeline/02_Truth/Truth.Normalize.cs
+MAIN/Modules/Continuum/Pipeline/02_Truth/Truth.Storage.cs
+MAIN/Modules/Continuum/Pipeline/03_Filter1/Filter1.BuildSeed.cs
+MAIN/Modules/Continuum/Pipeline/03_Filter1/Filter1.Rules.cs
+MAIN/Modules/Continuum/Pipeline/04_Essence/Essence.Assemble.cs
+MAIN/Modules/Continuum/Pipeline/04_Essence/Essence.Build.cs
+MAIN/Modules/Continuum/Pipeline/04_Essence/Essence.Clean.cs
+MAIN/Modules/Continuum/Pipeline/04_Filter2/Filter2.Restructure.cs
+MAIN/Modules/Continuum/Pipeline/04_Filter2/Filter2.Rules.cs
+MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Controller.cs
+MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Queue.cs
+MAIN/Modules/Continuum/Pipeline/06_Telemetry/Telemetry.ThresholdMonitor.cs
+MAIN/Modules/Portal/Portal.main.js
+MAIN/Modules/Portal/Portal.module.json
+MAIN/Modules/Portal/Portal.styles.css
+MAIN/Modules/VALTheme/VALTheme.main.js
+MAIN/Modules/VALTheme/VALTheme.module.json
+MAIN/Modules/VALTheme/VALTheme.theme.css
+MAIN/Modules/Void/Void.main.js
+MAIN/Modules/Void/Void.module.json
+MAIN/Modules/Void/Void.styles.css
+MAIN/Program.cs
+MAIN/VAL.csproj
+MAIN/ViewModels/DiagnosticsViewModel.cs
+MAIN/ViewModels/MainWindowViewModel.cs
+MAIN/ViewModels/RelayCommand.cs
+README.md
+Update-Manifest.ps1
 
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\Build.cmd
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\MainWindow.xaml
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\MainWindow.xaml.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Manifest.txt
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Program.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\VAL.csproj
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Dock\Dock.main.js
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Dock\Dock.module.json
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Dock\Dock.styles.css
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\ChatOrigin.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\ModuleLoader.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\OperationCoordinator.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\SessionContext.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\ToastArchitectureMap.md
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\ToastDefinition.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\ToastHub.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\ToastKey.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\ToastManager.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Abyss\AbyssRuntime.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Abyss\AbyssSearch.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Commands\AbyssCommandHandlers.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Commands\CommandRegistry.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Commands\CommandSpec.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Commands\HostCommand.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Commands\HostCommandRegistryguide.md
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Commands\HostCommandRouter.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Commands\PortalCommandHandlers.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Commands\VoidCommandHandlers.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Portal\PortalHostRouter.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Portal\PortalRuntime.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Host\Portal\PortalStaging.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Icons\VAL_Blue_Lens.ico
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Abyss\Abyss.main.js
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Abyss\Abyss.module.json
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Abyss\Abyss.styles.css
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Context.Prelude.txt
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Context.txt
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Continuum.Pipeline.Map.txt
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Client\Continuum.Client.js
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Client\Continuum.Client.module.json
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\00_Common\AtomicFile.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\00_Common\ContinuumContext.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\00_Common\ContinuumHost.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\00_Common\ContinuumPreamble.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\00_Common\ToastLedger.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\01_QuickRefresh\QuickRefresh.Commands.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\01_QuickRefresh\QuickRefresh.Entry.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\01_QuickRefresh\QuickRefresh.Flow.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\02_Truth\Truth.Messages.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\02_Truth\Truth.Normalize.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\02_Truth\Truth.Storage.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\03_Filter1\Filter1.BuildSeed.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\03_Filter1\Filter1.Rules.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\04_Essence\Essence.Assemble.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\04_Essence\Essence.Build.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\04_Essence\Essence.Clean.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\04_Filter2\Filter2.Restructure.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\04_Filter2\Filter2.Rules.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\05_Inject\Essence.Inject.Controller.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\05_Inject\Essence.Inject.Queue.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Continuum\Pipeline\06_Telemetry\Telemetry.ThresholdMonitor.cs
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Portal\Portal.main.js
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Portal\Portal.module.json
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Portal\Portal.styles.css
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\VALTheme\VALTheme.main.js
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\VALTheme\VALTheme.module.json
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\VALTheme\VALTheme.theme.css
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Void\Void.main.js
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Void\Void.module.json
-C:\Users\Vault\OneDrive\Desktop\VAL.v4.2.0\MAIN\Modules\Void\Void.styles.css
+=== FULL PATH MANIFEST ===
+C:\Users\Vault\OneDrive\Desktop\VAL\.gitignore
+C:\Users\Vault\OneDrive\Desktop\VAL\Assets\Screenshots\control-centre.png
+C:\Users\Vault\OneDrive\Desktop\VAL\Assets\Screenshots\ui.png
+C:\Users\Vault\OneDrive\Desktop\VAL\Build.cmd
+C:\Users\Vault\OneDrive\Desktop\VAL\Build\Publish_Release.cmd
+C:\Users\Vault\OneDrive\Desktop\VAL\Build\Publish_Release.ps1
+C:\Users\Vault\OneDrive\Desktop\VAL\Build\README.md
+C:\Users\Vault\OneDrive\Desktop\VAL\Build\ReleaseChecklist.md
+C:\Users\Vault\OneDrive\Desktop\VAL\Directory.Build.props
+C:\Users\Vault\OneDrive\Desktop\VAL\Docs\Modules.md
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\App.xaml
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\App.xaml.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\appsettings.Development.json
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\appsettings.json
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\CrashWindow.xaml
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\CrashWindow.xaml.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\DiagnosticsWindow.xaml
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\DiagnosticsWindow.xaml.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Dock\Dock.main.js
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Dock\Dock.module.json
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Dock\Dock.styles.css
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Abyss\AbyssRuntime.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Abyss\AbyssSearch.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ChatOrigin.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Commands\AbyssCommandHandlers.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Commands\CommandRegistry.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Commands\CommandSpec.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Commands\HostCommand.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Commands\HostCommandRegistryguide.md
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Commands\HostCommandRouter.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Commands\PortalCommandHandlers.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Commands\VoidCommandHandlers.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ILog.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ModuleLoader.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\OperationCoordinator.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Options\ModuleOptions.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Options\ValOptions.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Options\WebViewOptions.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Portal\PortalHostRouter.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Portal\PortalRuntime.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Portal\PortalStaging.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\Adapters\CommandDispatcherAdapter.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\Adapters\ModuleLoaderAdapter.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\Adapters\OperationCoordinatorAdapter.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\Adapters\SessionContextAdapter.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\Adapters\ToastServiceAdapter.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\AppPaths.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\BuildInfo.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\ContinuumPump.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\CrashHandler.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\DiagnosticsWindowService.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IAppPaths.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IBuildInfo.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\ICommandDispatcher.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IContinuumPump.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\ICrashHandler.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IDiagnosticsWindowService.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IModuleLoader.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IModuleRuntimeService.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IOperationCoordinator.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IPortalRuntimeService.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IProcessLauncher.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\ISessionContext.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IToastService.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IUiThread.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\IWebViewRuntime.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\ModuleRuntimeService.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\PortalRuntimeService.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\ProcessLauncher.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\SafeBoot.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\SmokeTestRunner.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\SmokeTestSettings.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\SmokeTestState.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\UiThread.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\Services\WebViewRuntime.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\SessionContext.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ToastArchitectureMap.md
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ToastDefinition.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ToastHub.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ToastKey.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ToastManager.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\ValLog.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\WebMessaging\IWebMessageSender.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\WebMessaging\MessageEnvelope.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Host\WebMessaging\WebMessageSender.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Icons\VAL_Blue_Lens.ico
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\MainWindow.xaml
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\MainWindow.xaml.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Manifest.txt
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Abyss\Abyss.main.js
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Abyss\Abyss.module.json
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Abyss\Abyss.styles.css
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Client\Continuum.Client.js
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Client\Continuum.Client.module.json
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Context.Prelude.txt
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Context.txt
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Continuum.Pipeline.Map.txt
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\00_Common\AtomicFile.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\00_Common\ContinuumContext.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\00_Common\ContinuumHost.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\00_Common\ContinuumPreamble.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\00_Common\ToastLedger.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\01_QuickRefresh\QuickRefresh.Commands.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\01_QuickRefresh\QuickRefresh.Entry.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\01_QuickRefresh\QuickRefresh.Flow.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\02_Truth\Truth.Messages.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\02_Truth\Truth.Normalize.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\02_Truth\Truth.Storage.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\03_Filter1\Filter1.BuildSeed.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\03_Filter1\Filter1.Rules.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\04_Essence\Essence.Assemble.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\04_Essence\Essence.Build.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\04_Essence\Essence.Clean.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\04_Filter2\Filter2.Restructure.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\04_Filter2\Filter2.Rules.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\05_Inject\Essence.Inject.Controller.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\05_Inject\Essence.Inject.Queue.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Continuum\Pipeline\06_Telemetry\Telemetry.ThresholdMonitor.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Portal\Portal.main.js
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Portal\Portal.module.json
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Portal\Portal.styles.css
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\VALTheme\VALTheme.main.js
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\VALTheme\VALTheme.module.json
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\VALTheme\VALTheme.theme.css
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Void\Void.main.js
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Void\Void.module.json
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Modules\Void\Void.styles.css
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\Program.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\VAL.csproj
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\ViewModels\DiagnosticsViewModel.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\ViewModels\MainWindowViewModel.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\MAIN\ViewModels\RelayCommand.cs
+C:\Users\Vault\OneDrive\Desktop\VAL\README.md
+C:\Users\Vault\OneDrive\Desktop\VAL\Update-Manifest.ps1
