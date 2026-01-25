@@ -84,6 +84,11 @@ namespace VAL.Continuum.Pipeline
 
         internal static bool TryAppendAllText(string path, string text)
         {
+            return TryAppendAllText(path, text, durable: true);
+        }
+
+        internal static bool TryAppendAllText(string path, string text, bool durable)
+        {
             if (string.IsNullOrWhiteSpace(path))
                 return false;
 
@@ -93,12 +98,16 @@ namespace VAL.Continuum.Pipeline
                 if (!string.IsNullOrWhiteSpace(dir))
                     Directory.CreateDirectory(dir);
 
-                using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough))
+                var options = durable ? FileOptions.WriteThrough : FileOptions.None;
+                using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, options))
                 using (var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
                 {
                     sw.Write(text ?? string.Empty);
                     sw.Flush();
-                    fs.Flush(flushToDisk: true);
+                    if (durable)
+                        fs.Flush(flushToDisk: true);
+                    else
+                        fs.Flush(flushToDisk: false);
                 }
 
                 return true;

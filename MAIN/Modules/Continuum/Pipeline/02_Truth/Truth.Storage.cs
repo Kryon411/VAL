@@ -527,11 +527,19 @@ namespace VAL.Continuum.Pipeline.Truth
                 foreach (var ln in File.ReadLines(path))
                 {
                     if (string.IsNullOrWhiteSpace(ln)) continue;
-                    if (ln.Length < 2 || ln[1] != '|') continue;
+
+                    // A truncated last line can occur after a crash/power loss; treat malformed lines as ignorable.
+                    if (ln.Length < 2) continue;
+                    var pipeIndex = ln.IndexOf('|');
+                    if (pipeIndex < 0) continue;
+                    if (pipeIndex != 1) continue;
+
                     var rc = char.ToUpperInvariant(ln[0]);
                     if (rc != 'A' && rc != 'U') continue;
+
                     var txt = NormalizeForStorage(ln.Substring(2));
                     if (string.IsNullOrWhiteSpace(txt)) continue;
+
                     idx.Seen.Add(Fingerprint(rc, NormalizeForFingerprint(txt)));
                 }
             }
