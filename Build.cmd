@@ -2,105 +2,42 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 REM ============================================================
-REM  VAL Build Script (clean + publish)
-REM  - Publishes MAIN\VAL.csproj to PRODUCT\
-REM  - Intended to be run from the repo root (this folder)
+REM Build.cmd - VAL build helper
 REM ============================================================
-
-REM Always run relative to this script location
-cd /d "%~dp0"
-
-REM ---- Argument handling ---------------------------------------------------
-set "MANIFEST_ONLY=0"
-
-if /i "%~1"=="--manifest" (
-  set "MANIFEST_ONLY=1"
-)
-
-if %MANIFEST_ONLY%==1 (
-  echo.
-  echo Updating manifest...
-  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Update-Manifest.ps1" -RootPath "%~dp0" -OutFile "%~dp0MAIN\Manifest.txt"
-  if %errorlevel% neq 0 (
-    echo ERROR: Manifest update failed.
-    exit /b 1
-  )
-
-  echo Manifest updated.
-  exit /b 0
-)
+for %%I in ("%~dp0.") do set "ROOT=%%~fI"
+if /I "%~1"=="--manifest" goto :manifest
+if /I "%~1"=="--publish"  goto :publish
 
 echo.
-echo ========================================
-echo           VAL BUILD (Release)
-echo ========================================
+echo Usage:
+echo   Build.cmd --manifest   ^(regenerate MAIN\Manifest.txt^)
+echo   Build.cmd --publish    ^(dotnet publish PRODUCT^)
 echo.
+exit /b 0
 
-REM ---- Sanity check ---------------------------------------------------------
-if not exist "MAIN\VAL.csproj" (
-  echo ERROR: Could not find MAIN\VAL.csproj
-  echo Make sure you run this from the VAL repo root.
-  pause
-  exit /b 1
-)
-
-REM ---- Clean outputs --------------------------------------------------------
-if exist "PRODUCT" (
-  echo Removing PRODUCT...
-  rmdir /s /q "PRODUCT"
-)
-
-if exist "MAIN\bin" (
-  echo Removing MAIN\bin...
-  rmdir /s /q "MAIN\bin"
-)
-
-if exist "MAIN\obj" (
-  echo Removing MAIN\obj...
-  rmdir /s /q "MAIN\obj"
-)
-
-echo.
-echo Restoring...
-dotnet restore "MAIN\VAL.csproj"
-if %errorlevel% neq 0 (
-  echo.
-  echo ========================================
-  echo            RESTORE FAILED
-  echo ========================================
-  pause
-  exit /b 1
-)
-
-echo.
-echo Publishing...
-dotnet publish "MAIN\VAL.csproj" -c Release -o "PRODUCT"
-if %errorlevel% neq 0 (
-  echo.
-  echo ========================================
-  echo            PUBLISH FAILED
-  echo ========================================
-  pause
-  exit /b 1
-)
-
-echo.
-echo ========================================
-echo          BUILD SUCCESSFUL!
-echo ========================================
-echo.
-echo Output: %cd%\PRODUCT
-echo Run:    PRODUCT\VAL.exe
-echo.
-
+:manifest
 echo Updating manifest...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Update-Manifest.ps1" -RootPath "%~dp0" -OutFile "%~dp0MAIN\Manifest.txt"
-if %errorlevel% neq 0 (
-  echo ERROR: Manifest update failed.
-  pause
+
+REM Prefer PowerShell 7 if available (pwsh), otherwise fall back to Windows PowerShell (powershell).
+set "PS_EXE=pwsh"
+where /q pwsh || set "PS_EXE=powershell"
+
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\Update-Manifest.ps1" -RootPath "%ROOT%" -OutFile "%ROOT%\MAIN\Manifest.txt"
+if errorlevel 1 (
+  echo.
+  echo ERROR: Manifest generation failed. See the error above.
   exit /b 1
 )
-echo Manifest updated.
 
-pause
+echo Manifest updated.
+exit /b 0
+
+:publish
+echo Publishing PRODUCT...
+
+pushd "%ROOT%\MAIN" >nul
+dotnet publish -c Release -o "%ROOT%\PRODUCT" || (popd & exit /b 1)
+popd >nul
+
+echo Publish complete: %ROOT%\PRODUCT
 exit /b 0
