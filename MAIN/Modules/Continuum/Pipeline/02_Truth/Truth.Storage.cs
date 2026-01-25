@@ -356,13 +356,14 @@ namespace VAL.Continuum.Pipeline.Truth
                         if (idx.Seen.Contains(fp))
                             return; // idempotent
 
-					var prefix = roleChar == 'A' ? "A|" : "U|";
-					// One physical line per message (payload itself is already escaped for storage).
-					var line = prefix + normalized + Environment.NewLine;
+                        var prefix = roleChar == 'A' ? "A|" : "U|";
+                        // One physical line per message (payload itself is already escaped for storage).
+                        var line = prefix + normalized + Environment.NewLine;
 
                         // IMPORTANT: only mark as "seen" after the append succeeds,
                         // otherwise an IO failure could cause permanent message loss.
-                        AtomicFile.AppendAllTextAtomic(GetTruthPath(chatId), line);
+                        if (!AtomicFile.TryAppendAllText(GetTruthPath(chatId), line))
+                            return;
                         idx.Seen.Add(fp);
 
                         appended = true;
