@@ -1597,7 +1597,7 @@ private static void MaybeShowChronicleSuggested(string chatId)
             {
                 var dir = TruthStorage.EnsureChatDir(chatId);
                 var path = Path.Combine(dir, "Chronicle.audit.txt");
-                AtomicFile.AppendAllTextAtomic(path, (line ?? string.Empty).Trim() + Environment.NewLine);
+                AtomicFile.TryAppendAllText(path, (line ?? string.Empty).Trim() + Environment.NewLine);
             }
             catch { }
         }

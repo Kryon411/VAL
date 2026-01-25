@@ -82,6 +82,33 @@ namespace VAL.Continuum.Pipeline
             }
         }
 
+        internal static bool TryAppendAllText(string path, string text)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            try
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    Directory.CreateDirectory(dir);
+
+                using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough))
+                using (var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+                {
+                    sw.Write(text ?? string.Empty);
+                    sw.Flush();
+                    fs.Flush(flushToDisk: true);
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static void ReplaceAtomic(string tempPath, string finalPath)
         {
             if (string.IsNullOrWhiteSpace(tempPath))
