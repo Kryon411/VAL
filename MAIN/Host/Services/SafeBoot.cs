@@ -1,6 +1,9 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
+using VAL.Continuum.Pipeline.Common;
+using VAL.Host.Logging;
 using VAL.Host.Options;
 
 namespace VAL.Host.Services
@@ -21,6 +24,7 @@ namespace VAL.Host.Services
 
         public void LogStartupInfo(IBuildInfo buildInfo, IAppPaths appPaths, WebViewOptions webViewOptions)
         {
+            InitializeDiagnostics(buildInfo);
             EnsureDirectory(appPaths.DataRoot);
             EnsureDirectory(appPaths.LogsRoot);
             EnsureDirectory(appPaths.ProfileRoot);
@@ -96,6 +100,31 @@ namespace VAL.Host.Services
             catch
             {
                 // Startup should never fail due to directory creation.
+            }
+        }
+
+        private static void InitializeDiagnostics(IBuildInfo buildInfo)
+        {
+            try
+            {
+                var productRoot = ContinuumContext.ResolveProductRoot();
+                if (string.IsNullOrWhiteSpace(productRoot))
+                    return;
+
+                var logsRoot = Path.Combine(productRoot, "Logs");
+                Directory.CreateDirectory(logsRoot);
+                var logPath = Path.Combine(logsRoot, "VAL.log");
+                ValLog.AddSink(new RollingFileLogSink(logPath));
+
+                var version = buildInfo?.Version ?? "unknown";
+                var hash = buildInfo?.InformationalVersion ?? "unknown";
+                var os = RuntimeInformation.OSDescription ?? "unknown";
+                var rid = RuntimeInformation.RuntimeIdentifier ?? "unknown";
+                ValLog.Info("Startup", $"VAL start v={version} hash={hash} os={os} rid={rid}");
+            }
+            catch
+            {
+                // Logging must never throw.
             }
         }
     }

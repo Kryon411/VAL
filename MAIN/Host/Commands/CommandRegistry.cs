@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using VAL.Continuum;
 using VAL.Continuum.Pipeline.QuickRefresh;
+using VAL.Host.Logging;
 
 namespace VAL.Host.Commands
 {
@@ -17,6 +18,8 @@ namespace VAL.Host.Commands
     {
         private static readonly Dictionary<string, CommandSpec> Specs =
             new Dictionary<string, CommandSpec>(StringComparer.OrdinalIgnoreCase);
+        private static readonly RateLimiter RateLimiter = new();
+        private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
 
         static CommandRegistry()
         {
@@ -71,7 +74,7 @@ namespace VAL.Host.Commands
                     t,
                     "Continuum",
                     Array.Empty<string>(),
-                    (cmd) => { try { ContinuumHost.HandleJson(cmd.RawJson); } catch { } }
+                    HandleContinuumCommand
                 ));
             }
 
@@ -203,6 +206,28 @@ namespace VAL.Host.Commands
                 Array.Empty<string>(),
                 PortalCommandHandlers.HandleSendStaged
             ));
+        }
+
+        private static void HandleContinuumCommand(HostCommand cmd)
+        {
+            try
+            {
+                ContinuumHost.HandleJson(cmd.RawJson);
+            }
+            catch (Exception ex)
+            {
+                LogHandlerFailure("cmd.fail.continuum", cmd, ex);
+            }
+        }
+
+        private static void LogHandlerFailure(string key, HostCommand cmd, Exception ex)
+        {
+            if (!RateLimiter.Allow(key, LogInterval))
+                return;
+
+            var sourceHost = cmd.SourceUri?.Host ?? "unknown";
+            ValLog.Warn(nameof(CommandRegistry),
+                $"Command handler failed for {cmd.Type} (source: {sourceHost}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
         }
 
         private static void Register(CommandSpec spec)
