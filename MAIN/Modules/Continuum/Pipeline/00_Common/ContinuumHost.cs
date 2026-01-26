@@ -1227,16 +1227,22 @@ namespace VAL.Continuum
                 var truthPath = TruthStorage.GetTruthPath(chatId);
                 if (!File.Exists(truthPath)) return false;
 
-                using var fs = new FileStream(truthPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var max = (int)Math.Min(32768, fs.Length);
-                if (max <= 0) return false;
+                var sb = new System.Text.StringBuilder();
+                foreach (var entry in TruthReader.Read(truthPath, repairTailFirst: true))
+                {
+                    if (sb.Length >= 32768)
+                        break;
 
-                var buf = new byte[max];
-                var read = fs.Read(buf, 0, max);
-                if (read <= 0) return false;
+                    sb.Append(entry.Role);
+                    sb.Append('|');
+                    sb.Append(entry.Payload);
+                    sb.Append('\n');
+                }
 
-                var head = System.Text.Encoding.UTF8.GetString(buf, 0, read);
-                return LooksLikeContinuumSeedText(head);
+                if (sb.Length == 0)
+                    return false;
+
+                return LooksLikeContinuumSeedText(sb.ToString());
             }
             catch
             {

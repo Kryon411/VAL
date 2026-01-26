@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using VAL.Continuum.Pipeline.Truth;
 
 namespace VAL.Host.Abyss
 {
@@ -106,7 +107,7 @@ namespace VAL.Host.Abyss
             if (max < 0 || min == int.MaxValue)
                 return (0, 0);
 
-            return (min + 1, max + 1);
+            return (min, max);
         }
 
         public static string BuildFingerprint(AbyssExchange exchange)
@@ -200,38 +201,18 @@ namespace VAL.Host.Abyss
             try { lastWriteUtc = File.GetLastWriteTimeUtc(truthPath); } catch { }
 
             AbyssExchange? current = null;
-            int lineIndex = 0;
 
-            foreach (var rawLine in SafeReadLines(truthPath))
+            foreach (var entry in TruthReader.Read(truthPath, repairTailFirst: true))
             {
-                if (string.IsNullOrWhiteSpace(rawLine))
-                {
-                    lineIndex++;
-                    continue;
-                }
-
-                if (rawLine.Length < 2 || rawLine[1] != '|')
-                {
-                    lineIndex++;
-                    continue;
-                }
-
-                var role = rawLine[0];
-                if (role != 'U' && role != 'A')
-                {
-                    lineIndex++;
-                    continue;
-                }
-
-                var payload = rawLine.Length > 2 ? UnescapeTruthPayload(rawLine.Substring(2)) : string.Empty;
+                var payload = UnescapeTruthPayload(entry.Payload);
                 var line = new AbyssTruthLine
                 {
-                    LineIndex = lineIndex,
-                    Role = role,
+                    LineIndex = entry.LineNumber,
+                    Role = entry.Role,
                     Text = payload
                 };
 
-                if (role == 'U')
+                if (entry.Role == 'U')
                 {
                     if (current != null && (current.UserLines.Count > 0 || current.AssistantLines.Count > 0))
                         exchanges.Add(current);
@@ -257,20 +238,12 @@ namespace VAL.Host.Abyss
                     }
                     current.AssistantLines.Add(line);
                 }
-
-                lineIndex++;
             }
 
             if (current != null && (current.UserLines.Count > 0 || current.AssistantLines.Count > 0))
                 exchanges.Add(current);
 
             return exchanges;
-        }
-
-        private static IEnumerable<string> SafeReadLines(string path)
-        {
-            try { return File.ReadLines(path); }
-            catch { return Array.Empty<string>(); }
         }
 
         private static int ScoreExchange(AbyssExchange exchange, IReadOnlyList<string> tokens)

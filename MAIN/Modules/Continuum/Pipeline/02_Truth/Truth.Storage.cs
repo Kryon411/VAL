@@ -511,75 +511,6 @@ namespace VAL.Continuum.Pipeline.Truth
             return Convert.ToHexString(hash);
         }
 
-        private static void RepairTruncatedTailIfNeeded(string truthPath)
-        {
-            if (string.IsNullOrWhiteSpace(truthPath))
-                return;
-
-            try
-            {
-                if (!File.Exists(truthPath))
-                    return;
-
-                using var fs = new FileStream(truthPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
-                if (fs.Length == 0)
-                    return;
-
-                var originalLength = fs.Length;
-                fs.Position = originalLength - 1;
-                var lastByte = fs.ReadByte();
-                if (lastByte == -1 || lastByte == (byte)'\n')
-                    return;
-
-                var buffer = new byte[64 * 1024];
-                long scanPos = originalLength;
-                long lastNewlinePos = -1;
-
-                while (scanPos > 0 && lastNewlinePos < 0)
-                {
-                    var readSize = (int)Math.Min(buffer.Length, scanPos);
-                    scanPos -= readSize;
-                    fs.Position = scanPos;
-                    var read = fs.Read(buffer, 0, readSize);
-                    for (var i = read - 1; i >= 0; i--)
-                    {
-                        if (buffer[i] == (byte)'\n')
-                        {
-                            lastNewlinePos = scanPos + i;
-                            break;
-                        }
-                    }
-                }
-
-                var newLength = lastNewlinePos >= 0 ? lastNewlinePos + 1 : 0;
-                var removed = originalLength - newLength;
-                if (removed <= 0)
-                    return;
-
-                fs.SetLength(newLength);
-                fs.Flush(flushToDisk: true);
-
-                try
-                {
-                    var dir = Path.GetDirectoryName(truthPath);
-                    if (!string.IsNullOrWhiteSpace(dir))
-                    {
-                        var logPath = Path.Combine(dir, "Truth.repair.log");
-                        var line = $"{DateTime.UtcNow:O} truncated tail repair removed {removed} bytes{Environment.NewLine}";
-                        AtomicFile.TryAppendAllText(logPath, line, durable: false);
-                    }
-                }
-                catch
-                {
-                    // best-effort logging
-                }
-            }
-            catch
-            {
-                // best-effort repair
-            }
-        }
-
         private static void EnsureIndexLoaded(string chatId, ChatIndex idx)
         {
             if (idx.Loaded) return;
@@ -593,17 +524,30 @@ namespace VAL.Continuum.Pipeline.Truth
 
             try
             {
-                RepairTruncatedTailIfNeeded(path);
-
-                foreach (var ln in File.ReadLines(path))
+                if (TruthFile.TryRepairTruncatedTail(path, out var removed) && removed > 0)
                 {
-                    if (!TruthLine.TryParse(ln, out var rc, out var payload))
-                        continue;
+                    try
+                    {
+                        var dir = Path.GetDirectoryName(path);
+                        if (!string.IsNullOrWhiteSpace(dir))
+                        {
+                            var logPath = Path.Combine(dir, "Truth.repair.log");
+                            var line = $"{DateTime.UtcNow:O} truncated tail repair removed {removed} bytes{Environment.NewLine}";
+                            AtomicFile.TryAppendAllText(logPath, line, durable: false);
+                        }
+                    }
+                    catch
+                    {
+                        // best-effort logging
+                    }
+                }
 
-                    var txt = NormalizeForStorage(payload);
+                foreach (var entry in TruthReader.Read(path, repairTailFirst: false))
+                {
+                    var txt = NormalizeForStorage(entry.Payload);
                     if (string.IsNullOrWhiteSpace(txt)) continue;
 
-                    idx.Seen.Add(Fingerprint(rc, NormalizeForFingerprint(txt)));
+                    idx.Seen.Add(Fingerprint(entry.Role, NormalizeForFingerprint(txt)));
                 }
             }
             catch
@@ -620,13 +564,32 @@ namespace VAL.Continuum.Pipeline.Truth
         public static string ReadTruthText(string chatId)
         {
             var path = GetTruthPath(chatId);
-            return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+            if (!File.Exists(path))
+                return string.Empty;
+
+            var sb = new StringBuilder();
+            foreach (var entry in TruthReader.Read(path, repairTailFirst: true))
+            {
+                sb.Append(entry.Role);
+                sb.Append('|');
+                sb.Append(entry.Payload);
+                sb.Append(Environment.NewLine);
+            }
+
+            return sb.ToString();
         }
 
         public static string[] ReadTruthLines(string chatId)
         {
             var path = GetTruthPath(chatId);
-            return File.Exists(path) ? File.ReadAllLines(path) : Array.Empty<string>();
+            if (!File.Exists(path))
+                return Array.Empty<string>();
+
+            var lines = new System.Collections.Generic.List<string>();
+            foreach (var entry in TruthReader.Read(path, repairTailFirst: true))
+                lines.Add($"{entry.Role}|{entry.Payload}");
+
+            return lines.ToArray();
         }
     }
 }
