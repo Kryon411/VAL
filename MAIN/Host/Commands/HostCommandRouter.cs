@@ -17,18 +17,19 @@ namespace VAL.Host.Commands
     /// </summary>
     public static class HostCommandRouter
     {
-        public static void HandleWebMessageJson(string? json)
+        public static void HandleWebMessage(WebMessageEnvelope webMessage)
         {
+            var json = webMessage.Json;
             if (string.IsNullOrWhiteSpace(json))
                 return;
 
-            if (!MessageEnvelope.TryParse(json, out var envelope))
+            if (!MessageEnvelope.TryParse(json, out var parsedEnvelope))
                 return;
 
-            if (!string.Equals(envelope.Type, "command", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(parsedEnvelope.Type, "command", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            var commandName = envelope.Name?.Trim();
+            var commandName = parsedEnvelope.Name?.Trim();
             if (string.IsNullOrWhiteSpace(commandName))
             {
                 ValLog.Warn(nameof(HostCommandRouter), "Web message missing command name.");
@@ -36,18 +37,18 @@ namespace VAL.Host.Commands
             }
 
             // Central session tracking.
-            SessionContext.Observe(commandName, envelope.ChatId);
+            SessionContext.Observe(commandName, parsedEnvelope.ChatId);
 
-            var payload = envelope.Payload;
+            var payload = parsedEnvelope.Payload;
             if (payload.HasValue && payload.Value.ValueKind == JsonValueKind.Object)
             {
-                var cmd = new HostCommand(commandName, json, envelope.ChatId, payload.Value);
+                var cmd = new HostCommand(commandName, json, parsedEnvelope.ChatId, webMessage.SourceUri, payload.Value);
                 Dispatch(cmd);
                 return;
             }
 
             using var emptyDoc = JsonDocument.Parse("{}");
-            var fallbackCmd = new HostCommand(commandName, json, envelope.ChatId, emptyDoc.RootElement);
+            var fallbackCmd = new HostCommand(commandName, json, parsedEnvelope.ChatId, webMessage.SourceUri, emptyDoc.RootElement);
             Dispatch(fallbackCmd);
         }
 
