@@ -35,6 +35,7 @@
   <ItemGroup>
     <Compile Remove="VAL.Tests\**\*.cs" />
     <Compile Remove="Tools\TruthStress\**\*.cs" />
+    <Compile Remove="Tools\TruthDoctor\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
