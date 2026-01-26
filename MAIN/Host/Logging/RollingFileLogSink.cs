@@ -36,7 +36,7 @@ namespace VAL.Host.Logging
                 lock (_sync)
                 {
                     Directory.CreateDirectory(_directory);
-                    RotateIfNeeded();
+                    RotateIfNeeded(logEvent.FormattedLine);
                     Append(logEvent.FormattedLine);
                     RotateIfNeeded();
                 }
@@ -54,18 +54,22 @@ namespace VAL.Host.Logging
             writer.Write(line);
         }
 
-        private void RotateIfNeeded()
+        private void RotateIfNeeded(string? pendingLine = null)
         {
             if (_maxFiles <= 1)
             {
-                TrimIfOversize();
+                TrimIfOversize(pendingLine);
                 return;
             }
 
             try
             {
                 var info = new FileInfo(FilePath);
-                if (!info.Exists || info.Length <= _maxBytes)
+                var projected = info.Exists ? info.Length : 0;
+                if (!string.IsNullOrEmpty(pendingLine))
+                    projected += _encoding.GetByteCount(pendingLine);
+
+                if (projected <= _maxBytes)
                     return;
 
                 RotateFiles();
@@ -76,12 +80,16 @@ namespace VAL.Host.Logging
             }
         }
 
-        private void TrimIfOversize()
+        private void TrimIfOversize(string? pendingLine = null)
         {
             try
             {
                 var info = new FileInfo(FilePath);
-                if (info.Exists && info.Length > _maxBytes)
+                var projected = info.Exists ? info.Length : 0;
+                if (!string.IsNullOrEmpty(pendingLine))
+                    projected += _encoding.GetByteCount(pendingLine);
+
+                if (projected > _maxBytes)
                     File.Delete(FilePath);
             }
             catch
