@@ -1228,7 +1228,7 @@ namespace VAL.Continuum
                 if (!File.Exists(truthPath)) return false;
 
                 var sb = new System.Text.StringBuilder();
-                foreach (var entry in Truth.TruthReader.Read(truthPath, repairTailFirst: true))
+                foreach (var entry in TruthReader.Read(truthPath, repairTailFirst: true))
                 {
                     if (sb.Length >= 32768)
                         break;

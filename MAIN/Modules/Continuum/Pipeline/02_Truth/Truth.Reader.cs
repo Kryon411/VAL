@@ -29,11 +29,24 @@ namespace VAL.Continuum.Pipeline.Truth
 
             var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
-            int lineNumber = 0;
+            FileStream? fs = null;
+            StreamReader? reader = null;
             try
             {
-                using var fs = new FileStream(truthPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new StreamReader(fs, encoding, detectEncodingFromByteOrderMarks: false);
+                fs = new FileStream(truthPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                reader = new StreamReader(fs, encoding, detectEncodingFromByteOrderMarks: false);
+            }
+            catch
+            {
+                reader?.Dispose();
+                fs?.Dispose();
+                yield break;
+            }
+
+            using (fs)
+            using (reader)
+            {
+                int lineNumber = 0;
                 while (true)
                 {
                     var line = reader.ReadLine();
@@ -47,10 +60,6 @@ namespace VAL.Continuum.Pipeline.Truth
 
                     yield return new TruthEntry(lineNumber, role, payload);
                 }
-            }
-            catch
-            {
-                yield break;
             }
         }
     }
