@@ -23,9 +23,7 @@ namespace VAL.Host
     /// </summary>
     public static class ModuleLoader
     {
-        // Idempotency guard: prevent duplicate module injection (especially across navigations).
-        private static readonly HashSet<string> _loadedConfigPaths = new(StringComparer.OrdinalIgnoreCase);
-        private static readonly object _loadLock = new();
+        private static readonly ModuleRegistrationTracker _registrationTracker = new();
         private static readonly object _statusLock = new();
         private static readonly Dictionary<string, ModuleStatusInfo> _moduleStatuses = new(StringComparer.OrdinalIgnoreCase);
 
@@ -312,10 +310,10 @@ namespace VAL.Host
                 {
                     try
                     {
-                        lock (_loadLock)
+                        if (!_registrationTracker.TryMarkRegistered(core, configPath))
                         {
-                            if (_loadedConfigPaths.Contains(configPath)) continue;
-                            _loadedConfigPaths.Add(configPath);
+                            ValLog.Verbose("ModuleLoader", $"Skipping already-registered module for this core: {configPath}");
+                            continue;
                         }
 
                         var moduleDir = Path.GetDirectoryName(configPath);
