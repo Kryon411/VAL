@@ -19,6 +19,8 @@ namespace VAL.Host.Services
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private Task? _initTask;
         private bool _eventsWired;
+        private volatile bool _bridgeArmed;
+        private Uri? _currentUri;
 
         public CoreWebView2? Core { get; private set; }
 
@@ -32,6 +34,10 @@ namespace VAL.Host.Services
         public event Action? NavigationCompleted;
         private static long _lastRejectedLogTicks;
         private static readonly long RejectedLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
+        private static long _lastBridgeDisarmedLogTicks;
+        private static long _lastBridgeIgnoredLogTicks;
+        private static long _lastNavigationBlockedLogTicks;
+        private static readonly long BridgeLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
 
         public async Task InitializeAsync(WebView2 control)
         {
@@ -123,8 +129,16 @@ namespace VAL.Host.Services
             if (!_eventsWired)
             {
                 Core.NavigationCompleted += (_, __) => NavigationCompleted?.Invoke();
+                Core.NavigationStarting += (_, e) => HandleNavigationStarting(e);
+                Core.SourceChanged += (_, __) => UpdateBridgeState(Core.Source);
                 Core.WebMessageReceived += (_, e) =>
                 {
+                    if (!_bridgeArmed)
+                    {
+                        LogBridgeIgnoredMessage();
+                        return;
+                    }
+
                     var source = e.Source;
                     if (!WebMessageOriginGuard.TryIsAllowed(source, out var sourceUri))
                     {
@@ -170,6 +184,31 @@ namespace VAL.Host.Services
             }
         }
 
+        private void HandleNavigationStarting(CoreWebView2NavigationStartingEventArgs e)
+        {
+            var uri = e.Uri;
+            if (!WebOriginPolicy.TryIsNavigationAllowed(uri, out _))
+            {
+                e.Cancel = true;
+                LogBlockedNavigation(uri);
+            }
+        }
+
+        private void UpdateBridgeState(string? source)
+        {
+            Uri? parsed = null;
+            if (Uri.TryCreate(source, UriKind.Absolute, out var candidate))
+                parsed = candidate;
+
+            _currentUri = parsed;
+
+            var wasArmed = _bridgeArmed;
+            _bridgeArmed = WebOriginPolicy.TryIsBridgeAllowed(source, out _);
+
+            if (wasArmed && !_bridgeArmed)
+                LogBridgeDisarmed(source);
+        }
+
         private static void LogRejectedWebMessage(string? source)
         {
             var nowTicks = DateTimeOffset.UtcNow.Ticks;
@@ -182,6 +221,44 @@ namespace VAL.Host.Services
 
             ValLog.Warn(nameof(WebViewRuntime),
                 $"Blocked web message from non-allowlisted origin: {source ?? "<null>"}");
+        }
+
+        private void LogBridgeDisarmed(string? source)
+        {
+            if (!ShouldLog(ref _lastBridgeDisarmedLogTicks, BridgeLogIntervalTicks))
+                return;
+
+            ValLog.Warn(nameof(WebViewRuntime),
+                $"Bridge disarmed due to untrusted origin: {source ?? "<null>"}");
+        }
+
+        private void LogBridgeIgnoredMessage()
+        {
+            if (!ShouldLog(ref _lastBridgeIgnoredLogTicks, BridgeLogIntervalTicks))
+                return;
+
+            var origin = _currentUri?.ToString() ?? "<null>";
+            ValLog.Warn(nameof(WebViewRuntime),
+                $"Ignoring web message while bridge disarmed (current origin: {origin})");
+        }
+
+        private static void LogBlockedNavigation(string? uri)
+        {
+            if (!ShouldLog(ref _lastNavigationBlockedLogTicks, BridgeLogIntervalTicks))
+                return;
+
+            ValLog.Warn(nameof(WebViewRuntime),
+                $"Canceled navigation to unsafe or unknown URI: {uri ?? "<null>"}");
+        }
+
+        private static bool ShouldLog(ref long lastTicksRef, long intervalTicks)
+        {
+            var nowTicks = DateTimeOffset.UtcNow.Ticks;
+            var lastTicks = Interlocked.Read(ref lastTicksRef);
+            if (nowTicks - lastTicks < intervalTicks)
+                return false;
+
+            return Interlocked.CompareExchange(ref lastTicksRef, nowTicks, lastTicks) == lastTicks;
         }
     }
 }
