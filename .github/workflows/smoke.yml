@@ -20,6 +20,12 @@ jobs:
       - name: Restore
         run: dotnet restore MAIN/VAL.csproj
 
+      - name: Build (Release)
+        run: dotnet build MAIN/VAL.csproj -c Release
+
+      - name: Test (Release)
+        run: dotnet test MAIN/VAL.Tests/VAL.Tests.csproj -c Release
+
       - name: Publish (win-x64)
         run: dotnet publish MAIN/VAL.csproj -c Release -r win-x64 -o artifacts/publish
 
