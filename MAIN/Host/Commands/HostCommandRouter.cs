@@ -17,8 +17,9 @@ namespace VAL.Host.Commands
     /// </summary>
     public static class HostCommandRouter
     {
-        public static void HandleWebMessageJson(string? json)
+        public static void HandleWebMessage(WebMessageEnvelope message)
         {
+            var json = message.Json;
             if (string.IsNullOrWhiteSpace(json))
                 return;
 
@@ -41,13 +42,13 @@ namespace VAL.Host.Commands
             var payload = envelope.Payload;
             if (payload.HasValue && payload.Value.ValueKind == JsonValueKind.Object)
             {
-                var cmd = new HostCommand(commandName, json, envelope.ChatId, payload.Value);
+                var cmd = new HostCommand(commandName, json, envelope.ChatId, message.SourceUri, payload.Value);
                 Dispatch(cmd);
                 return;
             }
 
             using var emptyDoc = JsonDocument.Parse("{}");
-            var fallbackCmd = new HostCommand(commandName, json, envelope.ChatId, emptyDoc.RootElement);
+            var fallbackCmd = new HostCommand(commandName, json, envelope.ChatId, message.SourceUri, emptyDoc.RootElement);
             Dispatch(fallbackCmd);
         }
 

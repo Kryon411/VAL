@@ -40,7 +40,7 @@ namespace VAL
             Closing += MainWindow_Closing;
             SourceInitialized += MainWindow_SourceInitialized;
 
-            _webViewRuntime.WebMessageJsonReceived += _viewModel.HandleWebMessageJson;
+            _webViewRuntime.WebMessageJsonReceived += _viewModel.HandleWebMessage;
         }
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)

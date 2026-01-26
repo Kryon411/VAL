@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using VAL.Host;
 using VAL.Host.Services;
+using VAL.Host.WebMessaging;
 
 namespace VAL.ViewModels
 {
@@ -114,11 +115,11 @@ namespace VAL.ViewModels
             }
         }
 
-        public void HandleWebMessageJson(string json)
+        public void HandleWebMessage(WebMessageEnvelope envelope)
         {
             try
             {
-                _commandDispatcher.HandleWebMessageJson(json);
+                _commandDispatcher.HandleWebMessage(envelope);
             }
             catch
             {
