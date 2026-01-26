@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using VAL.Continuum.Pipeline.Truth;
+using VAL.Host.Security;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Abyss
@@ -18,7 +19,6 @@ namespace VAL.Host.Abyss
         private static List<AbyssSearchResult> _lastResults = new();
         private static string? _lastQuery;
         private static string? _lastQueryOriginal;
-        private static string? _lastMemoryRoot;
         private static string? _lastGeneratedUtc;
 
         public static void Initialize(IWebMessageSender messageSender)
@@ -46,7 +46,7 @@ namespace VAL.Host.Abyss
             Task.Run(() =>
             {
                 var memoryRoot = ResolveMemoryRoot();
-                TrackQuery(query, queryOriginal, memoryRoot);
+                TrackQuery(query, queryOriginal);
                 if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 {
                     ClearLastResults();
@@ -108,7 +108,7 @@ namespace VAL.Host.Abyss
             Task.Run(() =>
             {
                 var memoryRoot = ResolveMemoryRoot();
-                TrackQuery("(Last)", null, memoryRoot);
+                TrackQuery("(Last)", null);
                 if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 {
                     ClearLastResults();
@@ -237,33 +237,34 @@ namespace VAL.Host.Abyss
             ClearLastResults();
         }
 
-        public static void OpenSource(string? truthPath, string? chatId)
+        public static void OpenSource(string? chatId)
         {
-            if (string.IsNullOrWhiteSpace(truthPath) && !string.IsNullOrWhiteSpace(chatId))
-            {
-                try { truthPath = TruthStorage.GetTruthPath(chatId); } catch { }
-            }
-
-            if (string.IsNullOrWhiteSpace(truthPath))
-            {
-                ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
+            if (string.IsNullOrWhiteSpace(chatId))
                 return;
-            }
+
+            if (!SafePathResolver.TryResolveChatTruthPath(ResolveProductRoot(), chatId, out var truthPath, out var chatDir))
+                return;
 
             try
             {
-                if (!File.Exists(truthPath))
+                if (File.Exists(truthPath))
                 {
-                    ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
+                    Process.Start(new ProcessStartInfo { FileName = truthPath, UseShellExecute = true });
                     return;
                 }
 
-                Process.Start(new ProcessStartInfo { FileName = truthPath, UseShellExecute = true });
+                if (Directory.Exists(chatDir))
+                {
+                    Process.Start(new ProcessStartInfo { FileName = chatDir, UseShellExecute = true });
+                    return;
+                }
             }
             catch
             {
-                ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
+                // ignore
             }
+
+            ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
         }
 
         private static void SendInjectText(string text, string? chatId)
@@ -299,7 +300,6 @@ namespace VAL.Host.Abyss
             List<AbyssSearchResult> snapshot;
             string? query;
             string? queryOriginal;
-            string? memoryRoot;
             string? generatedUtc;
 
             lock (Gate)
@@ -307,7 +307,6 @@ namespace VAL.Host.Abyss
                 snapshot = _lastResults.ToList();
                 query = _lastQuery;
                 queryOriginal = _lastQueryOriginal;
-                memoryRoot = _lastMemoryRoot;
                 generatedUtc = _lastGeneratedUtc;
             }
 
@@ -326,7 +325,6 @@ namespace VAL.Host.Abyss
                 {
                     index = i + 1,
                     chatId = exchange.ChatId,
-                    truthPath = exchange.TruthPath,
                     score = result.Score,
                     id = fingerprint,
                     fingerprint = fingerprint,
@@ -346,7 +344,6 @@ namespace VAL.Host.Abyss
                 generatedUtc = generatedUtc ?? string.Empty,
                 totalMatches = results.Count,
                 resultCount = results.Count,
-                memoryRoot = memoryRoot ?? string.Empty,
                 results = results
             };
         }
@@ -406,13 +403,12 @@ namespace VAL.Host.Abyss
                 : $"L{startLine}–L{endLine}";
         }
 
-        private static void TrackQuery(string queryUsed, string? queryOriginal, string memoryRoot)
+        private static void TrackQuery(string queryUsed, string? queryOriginal)
         {
             lock (Gate)
             {
                 _lastQuery = queryUsed;
                 _lastQueryOriginal = queryOriginal ?? queryUsed;
-                _lastMemoryRoot = memoryRoot;
                 _lastGeneratedUtc = DateTime.UtcNow.ToString("O");
             }
         }
