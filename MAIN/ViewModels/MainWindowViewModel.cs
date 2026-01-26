@@ -114,11 +114,11 @@ namespace VAL.ViewModels
             }
         }
 
-        public void HandleWebMessageJson(string json)
+        public void HandleWebMessageJson(VAL.Host.WebMessaging.WebMessageEnvelope envelope)
         {
             try
             {
-                _commandDispatcher.HandleWebMessageJson(json);
+                _commandDispatcher.HandleWebMessageJson(envelope);
             }
             catch
             {

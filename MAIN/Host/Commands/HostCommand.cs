@@ -14,13 +14,15 @@ namespace VAL.Host.Commands
         public string Type { get; }
         public string RawJson { get; }
         public string? ChatId { get; }
+        public Uri SourceUri { get; }
         public JsonElement Root { get; }
 
-        internal HostCommand(string type, string rawJson, string? chatId, JsonElement root)
+        internal HostCommand(string type, string rawJson, string? chatId, Uri sourceUri, JsonElement root)
         {
             Type = type;
             RawJson = rawJson;
             ChatId = chatId;
+            SourceUri = sourceUri;
             Root = root;
         }
 

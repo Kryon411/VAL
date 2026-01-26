@@ -7,6 +7,8 @@ using Microsoft.Web.WebView2.Wpf;
 using VAL.Host;
 using Microsoft.Extensions.Options;
 using VAL.Host.Options;
+using VAL.Host.Security;
+using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Services
 {
@@ -26,8 +28,10 @@ namespace VAL.Host.Services
             _webViewOptions = webViewOptions.Value;
         }
 
-        public event Action<string>? WebMessageJsonReceived;
+        public event Action<WebMessageEnvelope>? WebMessageJsonReceived;
         public event Action? NavigationCompleted;
+        private static long _lastRejectedLogTicks;
+        private static readonly long RejectedLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
 
         public async Task InitializeAsync(WebView2 control)
         {
@@ -119,7 +123,21 @@ namespace VAL.Host.Services
             if (!_eventsWired)
             {
                 Core.NavigationCompleted += (_, __) => NavigationCompleted?.Invoke();
-                Core.WebMessageReceived += (_, e) => WebMessageJsonReceived?.Invoke(e.WebMessageAsJson);
+                Core.WebMessageReceived += (_, e) =>
+                {
+                    var source = e.Source;
+                    if (!WebMessageOriginGuard.TryIsAllowed(source, out var sourceUri))
+                    {
+                        LogRejectedWebMessage(source);
+                        return;
+                    }
+
+                    var json = e.WebMessageAsJson;
+                    if (string.IsNullOrWhiteSpace(json))
+                        return;
+
+                    WebMessageJsonReceived?.Invoke(new WebMessageEnvelope(json, sourceUri!));
+                };
                 Core.NewWindowRequested += (_, e) => HandleNewWindowRequested(e);
                 _eventsWired = true;
             }
@@ -150,6 +168,20 @@ namespace VAL.Host.Services
                     // Never let window routing break the host.
                 }
             }
+        }
+
+        private static void LogRejectedWebMessage(string? source)
+        {
+            var nowTicks = DateTimeOffset.UtcNow.Ticks;
+            var lastTicks = Interlocked.Read(ref _lastRejectedLogTicks);
+            if (nowTicks - lastTicks < RejectedLogIntervalTicks)
+                return;
+
+            if (Interlocked.CompareExchange(ref _lastRejectedLogTicks, nowTicks, lastTicks) != lastTicks)
+                return;
+
+            ValLog.Warn(nameof(WebViewRuntime),
+                $"Blocked web message from non-allowlisted origin: {source ?? "<null>"}");
         }
     }
 }

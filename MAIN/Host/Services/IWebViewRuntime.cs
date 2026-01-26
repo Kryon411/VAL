@@ -11,7 +11,7 @@ namespace VAL.Host.Services
         CoreWebView2? Core { get; }
         void PostJson(string json);
         Task ExecuteScriptAsync(string js);
-        event Action<string>? WebMessageJsonReceived;
+        event Action<VAL.Host.WebMessaging.WebMessageEnvelope>? WebMessageJsonReceived;
         event Action? NavigationCompleted;
     }
 }
