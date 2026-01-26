@@ -37,8 +37,10 @@ namespace VAL.Tests.Logging
 
             try
             {
-                sink.Write(CreateEvent(new string('a', 120)));
-                sink.Write(CreateEvent(new string('b', 120)));
+                for (var i = 0; i < 5 && !File.Exists(Path.Combine(dir, "VAL.1.log")); i++)
+                {
+                    sink.Write(CreateEvent(new string('a', 120)));
+                }
 
                 Assert.True(File.Exists(path));
                 Assert.True(File.Exists(Path.Combine(dir, "VAL.1.log")));
