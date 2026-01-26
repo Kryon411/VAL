@@ -1,6 +1,8 @@
 using System;
 using System.Text.Json;
+using System.Threading;
 using VAL.Host;
+using VAL.Host.Security;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Commands
@@ -17,11 +19,23 @@ namespace VAL.Host.Commands
     /// </summary>
     public static class HostCommandRouter
     {
+        private static readonly long BlockedTypeLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
+        private static long _lastBlockedTypeLogTicks;
+
         public static void HandleWebMessage(WebMessageEnvelope webMessage)
         {
             var json = webMessage.Json;
             if (string.IsNullOrWhiteSpace(json))
                 return;
+
+            if (!WebMessageType.TryGetType(json, out var messageType))
+                return;
+
+            if (!WebCommandRegistry.IsAllowed(messageType))
+            {
+                LogBlockedType(messageType, webMessage.SourceUri);
+                return;
+            }
 
             if (!MessageEnvelope.TryParse(json, out var parsedEnvelope))
                 return;
@@ -64,6 +78,20 @@ namespace VAL.Host.Commands
             }
 
             ValLog.Warn(nameof(HostCommandRouter), $"Unknown command '{cmd.Type}'.");
+        }
+
+        private static void LogBlockedType(string type, Uri? sourceUri)
+        {
+            var nowTicks = DateTimeOffset.UtcNow.Ticks;
+            var lastTicks = Interlocked.Read(ref _lastBlockedTypeLogTicks);
+            if (nowTicks - lastTicks < BlockedTypeLogIntervalTicks)
+                return;
+
+            if (Interlocked.CompareExchange(ref _lastBlockedTypeLogTicks, nowTicks, lastTicks) != lastTicks)
+                return;
+
+            var sourceHost = sourceUri?.Host ?? "<unknown>";
+            ValLog.Warn(nameof(HostCommandRouter), $"Blocked unknown web message type: {type} (source: {sourceHost})");
         }
     }
 }
