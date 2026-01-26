@@ -78,8 +78,8 @@ namespace VAL.Host.Commands
         {
             try
             {
-                cmd.TryGetString("truthPath", out var truthPath);
-                AbyssRuntime.OpenSource(truthPath, cmd.ChatId);
+                cmd.TryGetString("chatId", out var chatId);
+                AbyssRuntime.OpenSource(chatId ?? cmd.ChatId);
             }
             catch { }
         }

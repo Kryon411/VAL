@@ -295,7 +295,6 @@
         post({
           type: "abyss.command.open_source",
           chatId: result.chatId,
-          truthPath: result.truthPath || "",
           startLine: result.startLine,
           endLine: result.endLine
         });
