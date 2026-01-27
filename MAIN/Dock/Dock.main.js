@@ -685,13 +685,16 @@ if (module==="Theme") {
 
     // Compose
 
+    const dividerTop = el("div","valdock-divider");
     const divider0 = el("div","valdock-divider");
     const divider1 = el("div","valdock-divider");
     const divider2 = el("div","valdock-divider");
     const divider3 = el("div","valdock-divider");
+    const divider4 = el("div","valdock-divider");
 
     panel.append(
       header,
+      dividerTop,
       rowC,
       rowBtns,
       divider0,
@@ -703,6 +706,7 @@ if (module==="Theme") {
       rowV,
       divider3,
       rowT,
+      divider4,
       rowTools,
       rowToolsBtns,
       status
