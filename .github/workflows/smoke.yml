@@ -94,13 +94,23 @@ jobs:
         shell: pwsh
         run: |
           $logRoot = Join-Path $env:LOCALAPPDATA "VAL\Logs"
-          if (Test-Path $logRoot) {
-            if (Test-Path (Join-Path $logRoot "CrashReport.txt")) {
-              Copy-Item -Path (Join-Path $logRoot "CrashReport.txt") -Destination artifacts/CrashReport.txt -Force
-            }
-            if (Test-Path (Join-Path $logRoot "VAL.log")) {
-              Copy-Item -Path (Join-Path $logRoot "VAL.log") -Destination artifacts/VAL.log -Force
-            }
+          $destDir = "artifacts"
+          New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+
+          $crashSrc = Join-Path $logRoot "CrashReport.txt"
+          $crashDest = Join-Path $destDir "CrashReport.txt"
+          if (Test-Path $crashSrc) {
+            Copy-Item -Path $crashSrc -Destination $crashDest -Force
+          } else {
+            Write-Host "No CrashReport.txt found at $crashSrc"
+          }
+
+          $valSrc = Join-Path $logRoot "VAL.log"
+          $valDest = Join-Path $destDir "VAL.log"
+          if (Test-Path $valSrc) {
+            Copy-Item -Path $valSrc -Destination $valDest -Force
+          } else {
+            Write-Host "No VAL.log found at $valSrc"
           }
 
       - name: Upload smoke artifacts
