@@ -32,6 +32,7 @@ MAIN/Host/Commands/HostCommand.cs
 MAIN/Host/Commands/HostCommandRegistryguide.md
 MAIN/Host/Commands/HostCommandRouter.cs
 MAIN/Host/Commands/PortalCommandHandlers.cs
+MAIN/Host/Commands/ToolsCommandHandlers.cs
 MAIN/Host/Commands/VoidCommandHandlers.cs
 MAIN/Host/ILog.cs
 MAIN/Host/ModuleLoader.cs

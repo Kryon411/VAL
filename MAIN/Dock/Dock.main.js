@@ -643,6 +643,33 @@ if (module==="Theme") {
       )
     );
 
+    // Tools row
+    const rowTools = el("div","valdock-row");
+    const toolsHint = el("div","valdock-row-note","Truth Health & Diagnostics");
+    rowTools.append(
+      el("div","valdock-row-title","Tools:"),
+      toolsHint
+    );
+
+    const rowToolsBtns = el("div","valdock-row valdock-actions");
+    const truthHealthBtn = btn("Truth Health", "secondary");
+    const diagnosticsBtn = btn("Diagnostics", "ghost");
+
+    attachTooltip(truthHealthBtn, "Open the Truth Health report.");
+    attachTooltip(diagnosticsBtn, "Open diagnostics for the current build.");
+
+    truthHealthBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      try { post({ type:"tools.open_truth_health" }); } catch(_) {}
+    }, true);
+
+    diagnosticsBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      try { post({ type:"tools.open_diagnostics" }); } catch(_) {}
+    }, true);
+
+    rowToolsBtns.append(truthHealthBtn, diagnosticsBtn);
+
     // Status
     const status = el("div","valdock-status","");
     function refreshStatus(){
@@ -676,6 +703,8 @@ if (module==="Theme") {
       rowV,
       divider3,
       rowT,
+      rowTools,
+      rowToolsBtns,
       status
     );
     dock.append(pill, panel);

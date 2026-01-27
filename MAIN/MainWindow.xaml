@@ -12,24 +12,10 @@
     </Window.InputBindings>
     <Grid Background="#0B0C10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Menu Grid.Row="0"
-              Background="#0B0C10"
-              Foreground="#E6EAF7"
-              BorderBrush="#1B2330">
-            <MenuItem Header="_Tools">
-                <MenuItem Header="Truth Health"
-                          Command="{Binding OpenTruthHealthCommand}" />
-                <Separator />
-                <MenuItem Header="Diagnostics"
-                          Command="{Binding OpenDiagnosticsCommand}" />
-            </MenuItem>
-        </Menu>
-
         <wv2:WebView2 x:Name="WebView"
-                      Grid.Row="1" />
+                      Grid.Row="0" />
     </Grid>
 </Window>

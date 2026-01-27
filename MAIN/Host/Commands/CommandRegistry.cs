@@ -206,6 +206,21 @@ namespace VAL.Host.Commands
                 Array.Empty<string>(),
                 PortalCommandHandlers.HandleSendStaged
             ));
+
+            // ---- Tools ----
+            Register(new CommandSpec(
+                "tools.open_truth_health",
+                "Tools",
+                Array.Empty<string>(),
+                ToolsCommandHandlers.HandleOpenTruthHealth
+            ));
+
+            Register(new CommandSpec(
+                "tools.open_diagnostics",
+                "Tools",
+                Array.Empty<string>(),
+                ToolsCommandHandlers.HandleOpenDiagnostics
+            ));
         }
 
         private static void HandleContinuumCommand(HostCommand cmd)
