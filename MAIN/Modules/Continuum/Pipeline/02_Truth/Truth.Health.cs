@@ -18,7 +18,7 @@ namespace VAL.Continuum.Pipeline.Truth
     {
         internal static TruthHealthReport Build(string chatId, string truthPath, string repairLogPath)
         {
-            return Build(chatId, truthPath, repairLogPath, repairTailFirst: true);
+            return Build(chatId, truthPath, repairLogPath, repairTailFirst: false);
         }
 
         internal static TruthHealthReport Build(string chatId, string truthPath, string repairLogPath, bool repairTailFirst)

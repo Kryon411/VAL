@@ -19,6 +19,7 @@ namespace VAL.ViewModels
         private readonly IProcessLauncher _processLauncher;
         private readonly IAppPaths _appPaths;
         private readonly IDiagnosticsWindowService _diagnosticsWindowService;
+        private readonly ITruthHealthWindowService _truthHealthWindowService;
         private readonly StartupOptions _startupOptions;
 
         private long _lastExitWarnedOperationId;
@@ -35,6 +36,7 @@ namespace VAL.ViewModels
             IProcessLauncher processLauncher,
             IAppPaths appPaths,
             IDiagnosticsWindowService diagnosticsWindowService,
+            ITruthHealthWindowService truthHealthWindowService,
             StartupOptions startupOptions)
         {
             _operationCoordinator = operationCoordinator;
@@ -45,6 +47,7 @@ namespace VAL.ViewModels
             _processLauncher = processLauncher;
             _appPaths = appPaths;
             _diagnosticsWindowService = diagnosticsWindowService;
+            _truthHealthWindowService = truthHealthWindowService;
             _startupOptions = startupOptions;
 
             ToggleDockCommand = new RelayCommand(() => IsDockOpen = !IsDockOpen);
@@ -53,6 +56,7 @@ namespace VAL.ViewModels
             OpenModulesFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.ModulesRoot));
             OpenProfileFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.ProfileRoot));
             OpenDiagnosticsCommand = new RelayCommand(() => _diagnosticsWindowService.ShowDiagnostics());
+            OpenTruthHealthCommand = new RelayCommand(() => _truthHealthWindowService.ShowTruthHealth());
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -63,6 +67,7 @@ namespace VAL.ViewModels
         public ICommand OpenModulesFolderCommand { get; }
         public ICommand OpenProfileFolderCommand { get; }
         public ICommand OpenDiagnosticsCommand { get; }
+        public ICommand OpenTruthHealthCommand { get; }
 
         public bool IsDockOpen
         {

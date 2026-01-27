@@ -73,6 +73,8 @@ namespace VAL
                         services.AddSingleton<IBuildInfo, BuildInfo>();
                         services.AddSingleton<ICrashHandler, CrashHandler>();
                         services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
+                        services.AddSingleton<ITruthHealthReportService, TruthHealthReportService>();
+                        services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();
                         services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
                         services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
                         services.AddSingleton<IContinuumPump, ContinuumPump>();
@@ -86,6 +88,8 @@ namespace VAL
 
                         services.AddTransient<DiagnosticsViewModel>();
                         services.AddTransient<DiagnosticsWindow>();
+                        services.AddTransient<UI.Truth.TruthHealthViewModel>();
+                        services.AddTransient<UI.Truth.TruthHealthWindow>();
                         services.AddSingleton<MainWindowViewModel>();
                         services.AddSingleton<MainWindow>();
                         services.AddSingleton<App>();

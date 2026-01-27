@@ -65,6 +65,8 @@ MAIN/Host/Services/IPortalRuntimeService.cs
 MAIN/Host/Services/IProcessLauncher.cs
 MAIN/Host/Services/ISessionContext.cs
 MAIN/Host/Services/IToastService.cs
+MAIN/Host/Services/ITruthHealthReportService.cs
+MAIN/Host/Services/ITruthHealthWindowService.cs
 MAIN/Host/Services/IUiThread.cs
 MAIN/Host/Services/IWebViewRuntime.cs
 MAIN/Host/Services/ModuleRuntimeService.cs
@@ -74,12 +76,15 @@ MAIN/Host/Services/SafeBoot.cs
 MAIN/Host/Services/SmokeTestRunner.cs
 MAIN/Host/Services/SmokeTestSettings.cs
 MAIN/Host/Services/SmokeTestState.cs
+MAIN/Host/Services/TruthHealthReportService.cs
+MAIN/Host/Services/TruthHealthWindowService.cs
 MAIN/Host/Services/UiThread.cs
 MAIN/Host/Services/WebViewRuntime.cs
 MAIN/Host/Startup/StartupCrashGuard.cs
 MAIN/Host/Startup/StartupOptions.cs
 MAIN/Host/Startup/StartupOptionsParser.cs
 MAIN/Host/SessionContext.cs
+MAIN/Host/TruthSession.cs
 MAIN/Host/ToastArchitectureMap.md
 MAIN/Host/ToastDefinition.cs
 MAIN/Host/ToastHub.cs
@@ -93,6 +98,9 @@ MAIN/Icons/VAL_Blue_Lens.ico
 MAIN/MainWindow.xaml
 MAIN/MainWindow.xaml.cs
 MAIN/Manifest.txt
+MAIN/UI/Truth/TruthHealthViewModel.cs
+MAIN/UI/Truth/TruthHealthWindow.xaml
+MAIN/UI/Truth/TruthHealthWindow.xaml.cs
 MAIN/Modules/Abyss/Abyss.main.js
 MAIN/Modules/Abyss/Abyss.module.json
 MAIN/Modules/Abyss/Abyss.styles.css
