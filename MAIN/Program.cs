@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
+using VAL.Host.Startup;
 using VAL.Host.WebMessaging;
 using VAL.ViewModels;
 
@@ -20,6 +21,14 @@ namespace VAL
             IHost? host = null;
             var smokeSettings = SmokeTestSettings.FromArgs(args);
             SmokeTestState? smokeState = null;
+            var startupOptions = StartupOptionsParser.Parse(args);
+            var crashGuard = new StartupCrashGuard();
+            var crashGuardSafeMode = crashGuard.EvaluateAndMarkStarting();
+            if (!startupOptions.SafeModeExplicit && crashGuardSafeMode)
+            {
+                startupOptions.SafeMode = true;
+            }
+
             var localConfigPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "VAL",
@@ -71,6 +80,8 @@ namespace VAL
                         services.AddSingleton(smokeSettings);
                         services.AddSingleton<SmokeTestState>();
                         services.AddSingleton<SmokeTestRunner>();
+                        services.AddSingleton(startupOptions);
+                        services.AddSingleton(crashGuard);
 
                         services.AddTransient<DiagnosticsViewModel>();
                         services.AddTransient<DiagnosticsWindow>();
@@ -86,6 +97,10 @@ namespace VAL
                 var buildInfo = host.Services.GetRequiredService<IBuildInfo>();
                 var webViewOptions = host.Services.GetRequiredService<IOptions<WebViewOptions>>().Value;
                 safeBoot.LogStartupInfo(buildInfo, appPaths, webViewOptions);
+                if (startupOptions.SafeMode)
+                {
+                    ValLog.Info("Startup", "SAFE MODE: modules disabled");
+                }
 
                 // App is code-only (no InitializeComponent). MainWindow is created in App.OnStartup.
                 var app = host.Services.GetRequiredService<App>();

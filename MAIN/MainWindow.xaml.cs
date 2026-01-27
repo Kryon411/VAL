@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using VAL.Host;
 using VAL.Host.Services;
 using VAL.Host.Options;
+using VAL.Host.Startup;
 using VAL.ViewModels;
 
 namespace VAL
@@ -17,6 +18,8 @@ namespace VAL
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly MainWindowViewModel _viewModel;
         private readonly WebViewOptions _webViewOptions;
+        private readonly StartupOptions _startupOptions;
+        private readonly StartupCrashGuard _startupCrashGuard;
 
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
@@ -27,14 +30,19 @@ namespace VAL
             IToastService toastService,
             IWebViewRuntime webViewRuntime,
             MainWindowViewModel viewModel,
-            IOptions<WebViewOptions> webViewOptions)
+            IOptions<WebViewOptions> webViewOptions,
+            StartupOptions startupOptions,
+            StartupCrashGuard startupCrashGuard)
         {
             _toastService = toastService;
             _webViewRuntime = webViewRuntime;
             _viewModel = viewModel;
             _webViewOptions = webViewOptions.Value;
+            _startupOptions = startupOptions;
+            _startupCrashGuard = startupCrashGuard;
 
             InitializeComponent();
+            Title = _startupOptions.SafeMode ? "VAL (SAFE MODE)" : "VAL";
             DataContext = _viewModel;
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
@@ -113,6 +121,8 @@ namespace VAL
             }
 
             WebView.Source = startUri;
+
+            _startupCrashGuard.MarkSuccess();
         }
     }
 }

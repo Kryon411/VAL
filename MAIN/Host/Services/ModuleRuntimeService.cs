@@ -4,6 +4,7 @@ using Microsoft.Web.WebView2.Core;
 using VAL.Continuum;
 using VAL.Host.Abyss;
 using VAL.Host.WebMessaging;
+using VAL.Host.Startup;
 
 namespace VAL.Host.Services
 {
@@ -12,6 +13,7 @@ namespace VAL.Host.Services
         private readonly IModuleLoader _moduleLoader;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IWebMessageSender _webMessageSender;
+        private readonly StartupOptions _startupOptions;
 
         private CoreWebView2? _modulesInitializedForCore;
         private int _modulesInitInFlight;
@@ -20,17 +22,25 @@ namespace VAL.Host.Services
         public ModuleRuntimeService(
             IModuleLoader moduleLoader,
             IWebViewRuntime webViewRuntime,
-            IWebMessageSender webMessageSender)
+            IWebMessageSender webMessageSender,
+            StartupOptions startupOptions)
         {
             _moduleLoader = moduleLoader;
             _webViewRuntime = webViewRuntime;
             _webMessageSender = webMessageSender;
+            _startupOptions = startupOptions;
         }
 
         public void Start()
         {
             if (_started)
                 return;
+
+            if (_startupOptions.SafeMode)
+            {
+                _started = true;
+                return;
+            }
 
             _webViewRuntime.NavigationCompleted += async () =>
             {
@@ -51,6 +61,9 @@ namespace VAL.Host.Services
 
         public async Task EnsureModulesInitializedAsync()
         {
+            if (_startupOptions.SafeMode)
+                return;
+
             var core = _webViewRuntime.Core;
             if (core == null)
                 return;

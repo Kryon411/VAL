@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using VAL.Host;
 using VAL.Host.Services;
+using VAL.Host.Startup;
 
 namespace VAL.ViewModels
 {
@@ -18,6 +19,7 @@ namespace VAL.ViewModels
         private readonly IProcessLauncher _processLauncher;
         private readonly IAppPaths _appPaths;
         private readonly IDiagnosticsWindowService _diagnosticsWindowService;
+        private readonly StartupOptions _startupOptions;
 
         private long _lastExitWarnedOperationId;
         private bool _isDockOpen;
@@ -32,7 +34,8 @@ namespace VAL.ViewModels
             IContinuumPump continuumPump,
             IProcessLauncher processLauncher,
             IAppPaths appPaths,
-            IDiagnosticsWindowService diagnosticsWindowService)
+            IDiagnosticsWindowService diagnosticsWindowService,
+            StartupOptions startupOptions)
         {
             _operationCoordinator = operationCoordinator;
             _commandDispatcher = commandDispatcher;
@@ -42,6 +45,7 @@ namespace VAL.ViewModels
             _processLauncher = processLauncher;
             _appPaths = appPaths;
             _diagnosticsWindowService = diagnosticsWindowService;
+            _startupOptions = startupOptions;
 
             ToggleDockCommand = new RelayCommand(() => IsDockOpen = !IsDockOpen);
             OpenLogsFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.LogsRoot));
@@ -88,6 +92,9 @@ namespace VAL.ViewModels
             {
                 ValLog.Warn(nameof(MainWindowViewModel), "Portal runtime initialization failed.");
             }
+
+            if (_startupOptions.SafeMode)
+                return;
 
             _moduleRuntimeService.Start();
             _continuumPump.Start();
