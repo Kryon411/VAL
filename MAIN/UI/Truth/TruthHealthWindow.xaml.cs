@@ -1,13 +1,14 @@
 using System.Windows;
+using VAL.Host.Services;
 
 namespace VAL.UI.Truth
 {
     public partial class TruthHealthWindow : Window
     {
-        public TruthHealthWindow(TruthHealthViewModel viewModel)
+        public TruthHealthWindow()
         {
             InitializeComponent();
-            DataContext = viewModel;
+            DataContext = new TruthHealthViewModel(new TruthHealthReportService());
         }
     }
 }
