@@ -76,6 +76,9 @@ MAIN/Host/Services/SmokeTestSettings.cs
 MAIN/Host/Services/SmokeTestState.cs
 MAIN/Host/Services/UiThread.cs
 MAIN/Host/Services/WebViewRuntime.cs
+MAIN/Host/Startup/StartupCrashGuard.cs
+MAIN/Host/Startup/StartupOptions.cs
+MAIN/Host/Startup/StartupOptionsParser.cs
 MAIN/Host/SessionContext.cs
 MAIN/Host/ToastArchitectureMap.md
 MAIN/Host/ToastDefinition.cs
