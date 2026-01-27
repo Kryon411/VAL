@@ -11,7 +11,8 @@ namespace VAL.Host.Services
         bool HasActiveChat,
         string ChatId,
         string StatusMessage,
-        TruthHealthSnapshot? Snapshot);
+        TruthHealthSnapshot? Snapshot,
+        System.Collections.Generic.IReadOnlyList<TruthHealthSnapshot> Reports);
 
     internal interface ITruthHealthReportService
     {

@@ -32,19 +32,33 @@ namespace VAL.Host.Services
         internal TruthHealthSnapshotResult GetCurrentSnapshot()
         {
             var chatId = TruthSession.CurrentChatId;
-            if (string.IsNullOrWhiteSpace(chatId) || !Guid.TryParse(chatId, out _))
+            var hasChatId = !string.IsNullOrWhiteSpace(chatId) && Guid.TryParse(chatId, out _);
+            var productRoot = ResolveProductRoot(chatId);
+            var reports = BuildReports(productRoot);
+
+            if (!hasChatId)
             {
                 return new TruthHealthSnapshotResult(
                     HasActiveChat: false,
                     ChatId: string.Empty,
                     StatusMessage: "No active chat session detected.",
-                    Snapshot: null);
+                    Snapshot: null,
+                    Reports: reports);
             }
 
-            return BuildSnapshot(chatId);
+            var snapshotResult = BuildSnapshot(chatId, reports);
+            if (snapshotResult.Snapshot != null)
+                return snapshotResult;
+
+            return new TruthHealthSnapshotResult(
+                HasActiveChat: true,
+                ChatId: chatId,
+                StatusMessage: snapshotResult.StatusMessage,
+                Snapshot: null,
+                Reports: reports);
         }
 
-        internal TruthHealthSnapshotResult BuildSnapshot(string chatId)
+        internal TruthHealthSnapshotResult BuildSnapshot(string chatId, System.Collections.Generic.IReadOnlyList<TruthHealthSnapshot> reports)
         {
             try
             {
@@ -55,10 +69,11 @@ namespace VAL.Host.Services
                         HasActiveChat: true,
                         ChatId: chatId,
                         StatusMessage: "Truth health unavailable.",
-                        Snapshot: null);
+                        Snapshot: null,
+                        Reports: reports);
                 }
 
-                var report = TruthHealth.Build(chatId, truthPath, repairLogPath);
+                var report = TruthHealth.Build(chatId, truthPath, repairLogPath, repairTailFirst: false);
                 var isLargeLog = report.Bytes > WarnMb * 1024L * 1024L;
                 var snapshot = new TruthHealthSnapshot(report, relativePath, isLargeLog);
 
@@ -66,7 +81,8 @@ namespace VAL.Host.Services
                     HasActiveChat: true,
                     ChatId: chatId,
                     StatusMessage: string.Empty,
-                    Snapshot: snapshot);
+                    Snapshot: snapshot,
+                    Reports: reports);
             }
             catch
             {
@@ -75,7 +91,67 @@ namespace VAL.Host.Services
                     HasActiveChat: true,
                     ChatId: chatId,
                     StatusMessage: "Truth health unavailable.",
-                    Snapshot: null);
+                    Snapshot: null,
+                    Reports: reports);
+            }
+        }
+
+        private System.Collections.Generic.List<TruthHealthSnapshot> BuildReports(string? productRoot)
+        {
+            var reports = new System.Collections.Generic.List<TruthHealthSnapshot>();
+            if (string.IsNullOrWhiteSpace(productRoot))
+                return reports;
+
+            try
+            {
+                var chatsRoot = Path.Combine(productRoot, "Memory", "Chats");
+                if (!Directory.Exists(chatsRoot))
+                    return reports;
+
+                var chatDirs = Directory.GetDirectories(chatsRoot);
+                Array.Sort(chatDirs, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var chatDir in chatDirs)
+                {
+                    var chatId = Path.GetFileName(chatDir);
+                    if (string.IsNullOrWhiteSpace(chatId))
+                        continue;
+
+                    var truthPath = Path.Combine(chatDir, TruthStorage.TruthFileName);
+                    var repairLogPath = Path.Combine(chatDir, "Truth.repair.log");
+                    var report = TruthHealth.Build(chatId, truthPath, repairLogPath, repairTailFirst: false);
+                    var relativePath = Path.Combine("Memory", "Chats", chatId, TruthStorage.TruthFileName);
+                    var isLargeLog = report.Bytes > WarnMb * 1024L * 1024L;
+                    reports.Add(new TruthHealthSnapshot(report, relativePath, isLargeLog));
+                }
+            }
+            catch
+            {
+                LogFailure();
+            }
+
+            return reports;
+        }
+
+        private string? ResolveProductRoot(string? chatId)
+        {
+            if (!string.IsNullOrWhiteSpace(_productRootOverride))
+                return _productRootOverride;
+
+            if (string.IsNullOrWhiteSpace(chatId))
+                return null;
+
+            try
+            {
+                var chatDir = TruthStorage.GetChatDir(chatId);
+                var chatsRoot = Directory.GetParent(chatDir);
+                var memoryRoot = chatsRoot?.Parent;
+                var productRoot = memoryRoot?.Parent;
+                return productRoot?.FullName;
+            }
+            catch
+            {
+                return null;
             }
         }
 
