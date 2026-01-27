@@ -1,6 +1,8 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
+using VAL.Host;
 
 namespace VAL.Host.Logging
 {
@@ -13,6 +15,9 @@ namespace VAL.Host.Logging
         private readonly string _directory;
         private readonly string _baseName;
         private readonly string _extension;
+        private static readonly RateLimiter RateLimiter = new();
+        private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
+        [ThreadStatic] private static bool _loggingWarning;
 
         public RollingFileLogSink(string filePath, long maxBytes = 2 * 1024 * 1024, int maxFiles = 5)
         {
@@ -74,9 +79,9 @@ namespace VAL.Host.Logging
 
                 RotateFiles();
             }
-            catch
+            catch (Exception ex)
             {
-                // Swallow rotation failures.
+                LogRotationFailure("rotate_check", ex);
             }
         }
 
@@ -92,9 +97,9 @@ namespace VAL.Host.Logging
                 if (projected > _maxBytes)
                     File.Delete(FilePath);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore trim failures.
+                LogRotationFailure("trim", ex);
             }
         }
 
@@ -108,9 +113,9 @@ namespace VAL.Host.Logging
                 if (File.Exists(oldest))
                     File.Delete(oldest);
             }
-            catch
+            catch (Exception ex)
             {
-                // Best-effort cleanup.
+                LogRotationFailure("delete_oldest", ex);
             }
 
             for (var i = maxIndex - 1; i >= 0; i--)
@@ -128,9 +133,9 @@ namespace VAL.Host.Logging
 
                     File.Move(source, dest);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Keep rotating what we can.
+                    LogRotationFailure("move", ex);
                 }
             }
         }
@@ -138,6 +143,30 @@ namespace VAL.Host.Logging
         private string IndexedPath(int index)
         {
             return Path.Combine(_directory, $"{_baseName}.{index}{_extension}");
+        }
+
+        private static void LogRotationFailure(string action, Exception ex)
+        {
+            if (_loggingWarning)
+                return;
+
+            if (!RateLimiter.Allow($"log.rotate.{action}", LogInterval))
+                return;
+
+            try
+            {
+                _loggingWarning = true;
+                ValLog.Warn(nameof(RollingFileLogSink),
+                    $"Rolling log rotation failed ({action}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+            }
+            catch
+            {
+                Trace.WriteLine($"[VAL] Rolling log rotation failed ({action}). {ex.GetType().Name}");
+            }
+            finally
+            {
+                _loggingWarning = false;
+            }
         }
     }
 }
