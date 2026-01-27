@@ -19,6 +19,9 @@ MAIN/CrashWindow.xaml
 MAIN/CrashWindow.xaml.cs
 MAIN/DiagnosticsWindow.xaml
 MAIN/DiagnosticsWindow.xaml.cs
+MAIN/UI/Truth/TruthHealthWindow.xaml
+MAIN/UI/Truth/TruthHealthWindow.xaml.cs
+MAIN/UI/Truth/TruthHealthViewModel.cs
 MAIN/Dock/Dock.main.js
 MAIN/Dock/Dock.module.json
 MAIN/Dock/Dock.styles.css
@@ -32,6 +35,7 @@ MAIN/Host/Commands/HostCommand.cs
 MAIN/Host/Commands/HostCommandRegistryguide.md
 MAIN/Host/Commands/HostCommandRouter.cs
 MAIN/Host/Commands/PortalCommandHandlers.cs
+MAIN/Host/Commands/TruthHealthCommandHandlers.cs
 MAIN/Host/Commands/VoidCommandHandlers.cs
 MAIN/Host/ILog.cs
 MAIN/Host/ModuleLoader.cs
@@ -58,6 +62,8 @@ MAIN/Host/Services/ICommandDispatcher.cs
 MAIN/Host/Services/IContinuumPump.cs
 MAIN/Host/Services/ICrashHandler.cs
 MAIN/Host/Services/IDiagnosticsWindowService.cs
+MAIN/Host/Services/ITruthHealthService.cs
+MAIN/Host/Services/ITruthHealthWindowService.cs
 MAIN/Host/Services/IModuleLoader.cs
 MAIN/Host/Services/IModuleRuntimeService.cs
 MAIN/Host/Services/IOperationCoordinator.cs
@@ -70,6 +76,9 @@ MAIN/Host/Services/IWebViewRuntime.cs
 MAIN/Host/Services/ModuleRuntimeService.cs
 MAIN/Host/Services/PortalRuntimeService.cs
 MAIN/Host/Services/ProcessLauncher.cs
+MAIN/Host/Services/TruthHealthService.cs
+MAIN/Host/Services/TruthHealthSnapshot.cs
+MAIN/Host/Services/TruthHealthWindowService.cs
 MAIN/Host/Services/SafeBoot.cs
 MAIN/Host/Services/SmokeTestRunner.cs
 MAIN/Host/Services/SmokeTestSettings.cs
@@ -80,6 +89,7 @@ MAIN/Host/Startup/StartupCrashGuard.cs
 MAIN/Host/Startup/StartupOptions.cs
 MAIN/Host/Startup/StartupOptionsParser.cs
 MAIN/Host/SessionContext.cs
+MAIN/Host/Truth/TruthSession.cs
 MAIN/Host/ToastArchitectureMap.md
 MAIN/Host/ToastDefinition.cs
 MAIN/Host/ToastHub.cs

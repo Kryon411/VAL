@@ -13,11 +13,14 @@ namespace VAL;
 /// </summary>
 public partial class App : Application
 {
+    public static IServiceProvider Services { get; private set; } = null!;
+
     private readonly IServiceProvider _services;
 
     public App(IServiceProvider services)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
+        Services = _services;
     }
 
     protected override void OnStartup(StartupEventArgs e)

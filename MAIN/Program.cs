@@ -10,6 +10,7 @@ using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
 using VAL.Host.Startup;
 using VAL.Host.WebMessaging;
+using VAL.UI.Truth;
 using VAL.ViewModels;
 
 namespace VAL
@@ -73,6 +74,8 @@ namespace VAL
                         services.AddSingleton<IBuildInfo, BuildInfo>();
                         services.AddSingleton<ICrashHandler, CrashHandler>();
                         services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
+                        services.AddSingleton<ITruthHealthService, TruthHealthService>();
+                        services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();
                         services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
                         services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
                         services.AddSingleton<IContinuumPump, ContinuumPump>();
@@ -86,6 +89,8 @@ namespace VAL
 
                         services.AddTransient<DiagnosticsViewModel>();
                         services.AddTransient<DiagnosticsWindow>();
+                        services.AddTransient<TruthHealthViewModel>();
+                        services.AddTransient<TruthHealthWindow>();
                         services.AddSingleton<MainWindowViewModel>();
                         services.AddSingleton<MainWindow>();
                         services.AddSingleton<App>();
