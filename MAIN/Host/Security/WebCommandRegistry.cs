@@ -61,6 +61,10 @@ namespace VAL.Host.Security
             "portal.command.send_staged",
             "portal.command.send",
             "portal.command.sendStaged",
+
+            // ---- Tools ----
+            "tools.open_truth_health",
+            "tools.open_diagnostics",
         };
 
         internal static readonly string[] AllowedPrefixes =

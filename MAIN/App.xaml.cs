@@ -20,6 +20,8 @@ public partial class App : Application
         _services = services ?? throw new ArgumentNullException(nameof(services));
     }
 
+    public IServiceProvider Services => _services;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
