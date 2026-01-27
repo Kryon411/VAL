@@ -7,7 +7,7 @@ using VAL.ViewModels;
 
 namespace VAL.UI.Truth
 {
-    public sealed class TruthHealthViewModel : INotifyPropertyChanged
+    internal sealed class TruthHealthViewModel : INotifyPropertyChanged
     {
         private readonly ITruthHealthReportService _reportService;
 

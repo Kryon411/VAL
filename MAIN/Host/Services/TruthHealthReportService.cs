@@ -7,7 +7,7 @@ using VAL.Host.Security;
 
 namespace VAL.Host.Services
 {
-    public sealed class TruthHealthReportService : ITruthHealthReportService
+    internal sealed class TruthHealthReportService : ITruthHealthReportService
     {
         internal const int WarnMb = 50;
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(20);
@@ -24,7 +24,12 @@ namespace VAL.Host.Services
             _productRootOverride = productRootOverride;
         }
 
-        public TruthHealthSnapshotResult GetCurrentSnapshot()
+        TruthHealthSnapshotResult ITruthHealthReportService.GetCurrentSnapshot()
+        {
+            return GetCurrentSnapshot();
+        }
+
+        internal TruthHealthSnapshotResult GetCurrentSnapshot()
         {
             var chatId = TruthSession.CurrentChatId;
             if (string.IsNullOrWhiteSpace(chatId) || !Guid.TryParse(chatId, out _))
