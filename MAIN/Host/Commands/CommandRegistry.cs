@@ -78,6 +78,14 @@ namespace VAL.Host.Commands
                 ));
             }
 
+            // ---- Truth ----
+            Register(new CommandSpec(
+                "truth.health.open",
+                "Truth",
+                Array.Empty<string>(),
+                TruthHealthCommandHandlers.HandleOpen
+            ));
+
             // ---- Abyss ----
             Register(new CommandSpec(
                 "abyss.command.open_query_ui",

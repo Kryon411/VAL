@@ -40,6 +40,9 @@ namespace VAL.Host.Security
             "inject.success",
             "continuum.event",
 
+            // ---- Truth ----
+            "truth.health.open",
+
             // ---- Abyss ----
             "abyss.command.open_query_ui",
             "abyss.command.search",

@@ -1,0 +1,139 @@
+<Window x:Class="VAL.UI.Truth.TruthHealthWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Truth Health"
+        Height="380"
+        Width="560"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Truth Health"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,4" />
+            <TextBlock Text="Local-only summary (no telemetry)."
+                       FontSize="12"
+                       Foreground="Gray"
+                       Margin="0,0,0,6" />
+            <TextBlock Text="{Binding StatusMessage}"
+                       FontSize="12"
+                       Foreground="DarkOrange"
+                       Margin="0,0,0,4" />
+        </StackPanel>
+
+        <Grid Grid.Row="1" Margin="0,4,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="170" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="Chat Id"
+                       FontWeight="SemiBold"
+                       Margin="0,0,8,6" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding ChatId}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="1"
+                       Text="Truth.log (relative)"
+                       FontWeight="SemiBold"
+                       Margin="0,0,8,6" />
+            <TextBlock Grid.Row="1"
+                       Grid.Column="1"
+                       Text="{Binding RelativePath}"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="2"
+                       Text="Size"
+                       FontWeight="SemiBold"
+                       Margin="0,0,8,6" />
+            <TextBlock Grid.Row="2"
+                       Grid.Column="1"
+                       Text="{Binding SizeText}"
+                       Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="3"
+                       Text="Physical lines"
+                       FontWeight="SemiBold"
+                       Margin="0,0,8,6" />
+            <TextBlock Grid.Row="3"
+                       Grid.Column="1"
+                       Text="{Binding PhysicalLineCount}"
+                       Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="4"
+                       Text="Parsed entries"
+                       FontWeight="SemiBold"
+                       Margin="0,0,8,6" />
+            <TextBlock Grid.Row="4"
+                       Grid.Column="1"
+                       Text="{Binding ParsedEntryCount}"
+                       Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="5"
+                       Text="Last parsed line"
+                       FontWeight="SemiBold"
+                       Margin="0,0,8,6" />
+            <TextBlock Grid.Row="5"
+                       Grid.Column="1"
+                       Text="{Binding LastParsedLine}"
+                       Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="6"
+                       Text="Last repair (UTC)"
+                       FontWeight="SemiBold"
+                       Margin="0,0,8,6" />
+            <TextBlock Grid.Row="6"
+                       Grid.Column="1"
+                       Text="{Binding LastRepairUtc}"
+                       Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="7"
+                       Text="Bytes removed"
+                       FontWeight="SemiBold"
+                       Margin="0,0,8,6" />
+            <TextBlock Grid.Row="7"
+                       Grid.Column="1"
+                       Text="{Binding BytesRemoved}"
+                       Margin="0,0,0,6" />
+
+            <TextBlock Grid.Row="8"
+                       Grid.ColumnSpan="2"
+                       Text="{Binding AdvisoryText}"
+                       Foreground="OrangeRed"
+                       FontWeight="SemiBold"
+                       Margin="0,4,0,0" />
+        </Grid>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Refresh"
+                    Width="90"
+                    Margin="0,0,8,0"
+                    Command="{Binding RefreshCommand}" />
+            <Button Content="Close"
+                    Width="90"
+                    IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>

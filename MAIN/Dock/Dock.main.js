@@ -554,13 +554,19 @@ if (module==="Theme") {
     }, true);
 
     const openBtn = btn("Session Folder", "ghost");
+    const truthHealthBtn = btn("Truth Health", "ghost");
     attachTooltip(openBtn, "Open the folder on your computer where this session’s files are stored.");
+    attachTooltip(truthHealthBtn, "Open a local-only health summary for this session’s Truth.log.");
     openBtn.addEventListener("click",(e)=>{
       e.preventDefault();
       try { post({ type:"continuum.command.open_session_folder", chatId: getChatId() }); } catch(_) {}
     }, true);
+    truthHealthBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      try { post({ type:"truth.health.open", chatId: getChatId() }); } catch(_) {}
+    }, true);
 
-    rowBtns.append(pulseBtn, preludeBtn, chronicleBtn, openBtn);
+    rowBtns.append(pulseBtn, preludeBtn, chronicleBtn, openBtn, truthHealthBtn);
 
     // Portal row
     const rowP = el("div","valdock-row");
