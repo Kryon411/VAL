@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
+using VAL.Host.Logging;
 using VAL.Host.Options;
 
 namespace VAL.Host
@@ -26,6 +27,8 @@ namespace VAL.Host
         private static readonly ModuleRegistrationTracker _registrationTracker = new();
         private static readonly object _statusLock = new();
         private static readonly Dictionary<string, ModuleStatusInfo> _moduleStatuses = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly RateLimiter RateLimiter = new();
+        private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
 
         public sealed class ModuleStatusInfo
         {
@@ -304,7 +307,14 @@ namespace VAL.Host
                 {
                     await core.ExecuteScriptAsync($"console.log('[VAL] ModuleLoader found {configs.Count} module config(s)')");
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    if (RateLimiter.Allow("module.discovery.console_log", LogInterval))
+                    {
+                        ValLog.Warn(nameof(ModuleLoader),
+                            $"Module discovery devtools log failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+                    }
+                }
 
                 foreach (var configPath in configs)
                 {

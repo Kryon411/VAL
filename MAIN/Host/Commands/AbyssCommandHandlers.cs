@@ -2,11 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using VAL.Host.Abyss;
+using VAL.Host.Logging;
 
 namespace VAL.Host.Commands
 {
     internal static class AbyssCommandHandlers
     {
+        private static readonly RateLimiter RateLimiter = new();
+        private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
+
         public static void HandleSearch(HostCommand cmd)
         {
             try
@@ -25,7 +29,10 @@ namespace VAL.Host.Commands
 
                 AbyssRuntime.Search(cmd.ChatId, query ?? string.Empty, max, queryOriginal, exclude);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure("search", cmd, ex);
+            }
         }
 
         public static void HandleOpenQueryUi(HostCommand cmd)
@@ -44,7 +51,10 @@ namespace VAL.Host.Commands
                 var exclude = ParseStringList(cmd, "excludeFingerprints");
                 AbyssRuntime.RetryLast(cmd.ChatId, exclude, max);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure("retry_last", cmd, ex);
+            }
         }
 
         public static void HandleInjectResults(HostCommand cmd)
@@ -54,7 +64,10 @@ namespace VAL.Host.Commands
                 var indices = ParseIndices(cmd);
                 AbyssRuntime.InjectResults(indices, cmd.ChatId);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure("inject_results", cmd, ex);
+            }
         }
 
         public static void HandleInjectResult(HostCommand cmd)
@@ -71,7 +84,10 @@ namespace VAL.Host.Commands
 
                 AbyssRuntime.InjectResult(id, index, cmd.ChatId);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure("inject_result", cmd, ex);
+            }
         }
 
         public static void HandleOpenSource(HostCommand cmd)
@@ -81,17 +97,34 @@ namespace VAL.Host.Commands
                 cmd.TryGetString("chatId", out var chatId);
                 AbyssRuntime.OpenSource(chatId ?? cmd.ChatId);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure("open_source", cmd, ex);
+            }
         }
 
         public static void HandleGetResults(HostCommand cmd)
         {
-            try { AbyssRuntime.EmitResults(cmd.ChatId); } catch { }
+            try
+            {
+                AbyssRuntime.EmitResults(cmd.ChatId);
+            }
+            catch (Exception ex)
+            {
+                LogCommandFailure("get_results", cmd, ex);
+            }
         }
 
         public static void HandleClearResults(HostCommand cmd)
         {
-            try { AbyssRuntime.ClearResults(cmd.ChatId); } catch { }
+            try
+            {
+                AbyssRuntime.ClearResults(cmd.ChatId);
+            }
+            catch (Exception ex)
+            {
+                LogCommandFailure("clear_results", cmd, ex);
+            }
         }
 
         public static void HandleDisregard(HostCommand cmd)
@@ -101,7 +134,14 @@ namespace VAL.Host.Commands
 
         public static void HandleInjectPrompt(HostCommand cmd)
         {
-            try { AbyssRuntime.InjectPrompt(cmd.ChatId); } catch { }
+            try
+            {
+                AbyssRuntime.InjectPrompt(cmd.ChatId);
+            }
+            catch (Exception ex)
+            {
+                LogCommandFailure("inject_prompt", cmd, ex);
+            }
         }
 
         public static void HandleInject(HostCommand cmd)
@@ -111,7 +151,10 @@ namespace VAL.Host.Commands
                 var indices = ParseIndices(cmd);
                 AbyssRuntime.InjectResults(indices, cmd.ChatId);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure("inject", cmd, ex);
+            }
         }
 
         public static void HandleLast(HostCommand cmd)
@@ -128,7 +171,10 @@ namespace VAL.Host.Commands
 
                 AbyssRuntime.FetchLast(cmd.ChatId, count, inject);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure("last", cmd, ex);
+            }
         }
 
         private static List<int> ParseIndices(HostCommand cmd)
@@ -154,7 +200,10 @@ namespace VAL.Host.Commands
                         indices.AddRange(ParseDelimitedIndices(scalar.GetString()));
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure("parse_indices", cmd, ex);
+            }
 
             if (indices.Count == 0 && cmd.TryGetInt("index", out var single))
                 indices.Add(single);
@@ -190,7 +239,10 @@ namespace VAL.Host.Commands
                     list.AddRange(ParseDelimitedList(scalar.GetString()));
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogCommandFailure($"parse_list.{field}", cmd, ex);
+            }
 
             if (list.Count == 0 &&
                 cmd.Root.TryGetProperty("payload", out var payload) &&
@@ -212,10 +264,24 @@ namespace VAL.Host.Commands
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    LogCommandFailure($"parse_list.payload.{field}", cmd, ex);
+                }
             }
 
             return list;
+        }
+
+        private static void LogCommandFailure(string action, HostCommand cmd, Exception ex)
+        {
+            var key = $"cmd.fail.abyss.{action}";
+            if (!RateLimiter.Allow(key, LogInterval))
+                return;
+
+            var sourceHost = cmd.SourceUri?.Host ?? "unknown";
+            ValLog.Warn(nameof(AbyssCommandHandlers),
+                $"Abyss command failed ({action}) for {cmd.Type} (source: {sourceHost}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
         }
 
         private static IEnumerable<string> ParseDelimitedList(string? raw)

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using VAL.Continuum.Pipeline.Truth;
+using VAL.Host.Logging;
 
 namespace VAL.Host.Abyss
 {
@@ -35,6 +36,9 @@ namespace VAL.Host.Abyss
 
     internal static class AbyssSearch
     {
+        private static readonly RateLimiter RateLimiter = new();
+        private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
+
         public static List<AbyssSearchResult> Search(string memoryRoot, string query, int maxResults, IReadOnlyCollection<string>? excludeFingerprints = null)
         {
             var results = new List<AbyssSearchResult>();
@@ -162,8 +166,9 @@ namespace VAL.Host.Abyss
             {
                 return Directory.EnumerateFiles(memoryRoot, "Truth.log", SearchOption.AllDirectories);
             }
-            catch
+            catch (Exception ex)
             {
+                LogFileFailure("enumerate_truth_logs", ex);
                 return Array.Empty<string>();
             }
         }
@@ -184,7 +189,10 @@ namespace VAL.Host.Abyss
                         latestPath = path;
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    LogFileFailure("truth_log_last_write", ex);
+                }
             }
 
             return latestPath;
@@ -198,7 +206,14 @@ namespace VAL.Host.Abyss
 
             var chatId = new DirectoryInfo(Path.GetDirectoryName(truthPath) ?? string.Empty).Name;
             var lastWriteUtc = DateTime.MinValue;
-            try { lastWriteUtc = File.GetLastWriteTimeUtc(truthPath); } catch { }
+            try
+            {
+                lastWriteUtc = File.GetLastWriteTimeUtc(truthPath);
+            }
+            catch (Exception ex)
+            {
+                LogFileFailure("truth_log_last_write", ex);
+            }
 
             AbyssExchange? current = null;
 
@@ -244,6 +259,15 @@ namespace VAL.Host.Abyss
                 exchanges.Add(current);
 
             return exchanges;
+        }
+
+        private static void LogFileFailure(string action, Exception ex)
+        {
+            var key = $"file.fail.abyss.{action}";
+            if (!RateLimiter.Allow(key, LogInterval))
+                return;
+
+            ValLog.Warn(nameof(AbyssSearch), $"Abyss file operation failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
         }
 
         private static int ScoreExchange(AbyssExchange exchange, IReadOnlyList<string> tokens)
