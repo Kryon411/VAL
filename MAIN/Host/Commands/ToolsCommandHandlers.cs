@@ -67,7 +67,7 @@ namespace VAL.Host.Commands
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";
             ValLog.Warn(nameof(ToolsCommandHandlers),
-                $"Tools command failed ({action}) for {cmd.Type} (source: {sourceHost}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+                $"Tools command failed ({action}) for {cmd.Type} (source: {sourceHost}). {LogSanitizer.Sanitize(ex.ToString())}");
         }
 
         internal static void ReportDiagnosticsFailure(HostCommand? cmd, Exception? ex, string reason)
@@ -75,7 +75,7 @@ namespace VAL.Host.Commands
             var sourceHost = cmd?.SourceUri?.Host ?? "unknown";
             var cmdType = cmd?.Type ?? "tools.open_diagnostics";
             var detail = ex != null
-                ? $"{ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}"
+                ? LogSanitizer.Sanitize(ex.ToString())
                 : "No exception details.";
             ValLog.Warn(nameof(ToolsCommandHandlers),
                 $"Diagnostics command failed ({reason}) for {cmdType} (source: {sourceHost}). {detail}");
@@ -86,7 +86,7 @@ namespace VAL.Host.Commands
         {
             var host = string.IsNullOrWhiteSpace(sourceHost) ? "unknown" : sourceHost;
             var detail = ex != null
-                ? $"{ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}"
+                ? LogSanitizer.Sanitize(ex.ToString())
                 : "No exception details.";
             ValLog.Warn(nameof(ToolsCommandHandlers),
                 $"Diagnostics command failed ({reason}) (source: {host}). {detail}");
