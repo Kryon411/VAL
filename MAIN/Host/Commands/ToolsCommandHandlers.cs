@@ -102,6 +102,7 @@ namespace VAL.Host.Commands
             {
                 ToastManager.ShowCatalog(
                     "Diagnostics failed (see Logs/VAL.log)",
+                    null,
                     ToastManager.ToastDurationBucket.M,
                     groupKey: "tools.diagnostics",
                     replaceGroup: true,

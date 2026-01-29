@@ -94,7 +94,7 @@ namespace VAL.Host.Commands
 
         private static bool IsDiagnosticsCommand(HostCommand cmd)
         {
-            return string.Equals(cmd?.Type, "tools.open_diagnostics", StringComparison.Ordinal);
+            return string.Equals(cmd.Type, "tools.open_diagnostics", StringComparison.Ordinal);
         }
 
         private static void LogBlockedType(string type, Uri? sourceUri)

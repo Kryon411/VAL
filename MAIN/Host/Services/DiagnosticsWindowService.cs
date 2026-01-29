@@ -38,7 +38,7 @@ namespace VAL.Host.Services
             catch (Exception ex)
             {
                 // Diagnostics must never crash the app.
-                ToolsCommandHandlers.ReportDiagnosticsFailure(null, ex, "exception");
+                ToolsCommandHandlers.ReportDiagnosticsFailure("tools.open_diagnostics", ex, "exception");
             }
         }
     }
