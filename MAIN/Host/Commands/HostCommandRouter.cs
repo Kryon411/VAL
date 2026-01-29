@@ -73,11 +73,28 @@ namespace VAL.Host.Commands
 
             if (error != null)
             {
+                if (IsDiagnosticsCommand(cmd))
+                {
+                    ToolsCommandHandlers.ReportDiagnosticsFailure(cmd, error, "exception");
+                    return;
+                }
+
                 ValLog.Warn(nameof(HostCommandRouter), $"Handler error for '{cmd.Type}': {error.GetType().Name}.");
                 return;
             }
 
+            if (IsDiagnosticsCommand(cmd))
+            {
+                ToolsCommandHandlers.ReportDiagnosticsFailure(cmd, null, "unhandled");
+                return;
+            }
+
             ValLog.Warn(nameof(HostCommandRouter), $"Unknown command '{cmd.Type}'.");
+        }
+
+        private static bool IsDiagnosticsCommand(HostCommand cmd)
+        {
+            return string.Equals(cmd.Type, "tools.open_diagnostics", StringComparison.Ordinal);
         }
 
         private static void LogBlockedType(string type, Uri? sourceUri)
