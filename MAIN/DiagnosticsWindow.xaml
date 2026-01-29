@@ -4,7 +4,15 @@
         Title="VAL Diagnostics"
         Height="620"
         Width="860"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Style="{StaticResource VALWindowTheme}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/VAL;component/UI/VALWindowTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -20,8 +28,7 @@
         <TextBox Grid.Row="1"
                  Text="{Binding DiagnosticsText, Mode=OneWay}"
                  IsReadOnly="True"
-                 TextWrapping="Wrap"
-                 VerticalScrollBarVisibility="Auto" />
+                 TextWrapping="Wrap" />
 
         <StackPanel Grid.Row="2"
                     Margin="0,12,0,0"

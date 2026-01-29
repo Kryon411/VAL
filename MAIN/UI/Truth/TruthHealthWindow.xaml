@@ -4,7 +4,15 @@
         Title="Truth Health"
         Height="420"
         Width="560"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Style="{StaticResource VALWindowTheme}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/VAL;component/UI/VALWindowTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -17,7 +25,7 @@
                        FontSize="16"
                        FontWeight="SemiBold" />
             <TextBlock Text="{Binding StatusMessage}"
-                       Foreground="#C9D4FF"
+                       Foreground="{StaticResource VAL.MutedForegroundBrush}"
                        Margin="0,6,0,0" />
         </StackPanel>
 
@@ -63,7 +71,7 @@
             <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding BytesRemoved}" Margin="0,0,0,6" />
 
             <TextBlock Grid.Row="8" Grid.Column="0" Text="Advisory" FontWeight="SemiBold" />
-            <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding AdvisoryText}" Foreground="#FFB86B" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding AdvisoryText}" Foreground="{StaticResource VAL.AccentBrush}" TextWrapping="Wrap" />
         </Grid>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
