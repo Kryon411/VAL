@@ -5,7 +5,7 @@
         Height="620"
         Width="860"
         WindowStartupLocation="CenterOwner"
-        Style="{StaticResource VALWindowTheme}">
+        Style="{DynamicResource VALWindowTheme}">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
