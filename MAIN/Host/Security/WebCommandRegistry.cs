@@ -62,6 +62,12 @@ namespace VAL.Host.Security
             "portal.command.send",
             "portal.command.sendStaged",
 
+            // ---- Privacy ----
+            "privacy.command.set_continuum_logging",
+            "privacy.command.set_portal_capture",
+            "privacy.command.open_data_folder",
+            "privacy.command.wipe_data",
+
             // ---- Tools ----
             "tools.open_truth_health",
             "tools.open_diagnostics",

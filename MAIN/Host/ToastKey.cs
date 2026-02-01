@@ -43,6 +43,10 @@ namespace VAL.Host
         OperationInProgress,
         OperationCancelled,
 
+        // Data wipe
+        DataWipeCompleted,
+        DataWipePartial,
+
         // Telemetry
         TelemetrySessionSizeEarly,
         TelemetrySessionSizeLarge,

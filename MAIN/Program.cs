@@ -73,6 +73,8 @@ namespace VAL
                         services.AddSingleton<IUiThread, UiThread>();
                         services.AddSingleton<IBuildInfo, BuildInfo>();
                         services.AddSingleton<ICrashHandler, CrashHandler>();
+                        services.AddSingleton<IPrivacySettingsService, PrivacySettingsService>();
+                        services.AddSingleton<IDataWipeService, DataWipeService>();
                         services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
                         services.AddSingleton<ITruthHealthReportService, TruthHealthReportService>();
                         services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();

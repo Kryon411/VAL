@@ -456,6 +456,40 @@ namespace VAL.Host
                 },
 
                 // -----------------
+                // Data wipe
+                // -----------------
+                {
+                    ToastKey.DataWipeCompleted,
+                    new ToastDef(
+                        ToastKey.DataWipeCompleted,
+                        "Data wipe complete. Logs, profiles, and local memory have been cleared.",
+                        "Privacy settings were preserved.",
+                        ToastManager.ToastDurationBucket.M,
+                        "data_wipe",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(1))
+                },
+                {
+                    ToastKey.DataWipePartial,
+                    new ToastDef(
+                        ToastKey.DataWipePartial,
+                        "Data wipe completed with some locked files.",
+                        "Close any open logs or folders and try again.",
+                        ToastManager.ToastDurationBucket.M,
+                        "data_wipe",
+                        ReplaceGroup: true,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(2))
+                },
+
+                // -----------------
                 // Telemetry
                 // -----------------
                 {

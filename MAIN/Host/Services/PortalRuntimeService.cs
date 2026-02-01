@@ -10,12 +10,15 @@ namespace VAL.Host.Services
 
         private readonly IWebMessageSender _webMessageSender;
         private readonly IWebViewRuntime _webViewRuntime;
+        private readonly IPrivacySettingsService _privacySettingsService;
         private bool _initialized;
 
-        public PortalRuntimeService(IWebMessageSender webMessageSender, IWebViewRuntime webViewRuntime)
+        public PortalRuntimeService(IWebMessageSender webMessageSender, IWebViewRuntime webViewRuntime, IPrivacySettingsService privacySettingsService)
         {
             _webMessageSender = webMessageSender;
             _webViewRuntime = webViewRuntime;
+            _privacySettingsService = privacySettingsService;
+            _privacySettingsService.SettingsChanged += OnPrivacySettingsChanged;
         }
 
         public void Initialize(Action focusControl)
@@ -42,6 +45,7 @@ namespace VAL.Host.Services
                     }
                 );
 
+                ApplyPrivacySettings(_privacySettingsService.GetSnapshot());
                 _initialized = true;
             }
             catch
@@ -62,6 +66,23 @@ namespace VAL.Host.Services
             catch
             {
                 ValLog.Warn(nameof(PortalRuntimeService), "Failed to attach portal window.");
+            }
+        }
+
+        private void OnPrivacySettingsChanged(PrivacySettingsSnapshot snapshot)
+        {
+            ApplyPrivacySettings(snapshot);
+        }
+
+        private static void ApplyPrivacySettings(PrivacySettingsSnapshot snapshot)
+        {
+            try
+            {
+                PortalRuntime.SetPrivacyAllowed(snapshot.PortalCaptureEnabled);
+            }
+            catch
+            {
+                ValLog.Warn(nameof(PortalRuntimeService), "Failed to apply portal privacy settings.");
             }
         }
     }
