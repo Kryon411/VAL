@@ -3,12 +3,12 @@ using System.Security.Cryptography;
 
 namespace VAL.Host.Security
 {
-    internal interface IWebViewSessionNonce
+    public interface IWebViewSessionNonce
     {
         string Value { get; }
     }
 
-    internal sealed class WebViewSessionNonce : IWebViewSessionNonce
+    public sealed class WebViewSessionNonce : IWebViewSessionNonce
     {
         public string Value { get; } = GenerateNonce();
 
