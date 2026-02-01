@@ -4,13 +4,14 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="VAL" Height="720" Width="1280"
         WindowStartupLocation="CenterScreen"
-        Background="#0B0C10" WindowStyle="SingleBorderWindow">
+        WindowStyle="SingleBorderWindow"
+        Style="{DynamicResource VALWindowTheme}">
     <Window.InputBindings>
         <KeyBinding Key="D"
                     Modifiers="Control+Alt"
                     Command="{Binding OpenDiagnosticsCommand}" />
     </Window.InputBindings>
-    <Grid Background="#0B0C10">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
