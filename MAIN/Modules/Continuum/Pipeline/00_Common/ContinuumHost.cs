@@ -535,7 +535,7 @@ namespace VAL.Continuum
 
 
 
-        private static void HandleToggleLogging(bool enable)
+        internal static void ApplyLoggingSetting(bool enable, bool showToast)
         {
             bool showPausedToast = false;
             lock (Sync)
@@ -547,10 +547,15 @@ namespace VAL.Continuum
             }
 
             // User-invoked: bypass launch quiet period.
-            if (showPausedToast)
+            if (showToast && showPausedToast)
             {
                 ToastHub.TryShow(ToastKey.ContinuumArchivingPaused, bypassLaunchQuiet: true);
             }
+        }
+
+        private static void HandleToggleLogging(bool enable)
+        {
+            ApplyLoggingSetting(enable, showToast: true);
         }
 
         

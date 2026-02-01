@@ -49,6 +49,19 @@
   transform: translateY(1px) scale(0.99);
 }
 
+.valdock-pill-indicator{
+  margin-left: 8px;
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(255, 96, 96, 0.92);
+  text-shadow: 0 0 6px rgba(255, 64, 64, 0.4);
+  display: none;
+}
+
+.valdock-pill-indicator.active{
+  display: inline-block;
+}
+
 /* Expanded Control Centre panel */
 .valdock-panel{
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -78,6 +91,25 @@
   margin-bottom: 10px;
   cursor: move;
   user-select: none;
+}
+
+.valdock-portal-banner{
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(160, 24, 36, 0.35);
+  border: 1px solid rgba(255, 120, 120, 0.3);
+  color: rgba(255, 220, 220, 0.95);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.valdock-portal-banner.active{
+  display: flex;
 }
 
 .valdock-title{
@@ -203,6 +235,11 @@
   cursor: pointer;
   font-size: 11px;
   box-shadow: none;
+}
+
+.valdock-tg-switch.valdock-tg-disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .valdock-status{

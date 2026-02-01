@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
@@ -13,6 +14,7 @@ namespace VAL.Host.Services
         private readonly IModuleLoader _moduleLoader;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IWebMessageSender _webMessageSender;
+        private readonly IPrivacySettingsService _privacySettingsService;
         private readonly StartupOptions _startupOptions;
 
         private CoreWebView2? _modulesInitializedForCore;
@@ -23,11 +25,13 @@ namespace VAL.Host.Services
             IModuleLoader moduleLoader,
             IWebViewRuntime webViewRuntime,
             IWebMessageSender webMessageSender,
+            IPrivacySettingsService privacySettingsService,
             StartupOptions startupOptions)
         {
             _moduleLoader = moduleLoader;
             _webViewRuntime = webViewRuntime;
             _webMessageSender = webMessageSender;
+            _privacySettingsService = privacySettingsService;
             _startupOptions = startupOptions;
         }
 
@@ -81,6 +85,7 @@ namespace VAL.Host.Services
 
                 ContinuumHost.PostToWebMessage = _webMessageSender.Send;
                 AbyssRuntime.Initialize(_webMessageSender);
+                SendPrivacySettings();
             }
             catch (System.Exception ex)
             {
@@ -91,6 +96,33 @@ namespace VAL.Host.Services
             finally
             {
                 Interlocked.Exchange(ref _modulesInitInFlight, 0);
+            }
+        }
+
+        private void SendPrivacySettings()
+        {
+            try
+            {
+                var snapshot = _privacySettingsService.GetSnapshot();
+                var payload = System.Text.Json.JsonSerializer.SerializeToElement(new
+                {
+                    version = snapshot.Version,
+                    continuumLoggingEnabled = snapshot.ContinuumLoggingEnabled,
+                    portalCaptureEnabled = snapshot.PortalCaptureEnabled
+                });
+
+                _webMessageSender.Send(new WebMessaging.MessageEnvelope
+                {
+                    Type = "event",
+                    Name = "privacy.settings.sync",
+                    Source = "host",
+                    Payload = payload,
+                    Ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                });
+            }
+            catch
+            {
+                ValLog.Warn(nameof(ModuleRuntimeService), "Failed to send privacy settings sync.");
             }
         }
     }

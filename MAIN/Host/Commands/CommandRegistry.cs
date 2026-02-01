@@ -206,6 +206,35 @@ namespace VAL.Host.Commands
                 PortalCommandHandlers.HandleSendStaged
             ));
 
+            // ---- Privacy ----
+            Register(new CommandSpec(
+                "privacy.command.set_continuum_logging",
+                "Privacy",
+                new[] { "enabled" },
+                PrivacyCommandHandlers.HandleSetContinuumLogging
+            ));
+
+            Register(new CommandSpec(
+                "privacy.command.set_portal_capture",
+                "Privacy",
+                new[] { "enabled" },
+                PrivacyCommandHandlers.HandleSetPortalCapture
+            ));
+
+            Register(new CommandSpec(
+                "privacy.command.open_data_folder",
+                "Privacy",
+                Array.Empty<string>(),
+                PrivacyCommandHandlers.HandleOpenDataFolder
+            ));
+
+            Register(new CommandSpec(
+                "privacy.command.wipe_data",
+                "Privacy",
+                Array.Empty<string>(),
+                PrivacyCommandHandlers.HandleWipeData
+            ));
+
             // ---- Tools ----
             Register(new CommandSpec(
                 "tools.open_truth_health",

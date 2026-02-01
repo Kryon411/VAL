@@ -64,6 +64,13 @@
   // Portal should ALWAYS default to Off on load (armed state is explicit user action).
   const PORTAL_ENABLED_KEY = "VAL_PortalEnabled";
   const PORTAL_COUNT_KEY   = "VAL_PortalStageCount";
+  const PRIVACY_DEFAULTS = Object.freeze({
+    version: 1,
+    continuumLoggingEnabled: true,
+    portalCaptureEnabled: true
+  });
+
+  let privacySettings = { ...PRIVACY_DEFAULTS };
 
   function emitAbyssCommand(type, detail){
     try {
@@ -193,6 +200,10 @@ function isPreludeNudgeSuppressed(){
   const LS_KEY  = "VAL_Dock_"+CHAT_ID;
 
   let dock, pill, panel;
+  let portalBanner, portalPillIndicator;
+  let portalToggle, portalPrivacyToggle, continuumPrivacyToggle;
+  let portalCount, portalPrivacyNote;
+  let portalArmed = false;
   let isDragging = false;
   let dragOffset = [0,0];
   let dragFromPill = false;
@@ -325,20 +336,26 @@ function isPreludeNudgeSuppressed(){
     const sw   = el("button","valdock-tg-switch", init ? "On" : "Off");
     sw.setAttribute("aria-pressed", String(init));
 
-    sw.addEventListener("click",(e)=>{
-      e.preventDefault();
-      const pressed = sw.getAttribute("aria-pressed")==="true";
-      const next = !pressed;
+    function setState(next){
       sw.setAttribute("aria-pressed", String(next));
       sw.textContent = next ? "On" : "Off";
+    }
 
-      if (module==="Continuum") {
+    function setDisabled(disabled){
+      sw.disabled = !!disabled;
+      sw.classList.toggle("valdock-tg-disabled", !!disabled);
+    }
+
+    sw.addEventListener("click",(e)=>{
+      e.preventDefault();
+      if (sw.disabled) return;
+      const pressed = sw.getAttribute("aria-pressed")==="true";
+      const next = !pressed;
+      setState(next);
+
+      if (module==="ContinuumLogging") {
         try {
-          if (typeof window.VAL_Continuum_toggleLogging === "function") {
-            window.VAL_Continuum_toggleLogging(next);
-          } else {
-            post({ type:"continuum.command.toggle_logging", chatId: getChatId(), enabled: next });
-          }
+          post({ type:"privacy.command.set_continuum_logging", enabled: next });
         } catch(_) {}
       }
 
@@ -346,23 +363,88 @@ function isPreludeNudgeSuppressed(){
         try { setVoidEnabled(next); } catch(_) {}
       }
 
-      
-      if (module==="Portal") {
+      if (module==="PortalArmed") {
+        try { setPortalArmed(next, { sendHost: true }); } catch(_) {}
+      }
+
+      if (module==="PortalPrivacy") {
         try {
-          setPortalEnabled(next);
-          post({ type:"portal.command.set_enabled", enabled: next });
+          post({ type:"privacy.command.set_portal_capture", enabled: next });
+          applyPrivacySettings({ ...privacySettings, portalCaptureEnabled: next });
         } catch(_) {}
       }
 
-if (module==="Theme") {
+      if (module==="Theme") {
         try { setThemeEnabled(next); } catch(_) {}
       }
     }, true);
 
     if (tooltipText) attachTooltip(sw, tooltipText);
 
+    wrap.setState = setState;
+    wrap.setDisabled = setDisabled;
+    wrap.getState = () => sw.getAttribute("aria-pressed")==="true";
     wrap.append(lab, sw);
     return wrap;
+  }
+
+  function updatePortalIndicators(){
+    const active = !!portalArmed;
+    try {
+      if (portalBanner) portalBanner.classList.toggle("active", active);
+      if (portalPillIndicator) portalPillIndicator.classList.toggle("active", active);
+    } catch(_) {}
+  }
+
+  function setPortalArmed(next, opts){
+    const options = opts || {};
+    portalArmed = !!next;
+    try { if (portalToggle) portalToggle.setState(portalArmed); } catch(_) {}
+    updatePortalIndicators();
+
+    if (options.sendHost) {
+      try {
+        setPortalEnabled(portalArmed);
+        post({ type:"portal.command.set_enabled", enabled: portalArmed });
+      } catch(_) {}
+    }
+
+    if (!portalArmed) {
+      try { if (portalCount) portalCount.textContent = "0/10"; } catch(_) {}
+    }
+  }
+
+  function applyPrivacySettings(next){
+    if (!next || typeof next !== "object") return;
+    privacySettings = {
+      version: Number.isFinite(next.version) ? next.version : privacySettings.version,
+      continuumLoggingEnabled: typeof next.continuumLoggingEnabled === "boolean"
+        ? next.continuumLoggingEnabled
+        : privacySettings.continuumLoggingEnabled,
+      portalCaptureEnabled: typeof next.portalCaptureEnabled === "boolean"
+        ? next.portalCaptureEnabled
+        : privacySettings.portalCaptureEnabled
+    };
+
+    try { if (continuumPrivacyToggle) continuumPrivacyToggle.setState(privacySettings.continuumLoggingEnabled); } catch(_) {}
+    try { if (portalPrivacyToggle) portalPrivacyToggle.setState(privacySettings.portalCaptureEnabled); } catch(_) {}
+    updatePortalPrivacyState();
+  }
+
+  function updatePortalPrivacyState(){
+    const allowed = !!privacySettings.portalCaptureEnabled;
+    try {
+      if (portalToggle) portalToggle.setDisabled(!allowed);
+    } catch(_) {}
+
+    if (!allowed) {
+      setPortalArmed(false, { sendHost: true });
+    }
+
+    try {
+      if (portalPrivacyNote)
+        portalPrivacyNote.textContent = allowed ? "Capture & hotkeys enabled" : "Disabled by Privacy setting";
+    } catch(_) {}
   }
 
 
@@ -437,6 +519,8 @@ if (module==="Theme") {
   function buildDock(){
     dock  = el("div","valdock");
     pill  = el("button","valdock-pill","Control Centre");
+    portalPillIndicator = el("span","valdock-pill-indicator","●");
+    pill.append(portalPillIndicator);
     panel = el("div","valdock-panel");
 
     // Drag handlers
@@ -451,16 +535,73 @@ if (module==="Theme") {
 
 
 
-    // Continuum row
-    const rowC = el("div","valdock-row");
-    rowC.append(
-      el("div","valdock-row-title","Continuum:"),
-      toggle(
-        "Chat monitoring",
-        "Continuum",
-        undefined
-      )
+    portalBanner = el("div","valdock-portal-banner","PORTAL ARMED");
+
+    // Privacy header row
+    const rowPrivacyHeader = el("div","valdock-row");
+    const privacyHint = el("div","valdock-row-note","Local-only data controls");
+    rowPrivacyHeader.append(
+      el("div","valdock-row-title","Privacy:"),
+      privacyHint
     );
+
+    // Continuum logging toggle
+    const rowPrivacyContinuum = el("div","valdock-row");
+    continuumPrivacyToggle = toggle(
+      "Continuum logging",
+      "ContinuumLogging",
+      privacySettings.continuumLoggingEnabled,
+      "Allow Continuum to write Truth.log for this session."
+    );
+    rowPrivacyContinuum.append(
+      el("div","valdock-row-title","Continuum:"),
+      continuumPrivacyToggle
+    );
+
+    // Portal privacy toggle
+    const rowPrivacyPortal = el("div","valdock-row");
+    portalPrivacyToggle = toggle(
+      "Portal capture & hotkeys",
+      "PortalPrivacy",
+      privacySettings.portalCaptureEnabled,
+      "Allow Portal to register hotkeys and monitor the clipboard."
+    );
+    portalPrivacyNote = el("div","valdock-row-note","Capture & hotkeys enabled");
+    rowPrivacyPortal.append(
+      el("div","valdock-row-title","Portal capture:"),
+      portalPrivacyToggle,
+      portalPrivacyNote
+    );
+
+    // Privacy action buttons
+    const rowPrivacyActions = el("div","valdock-row valdock-actions");
+    const openDataBtn = btn("Open Data Folder", "ghost");
+    const wipeDataBtn = btn("Wipe Data", "secondary");
+    attachTooltip(openDataBtn, "Open the local data folder used by VAL.");
+    attachTooltip(wipeDataBtn, "Wipe local logs, profiles, and session memory. This does not remove the app.");
+    openDataBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      try { post({ type:"privacy.command.open_data_folder" }); } catch(_) {}
+    }, true);
+    wipeDataBtn.addEventListener("click",(e)=>{
+      e.preventDefault();
+      const msg = [
+        "Wipe local VAL data?",
+        "",
+        "This will delete:",
+        "• Logs (VAL.log)",
+        "• WebView profile/cache",
+        "• Continuum session memory (Truth.log + snapshots)",
+        "• Portal staging",
+        "",
+        "Privacy settings are preserved. The app itself will not be removed."
+      ].join("\\n");
+      try {
+        if (!window.confirm(msg)) return;
+      } catch(_) { return; }
+      try { post({ type:"privacy.command.wipe_data" }); } catch(_) {}
+    }, true);
+    rowPrivacyActions.append(openDataBtn, wipeDataBtn);
 
     // Buttons row
     const rowBtns = el("div","valdock-row valdock-actions");
@@ -552,6 +693,9 @@ if (module==="Theme") {
                 }
               } catch(_) {}
             }
+            if ((msg.type || "") === "privacy.settings.sync") {
+              try { applyPrivacySettings(msg); } catch(_) {}
+            }
 
           } catch(_) {}
         });
@@ -576,7 +720,7 @@ if (module==="Theme") {
 
     // Portal row
     const rowP = el("div","valdock-row");
-    const portalCount = el("div","valdock-count", `0/10`);
+    portalCount = el("div","valdock-count", `0/10`);
     const portalSendBtn = btn("Send", "secondary");
     attachTooltip(portalSendBtn, "Paste all staged clipboard images into the composer (max 10).");
 
@@ -586,14 +730,16 @@ if (module==="Theme") {
       setTimeout(()=>{ try { post({ type:"portal.command.send_staged", max: 10 }); } catch(_) {} }, 80);
     }, true);
 
+    portalToggle = toggle(
+      "Capture & Stage",
+      "PortalArmed",
+      false,
+      "Arm Portal. Press 1 to open Screen Snip. Any clipboard images will stage (max 10)."
+    );
+
     rowP.append(
       el("div","valdock-row-title","Portal:"),
-      toggle(
-        "Capture & Stage",
-        "Portal",
-        false,
-        "Arm Portal. Press 1 to open Screen Snip. Any clipboard images will stage (max 10)."
-      ),
+      portalToggle,
       portalCount,
       portalSendBtn
     );
@@ -703,22 +849,28 @@ if (module==="Theme") {
     const divider2 = el("div","valdock-divider");
     const divider3 = el("div","valdock-divider");
     const divider4 = el("div","valdock-divider");
+    const divider5 = el("div","valdock-divider");
 
     panel.append(
       header,
+      portalBanner,
       dividerTop,
-      rowC,
-      rowBtns,
+      rowPrivacyHeader,
+      rowPrivacyContinuum,
+      rowPrivacyPortal,
+      rowPrivacyActions,
       divider0,
-      rowP,
+      rowBtns,
       divider1,
+      rowP,
+      divider2,
       rowA,
       rowABtns,
-      divider2,
-      rowV,
       divider3,
-      rowT,
+      rowV,
       divider4,
+      rowT,
+      divider5,
       rowTools,
       rowToolsBtns,
       status
@@ -727,11 +879,11 @@ if (module==="Theme") {
 
     // Portal safety: always start disarmed, and reset count display.
     try {
-      setPortalEnabled(false);
+      setPortalArmed(false, { sendHost: true });
       setPortalCount(0);
       if (portalCount) portalCount.textContent = "0/10";
-      post({ type:"portal.command.set_enabled", enabled: false });
     } catch(_) {}
+    try { updatePortalPrivacyState(); } catch(_) {}
     document.body.appendChild(dock);
 
     // Clicking minimized pill expands

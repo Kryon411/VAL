@@ -18,6 +18,7 @@ namespace VAL.Host.Portal
         private const int WM_HOTKEY = 0x0312;
 
         private static bool _enabled;
+        private static bool _privacyAllowed = true;
         private static IntPtr _hwnd = IntPtr.Zero;
         private static HwndSource? _source;
 
@@ -111,6 +112,12 @@ private static void RememberSig(string sig)
         {
             RunOnUI(() =>
             {
+                if (!_privacyAllowed && enabled)
+                {
+                    PostDebug("SetEnabled blocked: privacy disabled");
+                    enabled = false;
+                }
+
                 _enabled = enabled;
                 PostDebug("SetEnabled=" + enabled);
 
@@ -137,9 +144,44 @@ private static void RememberSig(string sig)
             });
         }
 
+        public static void SetPrivacyAllowed(bool allowed)
+        {
+            RunOnUI(() =>
+            {
+                _privacyAllowed = allowed;
+                if (!allowed && _enabled)
+                {
+                    PostDebug("Privacy disabled: forcing Portal off");
+                    _enabled = false;
+                    UnregisterHotkey();
+                    StopClipboardWatch();
+                    PortalStaging.Clear();
+                    _lastSig = "";
+                    _recentSigSet.Clear();
+                    _recentSigQueue.Clear();
+                    PostCleared();
+                    PostCount();
+                }
+            });
+        }
+
+        public static void ClearStaging()
+        {
+            RunOnUI(() =>
+            {
+                PortalStaging.Clear();
+                _lastSig = "";
+                _recentSigSet.Clear();
+                _recentSigQueue.Clear();
+                PostCleared();
+                PostCount();
+                try { _lastClipSeq = GetClipboardSequenceNumber(); } catch { }
+            });
+        }
+
         public static void OpenSnipOverlay()
         {
-            if (!_enabled) return;
+            if (!_enabled || !_privacyAllowed) return;
 
             PostDebug("OpenSnipOverlay()");
             SendWinShiftS();
@@ -147,7 +189,7 @@ private static void RememberSig(string sig)
 
         public static void SendStaged(int max)
         {
-            if (!_enabled) return;
+            if (!_enabled || !_privacyAllowed) return;
             if (_sending) { PostDebug("SendStaged ignored: already sending"); return; }
 
             RunOnUI(async () =>
