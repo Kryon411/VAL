@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using VAL.Host;
 using VAL.Host.Options;
+using VAL.Host.Security;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
 using VAL.Host.Startup;
@@ -78,6 +79,7 @@ namespace VAL
                         services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
                         services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
                         services.AddSingleton<IContinuumPump, ContinuumPump>();
+                        services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
                         services.AddSingleton<IWebViewRuntime, WebViewRuntime>();
                         services.AddSingleton<IWebMessageSender, WebMessageSender>();
                         services.AddSingleton(smokeSettings);

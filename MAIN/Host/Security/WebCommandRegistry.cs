@@ -67,11 +67,6 @@ namespace VAL.Host.Security
             "tools.open_diagnostics",
         };
 
-        internal static readonly string[] AllowedPrefixes =
-        {
-            "continuum.",
-        };
-
         internal static bool IsAllowed(string type)
         {
             if (string.IsNullOrWhiteSpace(type))
@@ -79,12 +74,6 @@ namespace VAL.Host.Security
 
             if (AllowedTypes.Contains(type))
                 return true;
-
-            foreach (var prefix in AllowedPrefixes)
-            {
-                if (!string.IsNullOrEmpty(prefix) && type.StartsWith(prefix, StringComparison.Ordinal))
-                    return true;
-            }
 
             return false;
         }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
@@ -16,6 +17,7 @@ namespace VAL.Host.Services
     {
         private readonly IAppPaths _appPaths;
         private readonly WebViewOptions _webViewOptions;
+        private readonly IWebViewSessionNonce _sessionNonce;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private Task? _initTask;
         private bool _eventsWired;
@@ -24,10 +26,11 @@ namespace VAL.Host.Services
 
         public CoreWebView2? Core { get; private set; }
 
-        public WebViewRuntime(IAppPaths appPaths, IOptions<WebViewOptions> webViewOptions)
+        public WebViewRuntime(IAppPaths appPaths, IOptions<WebViewOptions> webViewOptions, IWebViewSessionNonce sessionNonce)
         {
             _appPaths = appPaths;
             _webViewOptions = webViewOptions.Value;
+            _sessionNonce = sessionNonce;
         }
 
         public event Action<WebMessageEnvelope>? WebMessageJsonReceived;
@@ -114,6 +117,8 @@ namespace VAL.Host.Services
             Core.Settings.IsStatusBarEnabled = false;
             Core.Settings.IsWebMessageEnabled = true;
 
+            await InitializeSessionNonceScriptAsync().ConfigureAwait(false);
+
             if (!string.IsNullOrWhiteSpace(_webViewOptions.UserAgentOverride))
             {
                 try
@@ -140,15 +145,21 @@ namespace VAL.Host.Services
                     }
 
                     var source = e.Source;
-                    if (!WebMessageOriginGuard.TryIsAllowed(source, out var sourceUri))
-                    {
-                        LogRejectedWebMessage(source);
-                        return;
-                    }
-
                     var json = e.WebMessageAsJson;
                     if (string.IsNullOrWhiteSpace(json))
                         return;
+
+                    if (!MessageEnvelope.TryParse(json, out var envelope))
+                    {
+                        LogRejectedWebMessage(source, "invalid_payload");
+                        return;
+                    }
+
+                    if (!WebMessageOriginGuard.TryIsAllowed(source, envelope.Nonce, _sessionNonce.Value, out var sourceUri, out var reason))
+                    {
+                        LogRejectedWebMessage(source, reason ?? "nonce_or_origin_rejected");
+                        return;
+                    }
 
                     WebMessageJsonReceived?.Invoke(new WebMessageEnvelope(json, sourceUri!));
                 };
@@ -209,7 +220,7 @@ namespace VAL.Host.Services
                 LogBridgeDisarmed(source);
         }
 
-        private static void LogRejectedWebMessage(string? source)
+        private static void LogRejectedWebMessage(string? source, string reason)
         {
             var nowTicks = DateTimeOffset.UtcNow.Ticks;
             var lastTicks = Interlocked.Read(ref _lastRejectedLogTicks);
@@ -220,7 +231,7 @@ namespace VAL.Host.Services
                 return;
 
             ValLog.Warn(nameof(WebViewRuntime),
-                $"Blocked web message from non-allowlisted origin: {source ?? "<null>"}");
+                $"Rejected web message ({reason}): {source ?? "<null>"}");
         }
 
         private void LogBridgeDisarmed(string? source)
@@ -259,6 +270,25 @@ namespace VAL.Host.Services
                 return false;
 
             return Interlocked.CompareExchange(ref lastTicksRef, nowTicks, lastTicks) == lastTicks;
+        }
+
+        private async Task InitializeSessionNonceScriptAsync()
+        {
+            var nonce = _sessionNonce.Value;
+            if (string.IsNullOrWhiteSpace(nonce))
+                return;
+
+            var nonceJson = JsonSerializer.Serialize(nonce);
+            var script = $"window.__VAL_NONCE = {nonceJson};";
+
+            try
+            {
+                await Core!.AddScriptToExecuteOnDocumentCreatedAsync(script).ConfigureAwait(false);
+            }
+            catch
+            {
+                ValLog.Warn(nameof(WebViewRuntime), "Failed to inject WebView session nonce.");
+            }
         }
     }
 }
