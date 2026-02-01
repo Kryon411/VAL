@@ -17,18 +17,30 @@
     panelOpen: false
   };
 
+  function getNonce(){
+    try { return window.__VAL_NONCE || null; } catch(_) { return null; }
+  }
+
+  function withNonce(envelope){
+    if (!envelope || typeof envelope !== "object") return envelope;
+    if (envelope.nonce) return envelope;
+    const nonce = getNonce();
+    if (!nonce) return envelope;
+    return { ...envelope, nonce };
+  }
+
   function toEnvelope(message){
     if (!message || typeof message !== "object") return message;
     const type = (message.type || "").toString();
     if (!type) return message;
-    if (type === "command" || type === "event" || type === "log") return message;
-    return {
+    if (type === "command" || type === "event" || type === "log") return withNonce(message);
+    return withNonce({
       type: "command",
       name: type,
       payload: message,
       chatId: message.chatId,
       source: "abyss"
-    };
+    });
   }
 
   function unwrapEnvelope(message){

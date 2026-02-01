@@ -12,7 +12,7 @@ namespace VAL.Host.Commands
     /// "Schema-lite" philosophy:
     /// - We only define required fields when it protects correctness.
     /// - Handlers still do their own defensive checks.
-    /// - Unknown commands are ignored (or routed by prefix) to keep the host resilient.
+    /// - Unknown commands are ignored to keep the host resilient.
     /// </summary>
     internal static class CommandRegistry
     {
@@ -33,7 +33,6 @@ namespace VAL.Host.Commands
 
             // ---- Continuum ----
             // Explicit list so the host has a single discoverable map of supported commands.
-            // (We still have a prefix fallback for forward compatibility.)
             var continuumTypes = new[]
             {
                 "continuum.capture.flush_ack",
@@ -269,22 +268,6 @@ namespace VAL.Host.Commands
                 try
                 {
                     spec.Handler(cmd);
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    exception = ex;
-                    return false;
-                }
-            }
-
-            // 2) Forward-compat routing: any Continuum command we haven't catalogued yet.
-            //    ContinuumHost remains defensive and will ignore unknown types safely.
-            if (cmd.Type.StartsWith("continuum.", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    ContinuumHost.HandleJson(cmd.RawJson);
                     return true;
                 }
                 catch (Exception ex)

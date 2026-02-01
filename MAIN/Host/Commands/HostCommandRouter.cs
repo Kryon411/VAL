@@ -50,6 +50,12 @@ namespace VAL.Host.Commands
                 return;
             }
 
+            if (!WebCommandRegistry.IsAllowed(commandName))
+            {
+                LogBlockedType(commandName, webMessage.SourceUri);
+                return;
+            }
+
             // Central session tracking.
             SessionContext.Observe(commandName, parsedEnvelope.ChatId);
 

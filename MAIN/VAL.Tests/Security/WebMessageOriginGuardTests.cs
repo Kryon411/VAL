@@ -6,14 +6,17 @@ namespace VAL.Tests.Security
 {
     public sealed class WebMessageOriginGuardTests
     {
+        private const string ExpectedNonce = "nonce-value";
+
         [Theory]
         [InlineData("https://chatgpt.com/")]
         [InlineData("https://chat.openai.com/c/abc")]
         public void TryIsAllowed_AllowsChatGptHosts(string source)
         {
-            var result = WebMessageOriginGuard.TryIsAllowed(source, out var uri);
+            var result = WebMessageOriginGuard.TryIsAllowed(source, ExpectedNonce, ExpectedNonce, out var uri, out var reason);
 
             Assert.True(result);
+            Assert.Null(reason);
             Assert.NotNull(uri);
             Assert.True(Uri.TryCreate(source, UriKind.Absolute, out var expected));
             Assert.Equal(expected, uri);
@@ -27,10 +30,31 @@ namespace VAL.Tests.Security
         [InlineData("not a uri")]
         public void TryIsAllowed_RejectsInvalidOrigins(string source)
         {
-            var result = WebMessageOriginGuard.TryIsAllowed(source, out var uri);
+            var result = WebMessageOriginGuard.TryIsAllowed(source, ExpectedNonce, ExpectedNonce, out var uri, out var reason);
 
             Assert.False(result);
             Assert.Null(uri);
+            Assert.Equal("origin_not_allowlisted", reason);
+        }
+
+        [Fact]
+        public void TryIsAllowed_RejectsMissingNonce()
+        {
+            var result = WebMessageOriginGuard.TryIsAllowed("https://chatgpt.com/", null, ExpectedNonce, out var uri, out var reason);
+
+            Assert.False(result);
+            Assert.Null(uri);
+            Assert.Equal("nonce_missing", reason);
+        }
+
+        [Fact]
+        public void TryIsAllowed_RejectsMismatchedNonce()
+        {
+            var result = WebMessageOriginGuard.TryIsAllowed("https://chatgpt.com/", "wrong", ExpectedNonce, out var uri, out var reason);
+
+            Assert.False(result);
+            Assert.Null(uri);
+            Assert.Equal("nonce_mismatch", reason);
         }
     }
 }

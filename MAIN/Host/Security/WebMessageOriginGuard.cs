@@ -4,9 +4,42 @@ namespace VAL.Host.Security
 {
     internal static class WebMessageOriginGuard
     {
-        internal static bool TryIsAllowed(string? source, out Uri? uri)
+        internal static bool TryIsAllowed(
+            string? source,
+            string? nonce,
+            string expectedNonce,
+            out Uri? uri,
+            out string? rejectReason)
         {
-            return WebOriginPolicy.TryIsBridgeAllowed(source, out uri);
+            rejectReason = null;
+            if (!WebOriginPolicy.TryIsBridgeAllowed(source, out uri))
+            {
+                rejectReason = "origin_not_allowlisted";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(expectedNonce))
+            {
+                rejectReason = "nonce_uninitialized";
+                uri = null;
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(nonce))
+            {
+                rejectReason = "nonce_missing";
+                uri = null;
+                return false;
+            }
+
+            if (!string.Equals(nonce, expectedNonce, StringComparison.Ordinal))
+            {
+                rejectReason = "nonce_mismatch";
+                uri = null;
+                return false;
+            }
+
+            return true;
         }
     }
 }

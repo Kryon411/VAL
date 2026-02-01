@@ -22,11 +22,11 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void IsAllowed_ReturnsTrueForAllowedPrefix()
+        public void IsAllowed_ReturnsFalseForUnknownContinuumType()
         {
             var result = WebCommandRegistry.IsAllowed("continuum.custom.command");
 
-            Assert.True(result);
+            Assert.False(result);
         }
     }
 }
