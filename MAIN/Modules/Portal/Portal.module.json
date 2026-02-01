@@ -1,6 +1,11 @@
 {
   "name": "Portal",
+  "version": "1.0.0",
   "enabled": true,
-  "entry": "Portal.main.js",
-  "styles": "Portal.styles.css"
+  "entryScripts": [
+    "Portal.main.js"
+  ],
+  "styles": [
+    "Portal.styles.css"
+  ]
 }

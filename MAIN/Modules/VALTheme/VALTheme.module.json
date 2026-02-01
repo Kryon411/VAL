@@ -1,8 +1,11 @@
 {
   "name": "VALTheme",
   "version": "0.3.0",
-  "description": "SoftGlass HAL theme module for VAL: neural idle background + SoftGlass static chat background.",
-  "entry": "VALTheme.main.js",
-  "styles": "VALTheme.theme.css",
-  "enabled": true
+  "enabled": true,
+  "entryScripts": [
+    "VALTheme.main.js"
+  ],
+  "styles": [
+    "VALTheme.theme.css"
+  ]
 }
