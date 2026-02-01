@@ -10,10 +10,26 @@
     <SolidColorBrush x:Key="VAL.ButtonPressedBrush" Color="#334EC5FF" />
     <SolidColorBrush x:Key="VAL.TextBoxBackgroundBrush" Color="#F5020A14" />
 
+    <Style x:Key="VAL.FocusVisual" TargetType="{x:Type Control}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Control}">
+                    <Rectangle Margin="2"
+                               Stroke="{StaticResource VAL.AccentBrush}"
+                               StrokeThickness="1"
+                               StrokeDashArray="1 2"
+                               SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="VALWindowTheme" TargetType="Window">
         <Setter Property="Background" Value="{StaticResource VAL.WindowBackgroundBrush}" />
         <Setter Property="Foreground" Value="{StaticResource VAL.TextForegroundBrush}" />
         <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="KeyboardNavigation.TabNavigation" Value="Cycle" />
+        <Setter Property="KeyboardNavigation.ControlTabNavigation" Value="Cycle" />
     </Style>
 
     <Style TargetType="{x:Type TextBlock}">
@@ -29,6 +45,19 @@
         <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
         <Setter Property="Padding" Value="10" />
         <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource VAL.FocusVisual}" />
+    </Style>
+
+    <Style TargetType="{x:Type RichTextBox}">
+        <Setter Property="Background" Value="{StaticResource VAL.TextBoxBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource VAL.TextForegroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource VAL.SoftBorderBrush}" />
+        <Setter Property="CaretBrush" Value="{StaticResource VAL.AccentBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+        <Setter Property="Padding" Value="10" />
+        <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource VAL.FocusVisual}" />
     </Style>
 
     <Style TargetType="{x:Type Button}">
@@ -39,6 +68,7 @@
         <Setter Property="Padding" Value="10,6" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource VAL.FocusVisual}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{StaticResource VAL.ButtonHoverBrush}" />
@@ -51,5 +81,24 @@
                 <Setter Property="Foreground" Value="{StaticResource VAL.MutedForegroundBrush}" />
             </Trigger>
         </Style.Triggers>
+    </Style>
+
+    <Style TargetType="{x:Type ScrollViewer}">
+        <Setter Property="Foreground" Value="{StaticResource VAL.TextForegroundBrush}" />
+        <Setter Property="Background" Value="{StaticResource VAL.WindowBackgroundBrush}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource VAL.FocusVisual}" />
+    </Style>
+
+    <Style TargetType="{x:Type GroupBox}">
+        <Setter Property="Foreground" Value="{StaticResource VAL.TextForegroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource VAL.SoftBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10" />
+    </Style>
+
+    <Style TargetType="{x:Type Separator}">
+        <Setter Property="Background" Value="{StaticResource VAL.SoftBorderBrush}" />
+        <Setter Property="Margin" Value="0,10" />
+        <Setter Property="Height" Value="1" />
     </Style>
 </ResourceDictionary>

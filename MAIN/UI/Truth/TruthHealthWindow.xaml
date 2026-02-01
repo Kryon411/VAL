@@ -6,13 +6,6 @@
         Width="560"
         WindowStartupLocation="CenterOwner"
         Style="{DynamicResource VALWindowTheme}">
-    <Window.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/VAL;component/UI/VALWindowTheme.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Window.Resources>
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
