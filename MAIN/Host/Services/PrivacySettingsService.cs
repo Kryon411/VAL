@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using VAL.Continuum.Pipeline;
+using VAL.Continuum;
 
 namespace VAL.Host.Services
 {
@@ -127,7 +127,7 @@ namespace VAL.Host.Services
         {
             try
             {
-                VAL.Continuum.Pipeline.ContinuumHost.ApplyLoggingSetting(enabled, showToast: false);
+                ContinuumHost.ApplyLoggingSetting(enabled, showToast: false);
             }
             catch
             {
