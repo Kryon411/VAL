@@ -25,6 +25,27 @@ VAL is designed around a simple philosophy:
 
 ---
 
+## Build & Run (Developer)
+
+**Prerequisites**
+- Windows 10/11
+- .NET SDK 8.x (see `global.json`)
+- Microsoft Edge WebView2 Runtime (Evergreen)
+
+**Build**
+- `dotnet build MAIN/VAL.csproj`
+- or `Build.cmd --publish` (creates `PRODUCT/`)
+
+**Run**
+- `dotnet run --project MAIN/VAL.csproj`
+- or launch `MAIN/bin/Debug/net8.0-windows/VAL.exe` after build
+
+**Troubleshooting**
+- Default data root: `%LOCALAPPDATA%\VAL` (see `MAIN/appsettings.json`)
+- Logs: `%LOCALAPPDATA%\VAL\Logs\VAL.log`
+
+---
+
 ## Quick Start
 
 1) Launch **VAL**
@@ -89,6 +110,7 @@ Typical actions:
 For “how-to” steps and module-specific guides, see:
 
 - **Docs/Modules.md**
+- **Docs/BuildSmokeChecklist.md**
 
 ---
 
