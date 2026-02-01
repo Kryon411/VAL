@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Logging;
 using VAL.Host.Services;
@@ -73,7 +74,7 @@ namespace VAL.Host.Commands
         internal static void ReportDiagnosticsFailure(HostCommand? cmd, Exception? ex, string reason)
         {
             var sourceHost = cmd?.SourceUri?.Host ?? "unknown";
-            var cmdType = cmd?.Type ?? "tools.open_diagnostics";
+            var cmdType = cmd?.Type ?? WebCommandNames.ToolsOpenDiagnostics;
             var detail = ex != null
                 ? LogSanitizer.Sanitize(ex.ToString())
                 : "No exception details.";

@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json;
+using VAL.Contracts;
 using VAL.Host.Commands;
 using VAL.Host.Logging;
 
@@ -14,7 +15,7 @@ namespace VAL.Host.Portal
         {
             var t = cmd.Type ?? string.Empty;
 
-            if (t.Equals("portal.command.set_enabled", StringComparison.OrdinalIgnoreCase))
+            if (t.Equals(WebCommandNames.PortalCommandSetEnabled, StringComparison.OrdinalIgnoreCase))
             {
                 bool enabled = false;
                 try
@@ -41,7 +42,7 @@ namespace VAL.Host.Portal
                 return true;
             }
 
-            if (t.Equals("portal.command.open_snip", StringComparison.OrdinalIgnoreCase))
+            if (t.Equals(WebCommandNames.PortalCommandOpenSnip, StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
@@ -54,7 +55,7 @@ namespace VAL.Host.Portal
                 return true;
             }
 
-            if (t.Equals("portal.command.send_staged", StringComparison.OrdinalIgnoreCase))
+            if (t.Equals(WebCommandNames.PortalCommandSendStaged, StringComparison.OrdinalIgnoreCase))
             {
                 int max = 10;
                 try

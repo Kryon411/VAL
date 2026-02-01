@@ -1,6 +1,7 @@
 using System;
 using System.Text.Json;
 using System.Threading;
+using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Security;
 using VAL.Host.WebMessaging;
@@ -40,7 +41,7 @@ namespace VAL.Host.Commands
             if (!MessageEnvelope.TryParse(json, out var parsedEnvelope))
                 return;
 
-            if (!string.Equals(parsedEnvelope.Type, "command", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(parsedEnvelope.Type, WebMessageTypes.Command, StringComparison.OrdinalIgnoreCase))
                 return;
 
             var commandName = parsedEnvelope.Name?.Trim();
@@ -100,7 +101,7 @@ namespace VAL.Host.Commands
 
         private static bool IsDiagnosticsCommand(HostCommand cmd)
         {
-            return string.Equals(cmd.Type, "tools.open_diagnostics", StringComparison.Ordinal);
+            return string.Equals(cmd.Type, WebCommandNames.ToolsOpenDiagnostics, StringComparison.Ordinal);
         }
 
         private static void LogBlockedType(string type, Uri? sourceUri)

@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Contracts;
 using VAL.Host.Logging;
 using VAL.Host.Services;
 using VAL.Host.WebMessaging;
@@ -115,7 +116,7 @@ namespace VAL.Host.Commands
 
                 sender.Send(new MessageEnvelope
                 {
-                    Type = "event",
+                    Type = WebMessageTypes.Event,
                     Name = "privacy.settings.sync",
                     Source = "host",
                     Payload = payload,

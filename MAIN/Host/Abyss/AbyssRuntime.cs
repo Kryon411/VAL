@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using VAL.Contracts;
 using VAL.Continuum.Pipeline.Truth;
 using VAL.Host.Security;
 using VAL.Host.WebMessaging;
@@ -229,7 +230,7 @@ namespace VAL.Host.Abyss
             if (payload == null)
                 return;
 
-            SendEnvelope("event", "abyss.results", payload);
+            SendEnvelope(WebMessageTypes.Event, "abyss.results", payload);
         }
 
         public static void ClearResults(string? chatId)
@@ -275,7 +276,7 @@ namespace VAL.Host.Abyss
             if (_messageSender == null)
                 return;
 
-            SendEnvelope("command", "continuum.inject_text", new { chatId = chatId, text = text }, chatId);
+            SendEnvelope(WebMessageTypes.Command, WebCommandNames.ContinuumInjectText, new { chatId = chatId, text = text }, chatId);
         }
 
         private static string BuildInjectPayload(AbyssSearchResult result, string query)

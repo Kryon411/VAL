@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
+using VAL.Contracts;
 using VAL.Continuum;
 using VAL.Host.Abyss;
 using VAL.Host.WebMessaging;
@@ -113,7 +114,7 @@ namespace VAL.Host.Services
 
                 _webMessageSender.Send(new WebMessaging.MessageEnvelope
                 {
-                    Type = "event",
+                    Type = WebMessageTypes.Event,
                     Name = "privacy.settings.sync",
                     Source = "host",
                     Payload = payload,

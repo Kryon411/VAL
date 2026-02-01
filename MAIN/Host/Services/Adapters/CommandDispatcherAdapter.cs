@@ -1,4 +1,5 @@
 using System.Text.Json;
+using VAL.Contracts;
 using VAL.Continuum.Pipeline.Inject;
 using VAL.Host.Commands;
 using VAL.Host.WebMessaging;
@@ -29,8 +30,8 @@ namespace VAL.Host.Services.Adapters
 
             return new MessageEnvelope
             {
-                Type = "command",
-                Name = "continuum.inject_text",
+                Type = WebMessageTypes.Command,
+                Name = WebCommandNames.ContinuumInjectText,
                 ChatId = seed.ChatId,
                 Payload = payload
             };
