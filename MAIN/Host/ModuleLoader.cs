@@ -44,20 +44,15 @@ namespace VAL.Host
             public string Path { get; }
         }
 
-        private sealed class ModuleConfig
+        private sealed class ModuleManifest
         {
             public string? name { get; set; }
-            public string? description { get; set; }
-            public bool enabled { get; set; } = true;
-
-            // Paths are interpreted as relative to the directory containing the *.module.json file.
-            public string? entry { get; set; }
-            public string? styles { get; set; }
-
             public string? version { get; set; }
-
-            // Optional: additional scripts to load (in order). If present, these are loaded.
-            public string[]? scripts { get; set; }
+            public bool? enabled { get; set; }
+            public string[]? entryScripts { get; set; }
+            public string[]? styles { get; set; }
+            public string[]? capabilities { get; set; }
+            public string? minHostVersion { get; set; }
         }
 
         public static IReadOnlyList<ModuleStatusInfo> GetModuleStatuses()
@@ -151,76 +146,146 @@ namespace VAL.Host
                 if (!File.Exists(configPath))
                     return;
 
-                ModuleConfig? cfg;
+                ModuleManifest? manifest;
                 try
                 {
                     var jsonCfg = File.ReadAllText(configPath);
-                    cfg = JsonSerializer.Deserialize<ModuleConfig>(
+                    manifest = JsonSerializer.Deserialize<ModuleManifest>(
                         jsonCfg,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 }
                 catch (Exception ex)
                 {
                     var details = FormatConfigExceptionDetails(ex);
-                    ValLog.Warn("ModuleLoader", $"Failed to parse module config: {configPath}. {details} Module disabled due to config error.");
-                    RecordModuleStatus(configPath, moduleNameFromFile, "Disabled (config parse error)");
+                    var reason = $"Config parse error: {details}";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleNameFromFile, $"Skipped ({reason})");
                     return;
                 }
 
-                if (cfg == null || !cfg.enabled)
+                if (manifest == null)
+                {
+                    var reason = "Invalid manifest: Empty or unreadable config.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleNameFromFile, $"Skipped ({reason})");
                     return;
+                }
 
-                var moduleName = !string.IsNullOrWhiteSpace(cfg.name)
-                    ? cfg.name!.Trim()
+                var moduleName = !string.IsNullOrWhiteSpace(manifest.name)
+                    ? manifest.name!.Trim()
                     : moduleNameFromFile;
 
                 if (string.IsNullOrWhiteSpace(moduleName))
+                {
+                    var reason = "Invalid manifest: name is required.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleNameFromFile, $"Skipped ({reason})");
                     return;
+                }
+
+                if (string.IsNullOrWhiteSpace(manifest.version))
+                {
+                    var reason = "Invalid manifest: version is required.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                if (!manifest.enabled.HasValue)
+                {
+                    var reason = "Invalid manifest: enabled must be specified.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                if (manifest.entryScripts == null || manifest.entryScripts.Length == 0)
+                {
+                    var reason = "Invalid manifest: entryScripts must include at least one script.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                if (!manifest.enabled.Value)
+                {
+                    RecordModuleStatus(configPath, moduleName, "Disabled");
+                    return;
+                }
 
                 if (enabledSet != null &&
                     !enabledSet.Contains(moduleName) &&
                     !enabledSet.Contains(moduleNameFromFile))
                 {
+                    RecordModuleStatus(configPath, moduleName, "Skipped (not enabled)");
                     return;
                 }
 
-                // Determine entry + scripts
-                var entryRel = string.IsNullOrWhiteSpace(cfg.entry)
-                    ? (moduleNameFromFile + ".main.js")
-                    : cfg.entry!.Trim();
-
                 var scriptsToLoad = new List<string>();
-
-                if (cfg.scripts != null && cfg.scripts.Length > 0)
+                var seenScripts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var script in manifest.entryScripts)
                 {
-                    foreach (var s in cfg.scripts)
+                    if (string.IsNullOrWhiteSpace(script))
                     {
-                        if (string.IsNullOrWhiteSpace(s)) continue;
-                        scriptsToLoad.Add(s.Trim());
+                        var reason = "Invalid manifest: entryScripts contains an empty path.";
+                        ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                        RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                        return;
+                    }
+
+                    var trimmed = script.Trim();
+                    if (!seenScripts.Add(trimmed))
+                        continue;
+
+                    var scriptPath = Path.Combine(moduleDir, trimmed);
+                    if (!File.Exists(scriptPath))
+                    {
+                        var reason = $"Invalid manifest: missing entry script '{trimmed}'.";
+                        ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                        RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                        return;
+                    }
+
+                    scriptsToLoad.Add(trimmed);
+                }
+
+                var stylesToLoad = new List<string>();
+                if (manifest.styles != null && manifest.styles.Length > 0)
+                {
+                    var seenStyles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var style in manifest.styles)
+                    {
+                        if (string.IsNullOrWhiteSpace(style))
+                        {
+                            var reason = "Invalid manifest: styles contains an empty path.";
+                            ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                            RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                            return;
+                        }
+
+                        var trimmed = style.Trim();
+                        if (!seenStyles.Add(trimmed))
+                            continue;
+
+                        var stylePath = Path.Combine(moduleDir, trimmed);
+                        if (!File.Exists(stylePath))
+                        {
+                            var reason = $"Invalid manifest: missing style '{trimmed}'.";
+                            ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                            RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                            return;
+                        }
+
+                        stylesToLoad.Add(trimmed);
                     }
                 }
 
-                // Ensure entry is included (and loaded first) unless scripts already cover it.
-                if (!string.IsNullOrWhiteSpace(entryRel) &&
-                    !scriptsToLoad.Any(s => string.Equals(s, entryRel, StringComparison.OrdinalIgnoreCase)))
-                {
-                    scriptsToLoad.Insert(0, entryRel);
-                }
-
-                if (scriptsToLoad.Count == 0 && !string.IsNullOrWhiteSpace(entryRel))
-                    scriptsToLoad.Add(entryRel);
-
                 // Load scripts in order (dedupe by relative path, case-insensitive).
-                var seenScripts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
                 foreach (var rel in scriptsToLoad)
                 {
                     if (string.IsNullOrWhiteSpace(rel)) continue;
-                    if (!seenScripts.Add(rel)) continue;
 
                     var scriptPath = Path.Combine(moduleDir, rel);
-                    if (!File.Exists(scriptPath))
-                        continue;
 
                     try
                     {
@@ -236,21 +301,9 @@ namespace VAL.Host
                     }
                 }
 
-                // Styles
-                string? stylePath = null;
-                if (!string.IsNullOrWhiteSpace(cfg.styles))
+                foreach (var rel in stylesToLoad)
                 {
-                    stylePath = Path.Combine(moduleDir, cfg.styles!.Trim());
-                }
-                else
-                {
-                    var conventional = Path.Combine(moduleDir, moduleNameFromFile + ".styles.css");
-                    if (File.Exists(conventional))
-                        stylePath = conventional;
-                }
-
-                if (!string.IsNullOrWhiteSpace(stylePath) && File.Exists(stylePath))
-                {
+                    var stylePath = Path.Combine(moduleDir, rel);
                     try
                     {
                         var css = File.ReadAllText(stylePath);
@@ -350,6 +403,11 @@ namespace VAL.Host
                 // Enumeration failure should never prevent VAL from running.
                 ValLog.Warn("ModuleLoader", "Module discovery failed.");
             }
+
+            var statusSnapshot = GetModuleStatuses();
+            var loadedCount = statusSnapshot.Count(status => string.Equals(status.Status, "Loaded", StringComparison.OrdinalIgnoreCase));
+            var skippedCount = statusSnapshot.Count - loadedCount;
+            ValLog.Info("ModuleLoader", $"Modules Status: {loadedCount} loaded, {skippedCount} skipped.");
         }
     }
 }

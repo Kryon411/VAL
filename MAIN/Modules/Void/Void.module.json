@@ -1,6 +1,11 @@
 {
   "name": "Void",
+  "version": "1.0.0",
   "enabled": true,
-  "entry": "Void.main.js",
-  "styles": "Void.styles.css"
+  "entryScripts": [
+    "Void.main.js"
+  ],
+  "styles": [
+    "Void.styles.css"
+  ]
 }
