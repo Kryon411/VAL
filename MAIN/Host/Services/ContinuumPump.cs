@@ -10,6 +10,7 @@ namespace VAL.Host.Services
         private readonly IWebMessageSender _webMessageSender;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IUiThread _uiThread;
+        private readonly IContinuumInjectQueue _injectQueue;
 
         private IDisposable? _timer;
 
@@ -17,12 +18,14 @@ namespace VAL.Host.Services
             ICommandDispatcher commandDispatcher,
             IWebMessageSender webMessageSender,
             IWebViewRuntime webViewRuntime,
-            IUiThread uiThread)
+            IUiThread uiThread,
+            IContinuumInjectQueue injectQueue)
         {
             _commandDispatcher = commandDispatcher;
             _webMessageSender = webMessageSender;
             _webViewRuntime = webViewRuntime;
             _uiThread = uiThread;
+            _injectQueue = injectQueue;
         }
 
         public void Start()
@@ -44,7 +47,7 @@ namespace VAL.Host.Services
             if (_webViewRuntime.Core == null)
                 return;
 
-            var seed = EssenceInjectQueue.Dequeue();
+            var seed = _injectQueue.Dequeue();
             if (seed == null)
                 return;
 

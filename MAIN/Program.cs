@@ -67,6 +67,7 @@ namespace VAL
                         services.AddSingleton<ISessionContext, SessionContextAdapter>();
                         services.AddSingleton<IOperationCoordinator, OperationCoordinatorAdapter>();
                         services.AddSingleton<IToastService, ToastServiceAdapter>();
+                        services.AddSingleton<IToastHub, ToastHubAdapter>();
                         services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
                         services.AddSingleton<IAppPaths, AppPaths>();
                         services.AddSingleton<IProcessLauncher, ProcessLauncher>();
@@ -78,8 +79,11 @@ namespace VAL
                         services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
                         services.AddSingleton<ITruthHealthReportService, TruthHealthReportService>();
                         services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();
+                        services.AddSingleton<IPortalRuntimeStateManager, PortalRuntimeStateManager>();
                         services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
                         services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
+                        services.AddSingleton<VAL.Continuum.Pipeline.Truth.IContinuumWriter, VAL.Continuum.Pipeline.Truth.ContinuumWriter>();
+                        services.AddSingleton<VAL.Continuum.Pipeline.Inject.IContinuumInjectQueue, VAL.Continuum.Pipeline.Inject.ContinuumInjectQueue>();
                         services.AddSingleton<IContinuumPump, ContinuumPump>();
                         services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
                         services.AddSingleton<IWebViewRuntime, WebViewRuntime>();

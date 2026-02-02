@@ -35,12 +35,12 @@ MAIN/Host/Commands/PortalCommandHandlers.cs
 MAIN/Host/Commands/ToolsCommandHandlers.cs
 MAIN/Host/Commands/VoidCommandHandlers.cs
 MAIN/Host/ILog.cs
+MAIN/Host/IToastHub.cs
 MAIN/Host/ModuleLoader.cs
 MAIN/Host/OperationCoordinator.cs
 MAIN/Host/Options/ModuleOptions.cs
 MAIN/Host/Options/ValOptions.cs
 MAIN/Host/Options/WebViewOptions.cs
-MAIN/Host/Portal/PortalHostRouter.cs
 MAIN/Host/Portal/PortalRuntime.cs
 MAIN/Host/Portal/PortalStaging.cs
 MAIN/Host/Services/Adapters/CommandDispatcherAdapter.cs
@@ -56,6 +56,7 @@ MAIN/Host/Services/DiagnosticsWindowService.cs
 MAIN/Host/Services/IAppPaths.cs
 MAIN/Host/Services/IBuildInfo.cs
 MAIN/Host/Services/ICommandDispatcher.cs
+MAIN/Host/Services/IPortalRuntimeStateManager.cs
 MAIN/Host/Services/IContinuumPump.cs
 MAIN/Host/Services/ICrashHandler.cs
 MAIN/Host/Services/IDiagnosticsWindowService.cs
@@ -72,6 +73,7 @@ MAIN/Host/Services/IUiThread.cs
 MAIN/Host/Services/IWebViewRuntime.cs
 MAIN/Host/Services/ModuleRuntimeService.cs
 MAIN/Host/Services/PortalRuntimeService.cs
+MAIN/Host/Services/PortalRuntimeStateManager.cs
 MAIN/Host/Services/ProcessLauncher.cs
 MAIN/Host/Services/SafeBoot.cs
 MAIN/Host/Services/SmokeTestRunner.cs
@@ -88,6 +90,7 @@ MAIN/Host/SessionContext.cs
 MAIN/Host/TruthSession.cs
 MAIN/Host/ToastArchitectureMap.md
 MAIN/Host/ToastDefinition.cs
+MAIN/Host/ToastHubAdapter.cs
 MAIN/Host/ToastHub.cs
 MAIN/Host/ToastKey.cs
 MAIN/Host/ToastManager.cs
@@ -118,6 +121,8 @@ MAIN/Modules/Continuum/Pipeline/00_Common/ToastLedger.cs
 MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Commands.cs
 MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Entry.cs
 MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Flow.cs
+MAIN/Modules/Continuum/Pipeline/02_Truth/ContinuumWriter.cs
+MAIN/Modules/Continuum/Pipeline/02_Truth/IContinuumWriter.cs
 MAIN/Modules/Continuum/Pipeline/02_Truth/Truth.Messages.cs
 MAIN/Modules/Continuum/Pipeline/02_Truth/Truth.Normalize.cs
 MAIN/Modules/Continuum/Pipeline/02_Truth/Truth.Storage.cs
@@ -130,6 +135,8 @@ MAIN/Modules/Continuum/Pipeline/04_Filter2/Filter2.Restructure.cs
 MAIN/Modules/Continuum/Pipeline/04_Filter2/Filter2.Rules.cs
 MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Controller.cs
 MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Queue.cs
+MAIN/Modules/Continuum/Pipeline/05_Inject/ContinuumInjectQueue.cs
+MAIN/Modules/Continuum/Pipeline/05_Inject/IContinuumInjectQueue.cs
 MAIN/Modules/Continuum/Pipeline/06_Telemetry/Telemetry.ThresholdMonitor.cs
 MAIN/Modules/Portal/Portal.main.js
 MAIN/Modules/Portal/Portal.module.json
@@ -167,6 +174,8 @@ PRODUCT/Modules/Continuum/Pipeline/00_Common/ToastLedger.cs
 PRODUCT/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Commands.cs
 PRODUCT/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Entry.cs
 PRODUCT/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Flow.cs
+PRODUCT/Modules/Continuum/Pipeline/02_Truth/ContinuumWriter.cs
+PRODUCT/Modules/Continuum/Pipeline/02_Truth/IContinuumWriter.cs
 PRODUCT/Modules/Continuum/Pipeline/02_Truth/Truth.Messages.cs
 PRODUCT/Modules/Continuum/Pipeline/02_Truth/Truth.Normalize.cs
 PRODUCT/Modules/Continuum/Pipeline/02_Truth/Truth.Storage.cs
@@ -179,6 +188,8 @@ PRODUCT/Modules/Continuum/Pipeline/04_Filter2/Filter2.Restructure.cs
 PRODUCT/Modules/Continuum/Pipeline/04_Filter2/Filter2.Rules.cs
 PRODUCT/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Controller.cs
 PRODUCT/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Queue.cs
+PRODUCT/Modules/Continuum/Pipeline/05_Inject/ContinuumInjectQueue.cs
+PRODUCT/Modules/Continuum/Pipeline/05_Inject/IContinuumInjectQueue.cs
 PRODUCT/Modules/Continuum/Pipeline/06_Telemetry/Telemetry.ThresholdMonitor.cs
 PRODUCT/Modules/Portal/Portal.main.js
 PRODUCT/Modules/Portal/Portal.module.json
