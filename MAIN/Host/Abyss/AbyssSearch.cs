@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using VAL.Continuum.Pipeline.Truth;
 using VAL.Host.Logging;
 
@@ -38,8 +39,33 @@ namespace VAL.Host.Abyss
     {
         private static readonly RateLimiter RateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
+        private static readonly object CacheGate = new();
+        private static readonly Dictionary<string, TruthLogCache> CacheByRoot = new(StringComparer.OrdinalIgnoreCase);
+
+        private sealed class TruthLogCache
+        {
+            public Dictionary<string, TruthLogEntry> Entries { get; } = new(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private sealed class TruthLogEntry
+        {
+            public DateTime LastWriteUtc { get; init; }
+            public List<AbyssExchange> Exchanges { get; init; } = new();
+        }
+
+        private sealed class TruthLogSnapshot
+        {
+            public string Path { get; init; } = string.Empty;
+            public DateTime LastWriteUtc { get; init; }
+            public List<AbyssExchange> Exchanges { get; init; } = new();
+        }
 
         public static List<AbyssSearchResult> Search(string memoryRoot, string query, int maxResults, IReadOnlyCollection<string>? excludeFingerprints = null)
+        {
+            return Search(memoryRoot, query, maxResults, CancellationToken.None, excludeFingerprints);
+        }
+
+        public static List<AbyssSearchResult> Search(string memoryRoot, string query, int maxResults, CancellationToken cancellationToken, IReadOnlyCollection<string>? excludeFingerprints = null)
         {
             var results = new List<AbyssSearchResult>();
             var tokens = Tokenize(query);
@@ -59,10 +85,14 @@ namespace VAL.Host.Abyss
                 }
             }
 
-            foreach (var truthPath in EnumerateTruthLogs(memoryRoot))
+            foreach (var snapshot in GetTruthLogSnapshots(memoryRoot, cancellationToken))
             {
-                foreach (var exchange in ReadExchanges(truthPath))
+                cancellationToken.ThrowIfCancellationRequested();
+
+                foreach (var exchange in snapshot.Exchanges)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     var score = ScoreExchange(exchange, tokens);
                     if (score <= 0) continue;
 
@@ -130,10 +160,10 @@ namespace VAL.Host.Abyss
                 return list;
 
             var latest = GetMostRecentTruthLog(memoryRoot);
-            if (string.IsNullOrWhiteSpace(latest))
+            if (latest == null)
                 return list;
 
-            var exchanges = ReadExchanges(latest);
+            var exchanges = latest.Exchanges;
             if (exchanges.Count == 0)
                 return list;
 
@@ -160,11 +190,22 @@ namespace VAL.Host.Abyss
                 .Replace("\\\"", "\"");
         }
 
-        private static IEnumerable<string> EnumerateTruthLogs(string memoryRoot)
+        private static IEnumerable<string> EnumerateTruthLogs(string memoryRoot, CancellationToken cancellationToken)
         {
             try
             {
-                return Directory.EnumerateFiles(memoryRoot, "Truth.log", SearchOption.AllDirectories);
+                var results = new List<string>();
+                foreach (var path in Directory.EnumerateFiles(memoryRoot, "Truth.log", SearchOption.AllDirectories))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    results.Add(path);
+                }
+
+                return results;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -173,52 +214,115 @@ namespace VAL.Host.Abyss
             }
         }
 
-        private static string? GetMostRecentTruthLog(string memoryRoot)
+        private static TruthLogSnapshot? GetMostRecentTruthLog(string memoryRoot)
         {
-            string? latestPath = null;
-            DateTime latestUtc = DateTime.MinValue;
+            TruthLogSnapshot? latest = null;
 
-            foreach (var path in EnumerateTruthLogs(memoryRoot))
+            foreach (var snapshot in GetTruthLogSnapshots(memoryRoot, CancellationToken.None))
             {
+                if (latest == null || snapshot.LastWriteUtc > latest.LastWriteUtc)
+                    latest = snapshot;
+            }
+
+            return latest;
+        }
+
+        private static IReadOnlyList<TruthLogSnapshot> GetTruthLogSnapshots(string memoryRoot, CancellationToken cancellationToken)
+        {
+            var paths = EnumerateTruthLogs(memoryRoot, cancellationToken).ToList();
+            var snapshots = new List<TruthLogSnapshot>(paths.Count);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var truthPath in paths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                seen.Add(truthPath);
+
+                DateTime lastWriteUtc;
                 try
                 {
-                    var utc = File.GetLastWriteTimeUtc(path);
-                    if (utc > latestUtc)
-                    {
-                        latestUtc = utc;
-                        latestPath = path;
-                    }
+                    lastWriteUtc = File.GetLastWriteTimeUtc(truthPath);
                 }
                 catch (Exception ex)
                 {
                     LogFileFailure("truth_log_last_write", ex);
+                    continue;
+                }
+
+                TruthLogEntry? cachedEntry = null;
+                var useCache = false;
+
+                lock (CacheGate)
+                {
+                    if (!CacheByRoot.TryGetValue(memoryRoot, out var cache))
+                    {
+                        cache = new TruthLogCache();
+                        CacheByRoot[memoryRoot] = cache;
+                    }
+
+                    if (cache.Entries.TryGetValue(truthPath, out cachedEntry) &&
+                        cachedEntry.LastWriteUtc == lastWriteUtc)
+                    {
+                        useCache = true;
+                    }
+                }
+
+                List<AbyssExchange> exchanges;
+                if (useCache && cachedEntry != null)
+                {
+                    exchanges = cachedEntry.Exchanges;
+                }
+                else
+                {
+                    exchanges = ReadExchanges(truthPath, lastWriteUtc, cancellationToken);
+
+                    lock (CacheGate)
+                    {
+                        if (CacheByRoot.TryGetValue(memoryRoot, out var cache))
+                        {
+                            cache.Entries[truthPath] = new TruthLogEntry
+                            {
+                                LastWriteUtc = lastWriteUtc,
+                                Exchanges = exchanges
+                            };
+                        }
+                    }
+                }
+
+                snapshots.Add(new TruthLogSnapshot
+                {
+                    Path = truthPath,
+                    LastWriteUtc = lastWriteUtc,
+                    Exchanges = exchanges
+                });
+            }
+
+            lock (CacheGate)
+            {
+                if (CacheByRoot.TryGetValue(memoryRoot, out var cache))
+                {
+                    var stale = cache.Entries.Keys.Where(path => !seen.Contains(path)).ToList();
+                    foreach (var path in stale)
+                        cache.Entries.Remove(path);
                 }
             }
 
-            return latestPath;
+            return snapshots;
         }
 
-        private static List<AbyssExchange> ReadExchanges(string truthPath)
+        private static List<AbyssExchange> ReadExchanges(string truthPath, DateTime lastWriteUtc, CancellationToken cancellationToken)
         {
             var exchanges = new List<AbyssExchange>();
             if (string.IsNullOrWhiteSpace(truthPath) || !File.Exists(truthPath))
                 return exchanges;
 
             var chatId = new DirectoryInfo(Path.GetDirectoryName(truthPath) ?? string.Empty).Name;
-            var lastWriteUtc = DateTime.MinValue;
-            try
-            {
-                lastWriteUtc = File.GetLastWriteTimeUtc(truthPath);
-            }
-            catch (Exception ex)
-            {
-                LogFileFailure("truth_log_last_write", ex);
-            }
 
             AbyssExchange? current = null;
 
             foreach (var entry in TruthReader.Read(truthPath, repairTailFirst: true))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var payload = UnescapeTruthPayload(entry.Payload);
                 var line = new AbyssTruthLine
                 {
