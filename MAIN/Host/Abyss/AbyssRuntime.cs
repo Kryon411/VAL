@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using VAL.Contracts;
 using VAL.Continuum.Pipeline.Truth;
@@ -21,6 +22,7 @@ namespace VAL.Host.Abyss
         private static string? _lastQuery;
         private static string? _lastQueryOriginal;
         private static string? _lastGeneratedUtc;
+        private static CancellationTokenSource? _searchCts;
 
         public static void Initialize(IWebMessageSender messageSender)
         {
@@ -44,42 +46,55 @@ namespace VAL.Host.Abyss
             maxResults = Math.Max(1, Math.Min(4, maxResults));
             ToastHub.TryShow(ToastKey.AbyssSearching, chatId: chatId);
 
+            var token = BeginSearchCancellation();
+
             Task.Run(() =>
             {
-                var memoryRoot = ResolveMemoryRoot();
-                TrackQuery(query, queryOriginal);
-                if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
+                try
                 {
-                    ClearLastResults();
-                    ToastHub.TryShow(ToastKey.AbyssNoTruthLogs, chatId: chatId);
+                    var memoryRoot = ResolveMemoryRoot();
+                    TrackQuery(query, queryOriginal);
+                    if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
+                    {
+                        ClearLastResults();
+                        ToastHub.TryShow(ToastKey.AbyssNoTruthLogs, chatId: chatId);
+                        EmitResults(chatId);
+                        return;
+                    }
+
+                    token.ThrowIfCancellationRequested();
+
+                    var results = AbyssSearch.Search(memoryRoot, query, maxResults, token, excludeFingerprints);
+                    token.ThrowIfCancellationRequested();
+
+                    lock (Gate)
+                    {
+                        _lastResults = results;
+                    }
+
+                    if (results.Count == 0)
+                    {
+                        ToastHub.TryShow(ToastKey.AbyssNoMatches, chatId: chatId);
+                    }
+                    else
+                    {
+                        ToastHub.TryShow(
+                            ToastKey.AbyssMatches,
+                            chatId: chatId,
+                            titleOverride: $"Abyss: {results.Count} matches");
+                    }
+
+                    var resultsPath = WriteResultsFile(chatId, query, results);
+                    if (!string.IsNullOrWhiteSpace(resultsPath))
+                        ToastHub.TryShow(ToastKey.AbyssResultsWritten, chatId: chatId);
+
                     EmitResults(chatId);
-                    return;
                 }
-
-                var results = AbyssSearch.Search(memoryRoot, query, maxResults, excludeFingerprints);
-                lock (Gate)
+                catch (OperationCanceledException)
                 {
-                    _lastResults = results;
+                    // Swallow cancellation to avoid stale updates.
                 }
-
-                if (results.Count == 0)
-                {
-                    ToastHub.TryShow(ToastKey.AbyssNoMatches, chatId: chatId);
-                }
-                else
-                {
-                    ToastHub.TryShow(
-                        ToastKey.AbyssMatches,
-                        chatId: chatId,
-                        titleOverride: $"Abyss: {results.Count} matches");
-                }
-
-                var resultsPath = WriteResultsFile(chatId, query, results);
-                if (!string.IsNullOrWhiteSpace(resultsPath))
-                    ToastHub.TryShow(ToastKey.AbyssResultsWritten, chatId: chatId);
-
-                EmitResults(chatId);
-            });
+            }, token);
         }
 
         public static void RetryLast(string? chatId, IReadOnlyCollection<string>? excludeFingerprints, int maxResults)
@@ -411,6 +426,17 @@ namespace VAL.Host.Abyss
                 _lastQuery = queryUsed;
                 _lastQueryOriginal = queryOriginal ?? queryUsed;
                 _lastGeneratedUtc = DateTime.UtcNow.ToString("O");
+            }
+        }
+
+        private static CancellationToken BeginSearchCancellation()
+        {
+            lock (Gate)
+            {
+                _searchCts?.Cancel();
+                _searchCts?.Dispose();
+                _searchCts = new CancellationTokenSource();
+                return _searchCts.Token;
             }
         }
 
