@@ -12,6 +12,7 @@ namespace VAL.Host.Services
         private static readonly RateLimiter RateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
         private const int QueueWarnThreshold = 50;
+        private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(200);
 
         private readonly ICommandDispatcher _commandDispatcher;
         private readonly IWebMessageSender _webMessageSender;
@@ -21,6 +22,7 @@ namespace VAL.Host.Services
 
         private CancellationTokenSource? _pumpCts;
         private Task? _pumpTask;
+        private EssenceInjectController.InjectSeed? _pendingSeed;
 
         public ContinuumPump(
             ICommandDispatcher commandDispatcher,
@@ -64,7 +66,6 @@ namespace VAL.Host.Services
             }
 
             _pumpTask = null;
-            FlushPendingSeeds();
         }
 
         private async Task PumpContinuumQueueAsync(CancellationToken cancellationToken)
@@ -72,12 +73,36 @@ namespace VAL.Host.Services
             try
             {
                 var reader = _injectQueue.Reader;
-                while (await reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    while (_injectQueue.TryDequeue(out var seed))
+                    if (_pendingSeed == null)
                     {
-                        MaybeLogQueueDepth();
-                        DispatchSeed(seed);
+                        if (_webViewRuntime.Core == null)
+                        {
+                            await Task.Delay(RetryDelay, cancellationToken).ConfigureAwait(false);
+                            continue;
+                        }
+
+                        if (!await reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                            break;
+
+                        if (_injectQueue.TryDequeue(out var seed))
+                        {
+                            _pendingSeed = seed;
+                            MaybeLogQueueDepth();
+                        }
+                    }
+
+                    if (_pendingSeed != null)
+                    {
+                        if (TryDispatchSeed(_pendingSeed))
+                        {
+                            _pendingSeed = null;
+                        }
+                        else
+                        {
+                            await Task.Delay(RetryDelay, cancellationToken).ConfigureAwait(false);
+                        }
                     }
                 }
             }
@@ -87,19 +112,12 @@ namespace VAL.Host.Services
             }
         }
 
-        private void FlushPendingSeeds()
-        {
-            while (_injectQueue.TryDequeue(out var seed))
-            {
-                DispatchSeed(seed);
-            }
-        }
-
-        private void DispatchSeed(EssenceInjectController.InjectSeed? seed)
+        private bool TryDispatchSeed(EssenceInjectController.InjectSeed? seed)
         {
             if (seed == null)
-                return;
+                return false;
 
+            var didSend = false;
             _uiThread.Invoke(() =>
             {
                 if (_webViewRuntime.Core == null)
@@ -109,13 +127,20 @@ namespace VAL.Host.Services
                 {
                     var envelope = _commandDispatcher.CreateContinuumInjectEnvelope(seed);
                     if (envelope != null)
+                    {
                         _webMessageSender.Send(envelope);
+                        didSend = true;
+                    }
                 }
                 catch
                 {
-                    ValLog.Warn(nameof(ContinuumPump), "Continuum dispatch failed.");
+                    var key = "continuum.inject.dispatch.fail";
+                    if (RateLimiter.Allow(key, LogInterval))
+                        ValLog.Warn(nameof(ContinuumPump), "Continuum dispatch failed.");
                 }
             });
+
+            return didSend;
         }
 
         private void MaybeLogQueueDepth()
