@@ -67,18 +67,20 @@
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   display: none;
   flex-direction: column;
-  gap: 10px;
-  min-width: 520px;
+  gap: 0;
+  min-width: 480px;
   max-width: 80vw;
+  max-height: min(80vh, 720px);
   background:
     linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
   background-color: rgba(2,10,20,0.96);
   border: 1px solid rgba(120, 180, 240, 0.16);
   border-radius: 18px;
-  padding: 16px 18px;
+  padding: 0;
   box-shadow: none;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  overflow: hidden;
 }
 
 .valdock-header{
@@ -88,9 +90,14 @@
   align-items: center;
   font-weight: 600;
   font-size: 15px;
-  margin-bottom: 10px;
+  padding: 12px 14px 10px;
   cursor: move;
   user-select: none;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  border-bottom: 1px solid rgba(120, 180, 240, 0.16);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .valdock-portal-banner{
@@ -118,7 +125,7 @@
   justify-self: center;
   text-align: center;
   font-size: 16px;
-  letter-spacing: 0.10em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   opacity: 0.92;
 }
@@ -141,11 +148,12 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 6px;
+  margin-top: 0;
+  min-height: 36px;
 }
 
 .valdock-actions{
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
 }
 
@@ -178,11 +186,12 @@
     linear-gradient(135deg, rgba(255,255,255,0.06), rgba(4,18,30,0.96));
   background-color: rgba(4,18,32,0.96);
   color: rgba(245,251,255,0.75);
-  padding: 7px 12px;
+  padding: 6px 12px;
   border-radius: 999px;
   font-size: 12px;
   cursor: pointer;
   box-shadow: none;
+  min-height: 32px;
   transition:
     transform 0.1s ease,
     box-shadow 0.15s ease,
@@ -198,6 +207,11 @@
   box-shadow: none;
 }
 
+.valdock-btn.danger{
+  background: linear-gradient(135deg, rgba(255,120,120,0.24), rgba(60,12,18,0.9));
+  color: rgba(255, 220, 220, 0.92);
+}
+
 .valdock-btn:hover{
   transform: translateY(-1px);
   box-shadow: none;
@@ -208,12 +222,18 @@
   box-shadow: none;
 }
 
+.valdock-btn:disabled,
+.valdock-btn-disabled{
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .valdock-toggle{
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-right: 8px;
 }
 
 .valdock-tg-label{
@@ -235,6 +255,7 @@
   cursor: pointer;
   font-size: 11px;
   box-shadow: none;
+  min-height: 28px;
 }
 
 .valdock-tg-switch.valdock-tg-disabled{
@@ -246,7 +267,7 @@
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   opacity: 0.8;
   font-size: 12px;
-  padding-top: 6px;
+  padding: 6px 2px 0;
   border-top: 1px solid rgba(80, 120, 160, 0.15);
 }
 
@@ -318,4 +339,92 @@
   color: rgba(235,245,255,0.72);
   line-height: 1;
   user-select: none;
+}
+
+.valdock-body{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.valdock-section{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(120, 180, 240, 0.14);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.04), rgba(4,18,30,0.85));
+}
+
+.valdock-section-header{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.valdock-section-heading{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.valdock-section-title{
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(235,245,255,0.92);
+}
+
+.valdock-section-subtitle{
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.valdock-section-divider{
+  width: 100%;
+  height: 1px;
+  background: rgba(80, 120, 160, 0.2);
+  border-radius: 999px;
+}
+
+.valdock-section-body{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.valdock-section-hint{
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.valdock-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.valdock-inline-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.valdock-send{
+  margin-left: auto;
+}
+
+.valdock-portal-banner{
+  margin: 0;
 }
