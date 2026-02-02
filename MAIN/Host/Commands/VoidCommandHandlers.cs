@@ -1,4 +1,6 @@
 using System;
+using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace VAL.Host.Commands
 {
@@ -17,12 +19,18 @@ namespace VAL.Host.Commands
             if (_lastEnabledState != enabled)
             {
                 _lastEnabledState = enabled;
+                var toasts = GetToastHub() ?? new ToastHubAdapter();
 
                 if (enabled)
-                    ToastHub.TryShow(ToastKey.VoidEnabled);
+                    toasts.TryShow(ToastKey.VoidEnabled);
                 else
-                    ToastHub.TryShow(ToastKey.VoidDisabled);
+                    toasts.TryShow(ToastKey.VoidDisabled);
             }
+        }
+
+        private static IToastHub? GetToastHub()
+        {
+            return (Application.Current as App)?.Services.GetService<IToastHub>();
         }
     }
 }

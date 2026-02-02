@@ -86,19 +86,23 @@ namespace VAL.Host.Commands
                 var wipeService = services.GetRequiredService<IDataWipeService>();
                 var result = wipeService.WipeData();
 
+                var toastHub = services.GetService<IToastHub>() ?? new ToastHubAdapter();
+
                 if (result.Success)
                 {
-                    ToastHub.TryShow(ToastKey.DataWipeCompleted, bypassLaunchQuiet: true);
+                    toastHub.TryShow(ToastKey.DataWipeCompleted, bypassLaunchQuiet: true);
                 }
                 else
                 {
-                    ToastHub.TryShow(ToastKey.DataWipePartial, bypassLaunchQuiet: true);
+                    toastHub.TryShow(ToastKey.DataWipePartial, bypassLaunchQuiet: true);
                 }
             }
             catch (Exception ex)
             {
                 LogCommandFailure("wipe_data", cmd, ex);
-                ToastHub.TryShow(ToastKey.DataWipePartial, bypassLaunchQuiet: true);
+                var services = GetServices();
+                var toastHub = services?.GetService<IToastHub>() ?? new ToastHubAdapter();
+                toastHub.TryShow(ToastKey.DataWipePartial, bypassLaunchQuiet: true);
             }
         }
 

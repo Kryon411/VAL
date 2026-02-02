@@ -1,5 +1,8 @@
 using System;
+using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 using VAL.Host.Logging;
+using VAL.Host.Services;
 
 namespace VAL.Host.Commands
 {
@@ -13,7 +16,10 @@ namespace VAL.Host.Commands
             try
             {
                 if (cmd.TryGetBool("enabled", out var en))
-                    VAL.Host.Portal.PortalRuntime.SetEnabled(en);
+                {
+                    var runtime = GetRuntime() ?? new PortalRuntimeStateManager();
+                    runtime.SetEnabled(en);
+                }
             }
             catch (Exception ex)
             {
@@ -25,7 +31,8 @@ namespace VAL.Host.Commands
         {
             try
             {
-                VAL.Host.Portal.PortalRuntime.OpenSnipOverlay();
+                var runtime = GetRuntime() ?? new PortalRuntimeStateManager();
+                runtime.OpenSnipOverlay();
             }
             catch (Exception ex)
             {
@@ -39,7 +46,8 @@ namespace VAL.Host.Commands
             {
                 int max = 10;
                 if (cmd.TryGetInt("max", out var m)) max = m;
-                VAL.Host.Portal.PortalRuntime.SendStaged(max);
+                var runtime = GetRuntime() ?? new PortalRuntimeStateManager();
+                runtime.SendStaged(max);
             }
             catch (Exception ex)
             {
@@ -56,6 +64,11 @@ namespace VAL.Host.Commands
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";
             ValLog.Warn(nameof(PortalCommandHandlers),
                 $"Portal command failed ({action}) for {cmd.Type} (source: {sourceHost}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+        }
+
+        private static IPortalRuntimeStateManager? GetRuntime()
+        {
+            return (Application.Current as App)?.Services.GetService<IPortalRuntimeStateManager>();
         }
     }
 }

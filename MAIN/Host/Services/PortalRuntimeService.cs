@@ -11,13 +11,19 @@ namespace VAL.Host.Services
         private readonly IWebMessageSender _webMessageSender;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IPrivacySettingsService _privacySettingsService;
+        private readonly IPortalRuntimeStateManager _portalRuntimeStateManager;
         private bool _initialized;
 
-        public PortalRuntimeService(IWebMessageSender webMessageSender, IWebViewRuntime webViewRuntime, IPrivacySettingsService privacySettingsService)
+        public PortalRuntimeService(
+            IWebMessageSender webMessageSender,
+            IWebViewRuntime webViewRuntime,
+            IPrivacySettingsService privacySettingsService,
+            IPortalRuntimeStateManager portalRuntimeStateManager)
         {
             _webMessageSender = webMessageSender;
             _webViewRuntime = webViewRuntime;
             _privacySettingsService = privacySettingsService;
+            _portalRuntimeStateManager = portalRuntimeStateManager;
             _privacySettingsService.SettingsChanged += OnPrivacySettingsChanged;
         }
 
@@ -74,11 +80,11 @@ namespace VAL.Host.Services
             ApplyPrivacySettings(snapshot);
         }
 
-        private static void ApplyPrivacySettings(PrivacySettingsSnapshot snapshot)
+        private void ApplyPrivacySettings(PrivacySettingsSnapshot snapshot)
         {
             try
             {
-                PortalRuntime.SetPrivacyAllowed(snapshot.PortalCaptureEnabled);
+                _portalRuntimeStateManager.SetPrivacyAllowed(snapshot.PortalCaptureEnabled);
             }
             catch
             {
