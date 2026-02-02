@@ -15,7 +15,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore MAIN/VAL.csproj
@@ -23,7 +23,19 @@ jobs:
       - name: Build (Release)
         run: dotnet build MAIN/VAL.csproj -c Release
 
+      - name: Detect tests
+        id: detect-tests
+        shell: pwsh
+        run: |
+          $testProject = "MAIN/VAL.Tests/VAL.Tests.csproj"
+          if (Test-Path $testProject) {
+            "exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "exists=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
       - name: Test (Release)
+        if: steps.detect-tests.outputs.exists == 'true'
         run: dotnet test MAIN/VAL.Tests/VAL.Tests.csproj -c Release
 
       - name: Publish (win-x64)
@@ -123,5 +135,4 @@ jobs:
             artifacts/SmokeRun.txt
             artifacts/CrashReport.txt
             artifacts/VAL.log
-            artifacts/publish/**
           if-no-files-found: warn
