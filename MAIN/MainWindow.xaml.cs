@@ -107,9 +107,26 @@ namespace VAL
                 DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
             }
 
-            await _webViewRuntime.InitializeAsync(WebView);
+            var webViewInitialized = false;
+            try
+            {
+                await _webViewRuntime.InitializeAsync(WebView);
+                webViewInitialized = true;
+            }
+            catch (Exception ex)
+            {
+                ValLog.Warn("MainWindow", $"WebView2 initialization failed: {ex}");
+                MessageBox.Show(
+                    "VAL could not initialize the embedded browser. Please restart the app.",
+                    "VAL",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
 
-            WebView.DefaultBackgroundColor = System.Drawing.Color.FromArgb(11, 12, 16);
+            if (webViewInitialized)
+            {
+                WebView.DefaultBackgroundColor = System.Drawing.Color.FromArgb(11, 12, 16);
+            }
 
             try
             {
@@ -126,7 +143,10 @@ namespace VAL
                 startUri = new Uri(WebViewOptions.DefaultStartUrl);
             }
 
-            WebView.Source = startUri;
+            if (webViewInitialized)
+            {
+                WebView.Source = startUri;
+            }
 
             _startupCrashGuard.MarkSuccess();
         }

@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using VAL.Host;
@@ -23,6 +24,12 @@ namespace VAL.Host.Services
         private bool _eventsWired;
         private volatile bool _bridgeArmed;
         private Uri? _currentUri;
+        private Dispatcher? _dispatcher;
+        private EventHandler<CoreWebView2NavigationCompletedEventArgs>? _navigationCompletedHandler;
+        private EventHandler<CoreWebView2NavigationStartingEventArgs>? _navigationStartingHandler;
+        private EventHandler<CoreWebView2SourceChangedEventArgs>? _sourceChangedHandler;
+        private EventHandler<CoreWebView2WebMessageReceivedEventArgs>? _webMessageReceivedHandler;
+        private EventHandler<CoreWebView2NewWindowRequestedEventArgs>? _newWindowRequestedHandler;
 
         public CoreWebView2? Core { get; private set; }
 
@@ -46,7 +53,9 @@ namespace VAL.Host.Services
         {
             if (control == null) throw new ArgumentNullException(nameof(control));
 
-            await _initLock.WaitAsync().ConfigureAwait(false);
+            _dispatcher ??= control.Dispatcher;
+
+            await _initLock.WaitAsync();
             try
             {
                 if (_initTask != null)
@@ -55,52 +64,66 @@ namespace VAL.Host.Services
                     return;
                 }
 
-                _initTask = InitializeCoreAsync(control);
+                _initTask = RunOnUiAsync(() => InitializeCoreAsync(control));
             }
             finally
             {
                 _initLock.Release();
             }
 
-            await _initTask.ConfigureAwait(false);
+            try
+            {
+                await _initTask;
+            }
+            catch (Exception ex)
+            {
+                ValLog.Error(nameof(WebViewRuntime), $"WebView2 initialization failed: {ex}");
+                throw;
+            }
         }
 
         public void PostJson(string json)
         {
-            var core = Core;
-            if (core == null)
+            RunOnUiThread(() =>
             {
-                ValLog.Warn(nameof(WebViewRuntime), "PostJson called before WebView2 initialization.");
-                return;
-            }
+                var core = Core;
+                if (core == null)
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "PostJson called before WebView2 initialization.");
+                    return;
+                }
 
-            try
-            {
-                core.PostWebMessageAsJson(json);
-            }
-            catch
-            {
-                ValLog.Warn(nameof(WebViewRuntime), "Failed to post JSON to WebView2.");
-            }
+                try
+                {
+                    core.PostWebMessageAsJson(json);
+                }
+                catch
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "Failed to post JSON to WebView2.");
+                }
+            });
         }
 
         public async Task ExecuteScriptAsync(string js)
         {
-            var core = Core;
-            if (core == null)
+            await RunOnUiAsync(async () =>
             {
-                ValLog.Warn(nameof(WebViewRuntime), "ExecuteScriptAsync called before WebView2 initialization.");
-                return;
-            }
+                var core = Core;
+                if (core == null)
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "ExecuteScriptAsync called before WebView2 initialization.");
+                    return;
+                }
 
-            try
-            {
-                await core.ExecuteScriptAsync(js).ConfigureAwait(false);
-            }
-            catch
-            {
-                ValLog.Warn(nameof(WebViewRuntime), "Failed to execute script in WebView2.");
-            }
+                try
+                {
+                    await core.ExecuteScriptAsync(js);
+                }
+                catch
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "Failed to execute script in WebView2.");
+                }
+            });
         }
 
         private async Task InitializeCoreAsync(WebView2 control)
@@ -110,62 +133,84 @@ namespace VAL.Host.Services
             Directory.CreateDirectory(userData);
 
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userData);
-            await control.EnsureCoreWebView2Async(env);
-
-            Core = control.CoreWebView2;
-            Core.Settings.AreDevToolsEnabled = _webViewOptions.EffectiveAllowDevTools;
-            Core.Settings.IsStatusBarEnabled = false;
-            Core.Settings.IsWebMessageEnabled = true;
-
-            await InitializeSessionNonceScriptAsync().ConfigureAwait(false);
-
-            if (!string.IsNullOrWhiteSpace(_webViewOptions.UserAgentOverride))
+            await RunOnUiAsync(async () =>
             {
-                try
+                await control.EnsureCoreWebView2Async(env);
+
+                Core = control.CoreWebView2;
+                if (Core == null)
                 {
-                    Core.Settings.UserAgent = _webViewOptions.UserAgentOverride;
+                    var message = "WebView2 core initialization failed. Runtime missing or initialization did not complete.";
+                    ValLog.Error(nameof(WebViewRuntime), message);
+                    throw new InvalidOperationException(message);
                 }
-                catch
+
+                Core.Settings.AreDevToolsEnabled = _webViewOptions.EffectiveAllowDevTools;
+                Core.Settings.IsStatusBarEnabled = false;
+                Core.Settings.IsWebMessageEnabled = true;
+
+                await InitializeSessionNonceScriptAsync();
+
+                if (!string.IsNullOrWhiteSpace(_webViewOptions.UserAgentOverride))
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "Failed to apply user agent override.");
+                    try
+                    {
+                        Core.Settings.UserAgent = _webViewOptions.UserAgentOverride;
+                    }
+                    catch
+                    {
+                        ValLog.Warn(nameof(WebViewRuntime), "Failed to apply user agent override.");
+                    }
                 }
-            }
 
-            if (!_eventsWired)
-            {
-                Core.NavigationCompleted += (_, __) => NavigationCompleted?.Invoke();
-                Core.NavigationStarting += (_, e) => HandleNavigationStarting(e);
-                Core.SourceChanged += (_, __) => UpdateBridgeState(Core.Source);
-                Core.WebMessageReceived += (_, e) =>
+                if (!_eventsWired)
                 {
-                    if (!_bridgeArmed)
+                    _navigationCompletedHandler ??= (_, __) => NavigationCompleted?.Invoke();
+                    _navigationStartingHandler ??= (_, e) => HandleNavigationStarting(e);
+                    _sourceChangedHandler ??= (_, __) => UpdateBridgeState(Core?.Source);
+                    _webMessageReceivedHandler ??= (_, e) =>
                     {
-                        LogBridgeIgnoredMessage();
-                        return;
-                    }
+                        if (!_bridgeArmed)
+                        {
+                            LogBridgeIgnoredMessage();
+                            return;
+                        }
 
-                    var source = e.Source;
-                    var json = e.WebMessageAsJson;
-                    if (string.IsNullOrWhiteSpace(json))
-                        return;
+                        var source = e.Source;
+                        var json = e.WebMessageAsJson;
+                        if (string.IsNullOrWhiteSpace(json))
+                            return;
 
-                    if (!MessageEnvelope.TryParse(json, out var envelope))
-                    {
-                        LogRejectedWebMessage(source, "invalid_payload");
-                        return;
-                    }
+                        if (!MessageEnvelope.TryParse(json, out var envelope))
+                        {
+                            LogRejectedWebMessage(source, "invalid_payload");
+                            return;
+                        }
 
-                    if (!WebMessageOriginGuard.TryIsAllowed(source, envelope.Nonce, _sessionNonce.Value, out var sourceUri, out var reason))
-                    {
-                        LogRejectedWebMessage(source, reason ?? "nonce_or_origin_rejected");
-                        return;
-                    }
+                        if (!WebMessageOriginGuard.TryIsAllowed(source, envelope.Nonce, _sessionNonce.Value, out var sourceUri, out var reason))
+                        {
+                            LogRejectedWebMessage(source, reason ?? "nonce_or_origin_rejected");
+                            return;
+                        }
 
-                    WebMessageJsonReceived?.Invoke(new WebMessageEnvelope(json, sourceUri!));
-                };
-                Core.NewWindowRequested += (_, e) => HandleNewWindowRequested(e);
-                _eventsWired = true;
-            }
+                        WebMessageJsonReceived?.Invoke(new WebMessageEnvelope(json, sourceUri!));
+                    };
+                    _newWindowRequestedHandler ??= (_, e) => HandleNewWindowRequested(e);
+
+                    Core.NavigationCompleted -= _navigationCompletedHandler;
+                    Core.NavigationStarting -= _navigationStartingHandler;
+                    Core.SourceChanged -= _sourceChangedHandler;
+                    Core.WebMessageReceived -= _webMessageReceivedHandler;
+                    Core.NewWindowRequested -= _newWindowRequestedHandler;
+
+                    Core.NavigationCompleted += _navigationCompletedHandler;
+                    Core.NavigationStarting += _navigationStartingHandler;
+                    Core.SourceChanged += _sourceChangedHandler;
+                    Core.WebMessageReceived += _webMessageReceivedHandler;
+                    Core.NewWindowRequested += _newWindowRequestedHandler;
+                    _eventsWired = true;
+                }
+            });
         }
 
         private void HandleNewWindowRequested(CoreWebView2NewWindowRequestedEventArgs e)
@@ -173,9 +218,22 @@ namespace VAL.Host.Services
             if (!_webViewOptions.BlockNewWindow)
                 return;
 
+            if (_dispatcher != null && !_dispatcher.CheckAccess())
+            {
+                _dispatcher.Invoke(() => HandleNewWindowRequested(e));
+                return;
+            }
+
+            var core = Core;
             try
             {
-                e.NewWindow = Core;
+                if (core == null)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                e.NewWindow = core;
                 e.Handled = true;
             }
             catch
@@ -186,7 +244,7 @@ namespace VAL.Host.Services
 
                     var uri = e.Uri;
                     if (!string.IsNullOrWhiteSpace(uri))
-                        Core?.Navigate(uri);
+                        core?.Navigate(uri);
                 }
                 catch
                 {
@@ -281,14 +339,43 @@ namespace VAL.Host.Services
             var nonceJson = JsonSerializer.Serialize(nonce);
             var script = $"window.__VAL_NONCE = {nonceJson};";
 
-            try
+            await RunOnUiAsync(async () =>
             {
-                await Core!.AddScriptToExecuteOnDocumentCreatedAsync(script).ConfigureAwait(false);
-            }
-            catch
+                var core = Core;
+                if (core == null)
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "Failed to inject WebView session nonce.");
+                    return;
+                }
+
+                try
+                {
+                    await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
+                }
+                catch
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "Failed to inject WebView session nonce.");
+                }
+            });
+        }
+
+        private Task RunOnUiAsync(Func<Task> action)
+        {
+            if (_dispatcher == null || _dispatcher.CheckAccess())
+                return action();
+
+            return _dispatcher.InvokeAsync(action).Task.Unwrap();
+        }
+
+        private void RunOnUiThread(Action action)
+        {
+            if (_dispatcher == null || _dispatcher.CheckAccess())
             {
-                ValLog.Warn(nameof(WebViewRuntime), "Failed to inject WebView session nonce.");
+                action();
+                return;
             }
+
+            _dispatcher.Invoke(action);
         }
     }
 }
