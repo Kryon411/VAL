@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.WebMessaging;
+using VAL.Continuum.Pipeline.QuickRefresh;
 using VAL.Continuum.Pipeline.Truth;
 using VAL.Continuum.Pipeline.Inject;
 using VAL.Continuum.Pipeline;
