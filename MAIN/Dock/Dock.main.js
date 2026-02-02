@@ -93,6 +93,7 @@
     try {
       const c = Math.max(0, Math.min(10, Number(n)||0));
       localStorage.setItem(PORTAL_COUNT_KEY, String(c));
+      updatePortalCountDisplay(c);
     } catch(_) {}
   }
 
@@ -202,7 +203,7 @@ function isPreludeNudgeSuppressed(){
   let dock, pill, panel;
   let portalBanner, portalPillIndicator;
   let portalToggle, portalPrivacyToggle, continuumPrivacyToggle;
-  let portalCount, portalPrivacyNote;
+  let portalCount, portalPrivacyNote, portalSendBtn;
   let portalArmed = false;
   let isDragging = false;
   let dragOffset = [0,0];
@@ -410,8 +411,20 @@ function isPreludeNudgeSuppressed(){
     }
 
     if (!portalArmed) {
-      try { if (portalCount) portalCount.textContent = "0/10"; } catch(_) {}
+      updatePortalCountDisplay(0);
     }
+  }
+
+  function updatePortalCountDisplay(count){
+    const c = Math.max(0, Math.min(10, Number(count)||0));
+    try { if (portalCount) portalCount.textContent = `${c}/10`; } catch(_) {}
+    try {
+      if (portalSendBtn) {
+        const disabled = c <= 0;
+        portalSendBtn.disabled = disabled;
+        portalSendBtn.classList.toggle("valdock-btn-disabled", disabled);
+      }
+    } catch(_) {}
   }
 
   function applyPrivacySettings(next){
@@ -443,7 +456,7 @@ function isPreludeNudgeSuppressed(){
 
     try {
       if (portalPrivacyNote)
-        portalPrivacyNote.textContent = allowed ? "Capture & hotkeys enabled" : "Disabled by Privacy setting";
+        portalPrivacyNote.textContent = allowed ? "Hotkeys enabled" : "Disabled by Privacy setting";
     } catch(_) {}
   }
 
@@ -528,55 +541,47 @@ function isPreludeNudgeSuppressed(){
 
     // Header
     const header = el("div","valdock-header");
-    const title  = el("div","valdock-title","Control Centre");
+    const title  = el("div","valdock-title","CONTROL CENTRE");
     const close  = el("button","valdock-close","×");
     close.addEventListener("click",(e)=>{ e.preventDefault(); collapse(true); }, true);
     header.append(title, close);
 
-
+    const body = el("div","valdock-body");
 
     portalBanner = el("div","valdock-portal-banner","PORTAL ARMED");
+    body.append(portalBanner);
 
-    // Privacy header row
-    const rowPrivacyHeader = el("div","valdock-row");
-    const privacyHint = el("div","valdock-row-note","Local-only data controls");
-    rowPrivacyHeader.append(
-      el("div","valdock-row-title","Privacy:"),
-      privacyHint
-    );
+    function buildSection(titleText, subtitleText, controlEl){
+      const section = el("div","valdock-section");
+      const header = el("div","valdock-section-header");
+      const heading = el("div","valdock-section-heading");
+      const title = el("div","valdock-section-title", titleText);
+      heading.append(title);
 
-    // Continuum logging toggle
-    const rowPrivacyContinuum = el("div","valdock-row");
-    continuumPrivacyToggle = toggle(
-      "Continuum logging",
-      "ContinuumLogging",
-      privacySettings.continuumLoggingEnabled,
-      "Allow Continuum to write Truth.log for this session."
-    );
-    rowPrivacyContinuum.append(
-      el("div","valdock-row-title","Continuum:"),
-      continuumPrivacyToggle
-    );
+      let subtitleEl = null;
+      if (subtitleText) {
+        subtitleEl = el("div","valdock-section-subtitle", subtitleText);
+        heading.append(subtitleEl);
+      }
 
-    // Portal privacy toggle
-    const rowPrivacyPortal = el("div","valdock-row");
-    portalPrivacyToggle = toggle(
-      "Portal capture & hotkeys",
-      "PortalPrivacy",
-      privacySettings.portalCaptureEnabled,
-      "Allow Portal to register hotkeys and monitor the clipboard."
-    );
-    portalPrivacyNote = el("div","valdock-row-note","Capture & hotkeys enabled");
-    rowPrivacyPortal.append(
-      el("div","valdock-row-title","Portal capture:"),
-      portalPrivacyToggle,
-      portalPrivacyNote
-    );
+      header.append(heading);
+      if (controlEl) header.append(controlEl);
 
-    // Privacy action buttons
+      const divider = el("div","valdock-section-divider");
+      const content = el("div","valdock-section-body");
+
+      section.append(header, divider, content);
+      return { section, content, subtitleEl };
+    }
+
+    // Data & Privacy
+    const dataPrivacy = buildSection(
+      "Data & Privacy",
+      "All VAL data stays on this PC. Use these tools to inspect or clear local data."
+    );
     const rowPrivacyActions = el("div","valdock-row valdock-actions");
     const openDataBtn = btn("Open Data Folder", "ghost");
-    const wipeDataBtn = btn("Wipe Data", "secondary");
+    const wipeDataBtn = btn("Wipe Data", "danger");
     attachTooltip(openDataBtn, "Open the local data folder used by VAL.");
     attachTooltip(wipeDataBtn, "Wipe local logs, profiles, and session memory. This does not remove the app.");
     openDataBtn.addEventListener("click",(e)=>{
@@ -602,9 +607,18 @@ function isPreludeNudgeSuppressed(){
       try { post({ type:"privacy.command.wipe_data" }); } catch(_) {}
     }, true);
     rowPrivacyActions.append(openDataBtn, wipeDataBtn);
+    dataPrivacy.content.append(rowPrivacyActions);
 
-    // Buttons row
-    const rowBtns = el("div","valdock-row valdock-actions");
+    // Continuum
+    continuumPrivacyToggle = toggle(
+      "Continuum logging",
+      "ContinuumLogging",
+      privacySettings.continuumLoggingEnabled,
+      "Allow Continuum to write Truth.log for this session."
+    );
+    const continuumSection = buildSection("Continuum", null, continuumPrivacyToggle);
+
+    const rowBtns = el("div","valdock-grid");
 
     let refreshLocked = false;
     let refreshTimer = null;
@@ -689,7 +703,6 @@ function isPreludeNudgeSuppressed(){
                 const c = Number(msg.count);
                 if (Number.isFinite(c)) {
                   setPortalCount(c);
-                  if (portalCount) portalCount.textContent = `${Math.max(0, Math.min(10, c))}/10`;
                 }
               } catch(_) {}
             }
@@ -717,11 +730,23 @@ function isPreludeNudgeSuppressed(){
     }, true);
 
     rowBtns.append(pulseBtn, preludeBtn, chronicleBtn, openBtn);
+    const continuumHint = el("div","valdock-section-hint","Session tools for jumps and memory.");
+    continuumSection.content.append(rowBtns, continuumHint);
 
-    // Portal row
-    const rowP = el("div","valdock-row");
-    portalCount = el("div","valdock-count", `0/10`);
-    const portalSendBtn = btn("Send", "secondary");
+    // Portal
+    portalPrivacyToggle = toggle(
+      "Portal capture & hotkeys",
+      "PortalPrivacy",
+      privacySettings.portalCaptureEnabled,
+      "Allow Portal to register hotkeys and monitor the clipboard."
+    );
+    const portalSection = buildSection("Portal", "Hotkeys enabled", portalPrivacyToggle);
+    portalPrivacyNote = portalSection.subtitleEl;
+
+    const rowP = el("div","valdock-inline-row");
+    portalCount = el("div","valdock-count", "0/10");
+    portalSendBtn = btn("Send", "secondary");
+    portalSendBtn.classList.add("valdock-send");
     attachTooltip(portalSendBtn, "Paste all staged clipboard images into the composer (max 10).");
 
     portalSendBtn.addEventListener("click",(e)=>{
@@ -737,21 +762,11 @@ function isPreludeNudgeSuppressed(){
       "Arm Portal. Press 1 to open Screen Snip. Any clipboard images will stage (max 10)."
     );
 
-    rowP.append(
-      el("div","valdock-row-title","Portal:"),
-      portalToggle,
-      portalCount,
-      portalSendBtn
-    );
+    rowP.append(portalToggle, portalCount, portalSendBtn);
+    portalSection.content.append(rowP);
 
-    // Abyss row
-    const rowA = el("div","valdock-row");
-    const abyssHint = el("div","valdock-row-note","Recall/Search");
-    rowA.append(
-      el("div","valdock-row-title","Abyss:"),
-      abyssHint
-    );
-
+    // Abyss
+    const abyssSection = buildSection("Abyss", "Recall & search", null);
     const rowABtns = el("div","valdock-row valdock-actions");
     const abyssSearchBtn = btn("Search", "primary");
     const abyssLastBtn = btn("Last", "ghost");
@@ -777,41 +792,34 @@ function isPreludeNudgeSuppressed(){
     }, true);
 
     rowABtns.append(abyssSearchBtn, abyssLastBtn, abyssFolderBtn);
+    abyssSection.content.append(rowABtns);
 
-
-    // Void row
+    // Appearance
+    const appearanceSection = buildSection("Appearance", null, null);
     const rowV = el("div","valdock-row");
     rowV.append(
-      el("div","valdock-row-title","Void:"),
       toggle(
-        "Hide Code & Screenshots",
+        "Void",
         "Void",
         getVoidEnabled()
       )
     );
 
-    // Theme row
     const rowT = el("div","valdock-row");
     rowT.append(
-      el("div","valdock-row-title","Theme:"),
       toggle(
-        "VAL Theme",
+        "Theme",
         "Theme",
         getThemeEnabled()
       )
     );
+    appearanceSection.content.append(rowV, rowT);
 
-    // Tools row
-    const rowTools = el("div","valdock-row");
-    const toolsHint = el("div","valdock-row-note","Truth Health & Diagnostics");
-    rowTools.append(
-      el("div","valdock-row-title","Tools:"),
-      toolsHint
-    );
-
-    const rowToolsBtns = el("div","valdock-row valdock-actions");
+    // Tools
+    const toolsSection = buildSection("Tools", "Truth Health & Diagnostics", null);
+    const rowToolsBtns = el("div","valdock-grid");
     const truthHealthBtn = btn("Truth Health", "secondary");
-    const diagnosticsBtn = btn("Diagnostics", "ghost");
+    const diagnosticsBtn = btn("Diagnostics", "secondary");
 
     attachTooltip(truthHealthBtn, "Open the Truth Health report.");
     attachTooltip(diagnosticsBtn, "Open diagnostics for the current build.");
@@ -827,6 +835,7 @@ function isPreludeNudgeSuppressed(){
     }, true);
 
     rowToolsBtns.append(truthHealthBtn, diagnosticsBtn);
+    toolsSection.content.append(rowToolsBtns);
 
     // Status
     const status = el("div","valdock-status","");
@@ -842,46 +851,23 @@ function isPreludeNudgeSuppressed(){
     setInterval(refreshStatus, 2000);
 
     // Compose
-
-    const dividerTop = el("div","valdock-divider");
-    const divider0 = el("div","valdock-divider");
-    const divider1 = el("div","valdock-divider");
-    const divider2 = el("div","valdock-divider");
-    const divider3 = el("div","valdock-divider");
-    const divider4 = el("div","valdock-divider");
-    const divider5 = el("div","valdock-divider");
-
-    panel.append(
-      header,
-      portalBanner,
-      dividerTop,
-      rowPrivacyHeader,
-      rowPrivacyContinuum,
-      rowPrivacyPortal,
-      rowPrivacyActions,
-      divider0,
-      rowBtns,
-      divider1,
-      rowP,
-      divider2,
-      rowA,
-      rowABtns,
-      divider3,
-      rowV,
-      divider4,
-      rowT,
-      divider5,
-      rowTools,
-      rowToolsBtns,
+    body.append(
+      dataPrivacy.section,
+      continuumSection.section,
+      portalSection.section,
+      abyssSection.section,
+      appearanceSection.section,
+      toolsSection.section,
       status
     );
+
+    panel.append(header, body);
     dock.append(pill, panel);
 
     // Portal safety: always start disarmed, and reset count display.
     try {
       setPortalArmed(false, { sendHost: true });
       setPortalCount(0);
-      if (portalCount) portalCount.textContent = "0/10";
     } catch(_) {}
     try { updatePortalPrivacyState(); } catch(_) {}
     document.body.appendChild(dock);

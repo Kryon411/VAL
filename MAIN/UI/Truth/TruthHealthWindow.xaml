@@ -6,69 +6,79 @@
         Width="560"
         WindowStartupLocation="CenterOwner"
         Style="{DynamicResource VALWindowTheme}">
-    <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="Truth Health"
-                       FontSize="16"
-                       FontWeight="SemiBold" />
-            <TextBlock Text="{Binding StatusMessage}"
-                       Foreground="{StaticResource VAL.MutedForegroundBrush}"
-                       Margin="0,6,0,0" />
-        </StackPanel>
-
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="170" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+    <Border Margin="12"
+            Padding="16"
+            CornerRadius="14"
+            Background="{StaticResource VAL.WindowBackgroundBrush}"
+            BorderBrush="{StaticResource VAL.SoftBorderBrush}"
+            BorderThickness="1">
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Chat Id" FontWeight="SemiBold" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ChatId}" TextWrapping="Wrap" Margin="0,0,0,6" />
+            <StackPanel Grid.Row="0" Margin="0,0,0,6">
+                <TextBlock Text="Truth Health"
+                           FontSize="15"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding StatusMessage}"
+                           Foreground="{StaticResource VAL.MutedForegroundBrush}"
+                           Margin="0,4,0,0" />
+            </StackPanel>
 
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Truth.log" FontWeight="SemiBold" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TruthPath}" TextWrapping="Wrap" Margin="0,0,0,6" />
+            <Separator Grid.Row="1" />
 
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" FontWeight="SemiBold" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SizeText}" Margin="0,0,0,6" />
+            <Grid Grid.Row="2" Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="Physical lines" FontWeight="SemiBold" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PhysicalLineCount}" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Chat Id" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ChatId}" TextWrapping="Wrap" Margin="0,0,0,6" />
 
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="Parsed entries" FontWeight="SemiBold" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ParsedEntryCount}" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Truth.log" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding TruthPath}" TextWrapping="Wrap" Margin="0,0,0,6" />
 
-            <TextBlock Grid.Row="5" Grid.Column="0" Text="Last parsed line" FontWeight="SemiBold" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding LastParsedLine}" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SizeText}" Margin="0,0,0,6" />
 
-            <TextBlock Grid.Row="6" Grid.Column="0" Text="Last repair (UTC)" FontWeight="SemiBold" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding LastRepairUtc}" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Physical lines" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PhysicalLineCount}" Margin="0,0,0,6" />
 
-            <TextBlock Grid.Row="7" Grid.Column="0" Text="Bytes removed" FontWeight="SemiBold" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding BytesRemoved}" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Parsed entries" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ParsedEntryCount}" Margin="0,0,0,6" />
 
-            <TextBlock Grid.Row="8" Grid.Column="0" Text="Advisory" FontWeight="SemiBold" />
-            <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding AdvisoryText}" Foreground="{StaticResource VAL.AccentBrush}" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="Last parsed line" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding LastParsedLine}" Margin="0,0,0,6" />
+
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="Last repair (UTC)" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding LastRepairUtc}" Margin="0,0,0,6" />
+
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="Bytes removed" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding BytesRemoved}" Margin="0,0,0,6" />
+
+                <TextBlock Grid.Row="8" Grid.Column="0" Text="Advisory" FontWeight="SemiBold" />
+                <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding AdvisoryText}" Foreground="{StaticResource VAL.AccentBrush}" TextWrapping="Wrap" />
+            </Grid>
+
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="Refresh" Width="90" Command="{Binding RefreshCommand}" />
+            </StackPanel>
         </Grid>
-
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Content="Refresh" Width="90" Command="{Binding RefreshCommand}" />
-        </StackPanel>
-    </Grid>
+    </Border>
 </Window>
