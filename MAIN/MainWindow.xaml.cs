@@ -46,6 +46,7 @@ namespace VAL
             DataContext = _viewModel;
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
+            Closed += MainWindow_Closed;
             SourceInitialized += MainWindow_SourceInitialized;
 
             _webViewRuntime.WebMessageJsonReceived += _viewModel.HandleWebMessageJson;
@@ -84,6 +85,11 @@ namespace VAL
             {
                 ValLog.Warn("MainWindow", "Failed to attach portal window handle.");
             }
+        }
+
+        private void MainWindow_Closed(object? sender, EventArgs e)
+        {
+            _webViewRuntime.WebMessageJsonReceived -= _viewModel.HandleWebMessageJson;
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)

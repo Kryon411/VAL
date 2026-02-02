@@ -86,10 +86,10 @@ namespace VAL.Host.Services
                 WriteCrashReport(args.Exception, "Dispatcher");
             };
 
-            app.Startup += (_, __) => RunAsync(app, state);
+            app.Startup += (_, __) => _ = RunAsync(app, state);
         }
 
-        private async void RunAsync(Application app, SmokeTestState state)
+        private async Task RunAsync(Application app, SmokeTestState state)
         {
             SmokeTestResult result;
 
