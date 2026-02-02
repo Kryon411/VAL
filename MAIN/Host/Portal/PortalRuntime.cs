@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using System.Windows.Media.Imaging;
+using VAL.Contracts;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Portal
@@ -403,7 +404,7 @@ private static void RememberSig(string sig)
             {
                 _messageSender?.Send(new MessageEnvelope
                 {
-                    Type = "event",
+                    Type = WebMessageTypes.Event,
                     Name = "portal.stage.count",
                     Payload = JsonSerializer.SerializeToElement(new { count = PortalStaging.Count })
                 });
@@ -417,7 +418,7 @@ private static void RememberSig(string sig)
             {
                 _messageSender?.Send(new MessageEnvelope
                 {
-                    Type = "event",
+                    Type = WebMessageTypes.Event,
                     Name = "portal.stage.cleared",
                     Payload = JsonSerializer.SerializeToElement(new { })
                 });
@@ -431,7 +432,7 @@ private static void RememberSig(string sig)
             {
                 _messageSender?.Send(new MessageEnvelope
                 {
-                    Type = "log",
+                    Type = WebMessageTypes.Log,
                     Name = "portal.debug",
                     Payload = JsonSerializer.SerializeToElement(new { message = message ?? string.Empty })
                 });

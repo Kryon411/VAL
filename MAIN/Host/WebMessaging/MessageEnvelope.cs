@@ -1,6 +1,7 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using VAL.Contracts;
 using VAL.Host;
 
 namespace VAL.Host.WebMessaging
@@ -69,7 +70,7 @@ namespace VAL.Host.WebMessaging
                 if (!IsEnvelopeType(type))
                 {
                     name = type.Trim();
-                    type = "command";
+                    type = WebMessageTypes.Command;
                     if (!payload.HasValue)
                         payload = root.Clone();
                 }
@@ -104,9 +105,9 @@ namespace VAL.Host.WebMessaging
             if (string.IsNullOrWhiteSpace(type))
                 return false;
 
-            return type.Equals("command", StringComparison.OrdinalIgnoreCase)
-                || type.Equals("event", StringComparison.OrdinalIgnoreCase)
-                || type.Equals("log", StringComparison.OrdinalIgnoreCase);
+            return type.Equals(WebMessageTypes.Command, StringComparison.OrdinalIgnoreCase)
+                || type.Equals(WebMessageTypes.Event, StringComparison.OrdinalIgnoreCase)
+                || type.Equals(WebMessageTypes.Log, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string? ReadString(JsonElement root, string name)

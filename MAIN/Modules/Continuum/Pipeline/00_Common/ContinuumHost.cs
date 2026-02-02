@@ -2,10 +2,11 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
-using VAL.Host.WebMessaging;
 using System.Threading;
 using System.Threading.Tasks;
+using VAL.Contracts;
 using VAL.Host;
+using VAL.Host.WebMessaging;
 using VAL.Continuum.Pipeline.QuickRefresh;
 using VAL.Continuum.Pipeline.Truth;
 using VAL.Continuum.Pipeline.Inject;
@@ -223,53 +224,53 @@ namespace VAL.Continuum
             _uiCtx ??= SynchronizationContext.Current;
 
             // Capture flush acknowledgements (Pulse preflight)
-            if (type.Equals("continuum.capture.flush_ack", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumCaptureFlushAck, StringComparison.OrdinalIgnoreCase))
             {
                 HandleCaptureFlushAck(msg);
                 return;
             }
 
-            if (type.Equals("continuum.session.attached", StringComparison.OrdinalIgnoreCase) ||
-                type.Equals("continuum.session.attach", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumSessionAttached, StringComparison.OrdinalIgnoreCase) ||
+                type.Equals(WebCommandNames.ContinuumSessionAttach, StringComparison.OrdinalIgnoreCase))
             {
                 HandleSessionAttach(msg.chatId);
                 return;
             }
 
-            if (type.Equals("continuum.command.toggle_logging", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumCommandToggleLogging, StringComparison.OrdinalIgnoreCase))
             {
                 HandleToggleLogging(msg.enabled ?? true);
                 return;
             }
 
-            if (type.Equals("continuum.ui.new_chat", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumUiNewChat, StringComparison.OrdinalIgnoreCase))
             {
                 // Suppressed: Prelude guidance is shown via the dedicated new-chat Prelude prompt toast.
                 return;
             }
 
-            if (type.Equals("continuum.ui.prelude_prompt", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumUiPreludePrompt, StringComparison.OrdinalIgnoreCase))
             {
                 HandlePreludePrompt(msg);
                 return;
             }
 
-            if (type.Equals("continuum.ui.composer_interaction", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumUiComposerInteraction, StringComparison.OrdinalIgnoreCase))
             {
                 HandleChronicleComposerInteraction(msg.chatId, msg.capturedTurns ?? 0);
                 return;
             }
 
 
-            if (type.Equals("continuum.command.inject_preamble", StringComparison.OrdinalIgnoreCase) ||
-                type.Equals("continuum.command.inject_prelude", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumCommandInjectPreamble, StringComparison.OrdinalIgnoreCase) ||
+                type.Equals(WebCommandNames.ContinuumCommandInjectPrelude, StringComparison.OrdinalIgnoreCase))
             {
                 HandleInjectPrelude(msg.chatId);
                 return;
             }
 
-            if (type.Equals("continuum.truth.append", StringComparison.OrdinalIgnoreCase) ||
-                type.Equals("truth.append", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumTruthAppend, StringComparison.OrdinalIgnoreCase) ||
+                type.Equals(WebCommandNames.TruthAppend, StringComparison.OrdinalIgnoreCase))
             {
                 bool enabled;
                 bool chronicle;
@@ -296,7 +297,7 @@ namespace VAL.Continuum
                 return;
             }
 
-            if (type.Equals("continuum.truth", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumTruth, StringComparison.OrdinalIgnoreCase))
             {
                 bool enabled;
                 bool chronicle;
@@ -350,47 +351,47 @@ namespace VAL.Continuum
                 return;
             }
 
-            if (type.Equals(QuickRefreshCommands.CommandPulse, StringComparison.OrdinalIgnoreCase) ||
-                type.Equals(QuickRefreshCommands.CommandRefreshQuick, StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumCommandPulse, StringComparison.OrdinalIgnoreCase) ||
+                type.Equals(WebCommandNames.ContinuumCommandRefreshQuick, StringComparison.OrdinalIgnoreCase))
             {
                 HandlePulse(msg.chatId);
                 return;
             }
 
-            if (type.Equals("continuum.command.open_session_folder", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumCommandOpenSessionFolder, StringComparison.OrdinalIgnoreCase))
             {
                 HandleOpenSessionFolder(msg.chatId);
                 return;
             }
 
-            if (type.Equals("continuum.command.chronicle_cancel", StringComparison.OrdinalIgnoreCase) ||
-                type.Equals("continuum.command.cancel_chronicle", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumCommandChronicleCancel, StringComparison.OrdinalIgnoreCase) ||
+                type.Equals(WebCommandNames.ContinuumCommandCancelChronicle, StringComparison.OrdinalIgnoreCase))
             {
                 HandleChronicleCancel(msg.chatId);
                 return;
             }
 
-            if (type.Equals("continuum.command.chronicle_rebuild_truth", StringComparison.OrdinalIgnoreCase) ||
-                type.Equals("continuum.command.chronicle", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumCommandChronicleRebuildTruth, StringComparison.OrdinalIgnoreCase) ||
+                type.Equals(WebCommandNames.ContinuumCommandChronicle, StringComparison.OrdinalIgnoreCase))
             {
                 HandleChronicleRebuild(msg.chatId);
                 return;
             }
 
-            if (type.Equals("continuum.chronicle.progress", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumChronicleProgress, StringComparison.OrdinalIgnoreCase))
             {
                 // Toast Catalog v1: no progress toasts.
                 return;
             }
 
-            if (type.Equals("continuum.chronicle.done", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(WebCommandNames.ContinuumChronicleDone, StringComparison.OrdinalIgnoreCase))
             {
                 HandleChronicleDone(msg);
                 return;
             }
 
-            if (type.Equals("inject.success", StringComparison.OrdinalIgnoreCase) ||
-                (type.Equals("continuum.event", StringComparison.OrdinalIgnoreCase) && (msg.evt ?? "").StartsWith("refresh.inject.success", StringComparison.OrdinalIgnoreCase)))
+            if (type.Equals(WebCommandNames.InjectSuccess, StringComparison.OrdinalIgnoreCase) ||
+                (type.Equals(WebCommandNames.ContinuumEvent, StringComparison.OrdinalIgnoreCase) && (msg.evt ?? "").StartsWith("refresh.inject.success", StringComparison.OrdinalIgnoreCase)))
             {
                 EndRefresh(SessionContext.ResolveChatId(msg.chatId));
                 return;
@@ -485,8 +486,8 @@ namespace VAL.Continuum
                 {
                     post(new MessageEnvelope
                     {
-                        Type = "event",
-                        Name = "continuum.session.attached",
+                        Type = WebMessageTypes.Event,
+                        Name = WebCommandNames.ContinuumSessionAttached,
                         ChatId = cid,
                         Payload = JsonSerializer.SerializeToElement(new { chatId = cid })
                     });
@@ -941,8 +942,8 @@ namespace VAL.Continuum
 
                 post(new MessageEnvelope
                 {
-                    Type = "command",
-                    Name = "continuum.capture.flush",
+                    Type = WebMessageTypes.Command,
+                    Name = WebCommandNames.ContinuumCaptureFlush,
                     ChatId = chatId,
                     Payload = JsonSerializer.SerializeToElement(new
                     {
@@ -1302,8 +1303,8 @@ private static void MaybeShowChronicleSuggested(string chatId)
 
                 post(new MessageEnvelope
                 {
-                    Type = "command",
-                    Name = "continuum.chronicle.cancel",
+                    Type = WebMessageTypes.Command,
+                    Name = WebCommandNames.ContinuumChronicleCancel,
                     ChatId = cid,
                     Payload = JsonSerializer.SerializeToElement(new
                     {
@@ -1426,8 +1427,8 @@ private static void MaybeShowChronicleSuggested(string chatId)
 
                 post(new MessageEnvelope
                 {
-                    Type = "command",
-                    Name = "continuum.chronicle.start",
+                    Type = WebMessageTypes.Command,
+                    Name = WebCommandNames.ContinuumChronicleStart,
                     ChatId = cid,
                     Payload = JsonSerializer.SerializeToElement(new
                     {

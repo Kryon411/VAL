@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using VAL.Continuum;
-using VAL.Continuum.Pipeline.QuickRefresh;
+using VAL.Contracts;
 using VAL.Host.Logging;
 
 namespace VAL.Host.Commands
@@ -25,7 +25,7 @@ namespace VAL.Host.Commands
         {
             // ---- Void ----
             Register(new CommandSpec(
-                "void.command.set_enabled",
+                WebCommandNames.VoidCommandSetEnabled,
                 "Void",
                 new[] { "enabled" },
                 VoidCommandHandlers.HandleSetEnabled
@@ -35,36 +35,36 @@ namespace VAL.Host.Commands
             // Explicit list so the host has a single discoverable map of supported commands.
             var continuumTypes = new[]
             {
-                "continuum.capture.flush_ack",
-                "continuum.session.attach",
-                "continuum.session.attached",
-                "continuum.command.toggle_logging",
+                WebCommandNames.ContinuumCaptureFlushAck,
+                WebCommandNames.ContinuumSessionAttach,
+                WebCommandNames.ContinuumSessionAttached,
+                WebCommandNames.ContinuumCommandToggleLogging,
 
-                "continuum.ui.new_chat",
-                "continuum.ui.prelude_prompt",
-                "continuum.ui.composer_interaction",
+                WebCommandNames.ContinuumUiNewChat,
+                WebCommandNames.ContinuumUiPreludePrompt,
+                WebCommandNames.ContinuumUiComposerInteraction,
 
-                "continuum.command.inject_preamble",
-                "continuum.command.inject_prelude",
+                WebCommandNames.ContinuumCommandInjectPreamble,
+                WebCommandNames.ContinuumCommandInjectPrelude,
 
-                "continuum.truth.append",
-                "truth.append",
-                "continuum.truth",
+                WebCommandNames.ContinuumTruthAppend,
+                WebCommandNames.TruthAppend,
+                WebCommandNames.ContinuumTruth,
 
-                QuickRefreshCommands.CommandPulse,
-                QuickRefreshCommands.CommandRefreshQuick,
+                WebCommandNames.ContinuumCommandPulse,
+                WebCommandNames.ContinuumCommandRefreshQuick,
 
-                "continuum.command.open_session_folder",
+                WebCommandNames.ContinuumCommandOpenSessionFolder,
 
-                "continuum.command.chronicle_cancel",
-                "continuum.command.cancel_chronicle",
-                "continuum.command.chronicle_rebuild_truth",
-                "continuum.command.chronicle",
-                "continuum.chronicle.progress",
-                "continuum.chronicle.done",
+                WebCommandNames.ContinuumCommandChronicleCancel,
+                WebCommandNames.ContinuumCommandCancelChronicle,
+                WebCommandNames.ContinuumCommandChronicleRebuildTruth,
+                WebCommandNames.ContinuumCommandChronicle,
+                WebCommandNames.ContinuumChronicleProgress,
+                WebCommandNames.ContinuumChronicleDone,
 
-                "inject.success",
-                "continuum.event",
+                WebCommandNames.InjectSuccess,
+                WebCommandNames.ContinuumEvent,
             };
 
             foreach (var t in continuumTypes)
@@ -79,84 +79,84 @@ namespace VAL.Host.Commands
 
             // ---- Abyss ----
             Register(new CommandSpec(
-                "abyss.command.open_query_ui",
+                WebCommandNames.AbyssCommandOpenQueryUi,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleOpenQueryUi
             ));
 
             Register(new CommandSpec(
-                "abyss.command.search",
+                WebCommandNames.AbyssCommandSearch,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleSearch
             ));
 
             Register(new CommandSpec(
-                "abyss.command.retry_last",
+                WebCommandNames.AbyssCommandRetryLast,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleRetryLast
             ));
 
             Register(new CommandSpec(
-                "abyss.command.inject_result",
+                WebCommandNames.AbyssCommandInjectResult,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleInjectResult
             ));
 
             Register(new CommandSpec(
-                "abyss.command.inject_results",
+                WebCommandNames.AbyssCommandInjectResults,
                 "Abyss",
                 new[] { "indices" },
                 AbyssCommandHandlers.HandleInjectResults
             ));
 
             Register(new CommandSpec(
-                "abyss.command.last",
+                WebCommandNames.AbyssCommandLast,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleLast
             ));
 
             Register(new CommandSpec(
-                "abyss.command.open_source",
+                WebCommandNames.AbyssCommandOpenSource,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleOpenSource
             ));
 
             Register(new CommandSpec(
-                "abyss.command.clear_results",
+                WebCommandNames.AbyssCommandClearResults,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleClearResults
             ));
 
             Register(new CommandSpec(
-                "abyss.command.disregard",
+                WebCommandNames.AbyssCommandDisregard,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleDisregard
             ));
 
             Register(new CommandSpec(
-                "abyss.command.get_results",
+                WebCommandNames.AbyssCommandGetResults,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleGetResults
             ));
 
             Register(new CommandSpec(
-                "abyss.command.inject_prompt",
+                WebCommandNames.AbyssCommandInjectPrompt,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleInjectPrompt
             ));
 
             Register(new CommandSpec(
-                "abyss.command.inject",
+                WebCommandNames.AbyssCommandInject,
                 "Abyss",
                 Array.Empty<string>(),
                 AbyssCommandHandlers.HandleInject
@@ -164,7 +164,7 @@ namespace VAL.Host.Commands
 
             // ---- Portal ----
             Register(new CommandSpec(
-                "portal.command.set_enabled",
+                WebCommandNames.PortalCommandSetEnabled,
                 "Portal",
                 new[] { "enabled" },
                 PortalCommandHandlers.HandleSetEnabled
@@ -172,35 +172,35 @@ namespace VAL.Host.Commands
 
             // Accept both command names (old/new) and map to same handler.
             Register(new CommandSpec(
-                "portal.command.open_snip",
+                WebCommandNames.PortalCommandOpenSnip,
                 "Portal",
                 Array.Empty<string>(),
                 PortalCommandHandlers.HandleOpenSnip
             ));
 
             Register(new CommandSpec(
-                "portal.command.open_snip_overlay",
+                WebCommandNames.PortalCommandOpenSnipOverlay,
                 "Portal",
                 Array.Empty<string>(),
                 PortalCommandHandlers.HandleOpenSnip
             ));
 
             Register(new CommandSpec(
-                "portal.command.send_staged",
+                WebCommandNames.PortalCommandSendStaged,
                 "Portal",
                 Array.Empty<string>(),
                 PortalCommandHandlers.HandleSendStaged
             ));
 
             Register(new CommandSpec(
-                "portal.command.send",
+                WebCommandNames.PortalCommandSend,
                 "Portal",
                 Array.Empty<string>(),
                 PortalCommandHandlers.HandleSendStaged
             ));
 
             Register(new CommandSpec(
-                "portal.command.sendStaged",
+                WebCommandNames.PortalCommandSendStagedLegacy,
                 "Portal",
                 Array.Empty<string>(),
                 PortalCommandHandlers.HandleSendStaged
@@ -208,28 +208,28 @@ namespace VAL.Host.Commands
 
             // ---- Privacy ----
             Register(new CommandSpec(
-                "privacy.command.set_continuum_logging",
+                WebCommandNames.PrivacyCommandSetContinuumLogging,
                 "Privacy",
                 new[] { "enabled" },
                 PrivacyCommandHandlers.HandleSetContinuumLogging
             ));
 
             Register(new CommandSpec(
-                "privacy.command.set_portal_capture",
+                WebCommandNames.PrivacyCommandSetPortalCapture,
                 "Privacy",
                 new[] { "enabled" },
                 PrivacyCommandHandlers.HandleSetPortalCapture
             ));
 
             Register(new CommandSpec(
-                "privacy.command.open_data_folder",
+                WebCommandNames.PrivacyCommandOpenDataFolder,
                 "Privacy",
                 Array.Empty<string>(),
                 PrivacyCommandHandlers.HandleOpenDataFolder
             ));
 
             Register(new CommandSpec(
-                "privacy.command.wipe_data",
+                WebCommandNames.PrivacyCommandWipeData,
                 "Privacy",
                 Array.Empty<string>(),
                 PrivacyCommandHandlers.HandleWipeData
@@ -237,14 +237,14 @@ namespace VAL.Host.Commands
 
             // ---- Tools ----
             Register(new CommandSpec(
-                "tools.open_truth_health",
+                WebCommandNames.ToolsOpenTruthHealth,
                 "Tools",
                 Array.Empty<string>(),
                 ToolsCommandHandlers.HandleOpenTruthHealth
             ));
 
             Register(new CommandSpec(
-                "tools.open_diagnostics",
+                WebCommandNames.ToolsOpenDiagnostics,
                 "Tools",
                 Array.Empty<string>(),
                 ToolsCommandHandlers.HandleOpenDiagnostics

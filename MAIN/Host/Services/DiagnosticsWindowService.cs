@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using VAL;
+using VAL.Contracts;
 using VAL.Host.Commands;
 
 namespace VAL.Host.Services
@@ -38,7 +39,7 @@ namespace VAL.Host.Services
             catch (Exception ex)
             {
                 // Diagnostics must never crash the app.
-                ToolsCommandHandlers.ReportDiagnosticsFailure("tools.open_diagnostics", ex, "exception");
+                ToolsCommandHandlers.ReportDiagnosticsFailure(WebCommandNames.ToolsOpenDiagnostics, ex, "exception");
             }
         }
     }

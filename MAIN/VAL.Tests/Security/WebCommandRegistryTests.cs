@@ -1,3 +1,4 @@
+using VAL.Contracts;
 using VAL.Host.Security;
 using Xunit;
 
@@ -8,7 +9,7 @@ namespace VAL.Tests.Security
         [Fact]
         public void IsAllowed_ReturnsTrueForKnownType()
         {
-            var result = WebCommandRegistry.IsAllowed("command");
+            var result = WebCommandRegistry.IsAllowed(WebMessageTypes.Command);
 
             Assert.True(result);
         }

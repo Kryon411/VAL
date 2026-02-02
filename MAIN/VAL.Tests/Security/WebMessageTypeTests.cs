@@ -1,3 +1,4 @@
+using VAL.Contracts;
 using VAL.Host.Security;
 using Xunit;
 
@@ -8,18 +9,18 @@ namespace VAL.Tests.Security
         [Fact]
         public void TryGetType_ReturnsTypeWhenPresent()
         {
-            var json = "{\"type\":\"command\",\"name\":\"void.command.set_enabled\"}";
+            var json = $"{{\"type\":\"{WebMessageTypes.Command}\",\"name\":\"{WebCommandNames.VoidCommandSetEnabled}\"}}";
 
             var result = WebMessageType.TryGetType(json, out var type);
 
             Assert.True(result);
-            Assert.Equal("command", type);
+            Assert.Equal(WebMessageTypes.Command, type);
         }
 
         [Fact]
         public void TryGetType_ReturnsFalseWhenMissingType()
         {
-            var json = "{\"name\":\"void.command.set_enabled\"}";
+            var json = $"{{\"name\":\"{WebCommandNames.VoidCommandSetEnabled}\"}}";
 
             var result = WebMessageType.TryGetType(json, out var type);
 
