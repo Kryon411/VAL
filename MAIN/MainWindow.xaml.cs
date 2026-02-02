@@ -115,7 +115,7 @@ namespace VAL
             }
             catch (Exception ex)
             {
-                ValLog.Warn("MainWindow", $"WebView2 initialization failed: {ex.Message}");
+                ValLog.Warn("MainWindow", $"WebView2 initialization failed: {ex}");
                 MessageBox.Show(
                     "VAL could not initialize the embedded browser. Please restart the app.",
                     "VAL",

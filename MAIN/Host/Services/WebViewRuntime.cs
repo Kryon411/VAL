@@ -71,7 +71,15 @@ namespace VAL.Host.Services
                 _initLock.Release();
             }
 
-            await _initTask;
+            try
+            {
+                await _initTask;
+            }
+            catch (Exception ex)
+            {
+                ValLog.Error(nameof(WebViewRuntime), $"WebView2 initialization failed: {ex}");
+                throw;
+            }
         }
 
         public void PostJson(string json)
@@ -125,80 +133,84 @@ namespace VAL.Host.Services
             Directory.CreateDirectory(userData);
 
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userData);
-            await control.EnsureCoreWebView2Async(env);
-
-            Core = control.CoreWebView2;
-            if (Core == null)
+            await RunOnUiAsync(async () =>
             {
-                ValLog.Warn(nameof(WebViewRuntime), "WebView2 core initialization failed.");
-                return;
-            }
+                await control.EnsureCoreWebView2Async(env);
 
-            Core.Settings.AreDevToolsEnabled = _webViewOptions.EffectiveAllowDevTools;
-            Core.Settings.IsStatusBarEnabled = false;
-            Core.Settings.IsWebMessageEnabled = true;
-
-            await InitializeSessionNonceScriptAsync();
-
-            if (!string.IsNullOrWhiteSpace(_webViewOptions.UserAgentOverride))
-            {
-                try
+                Core = control.CoreWebView2;
+                if (Core == null)
                 {
-                    Core.Settings.UserAgent = _webViewOptions.UserAgentOverride;
+                    var message = "WebView2 core initialization failed. Runtime missing or initialization did not complete.";
+                    ValLog.Error(nameof(WebViewRuntime), message);
+                    throw new InvalidOperationException(message);
                 }
-                catch
+
+                Core.Settings.AreDevToolsEnabled = _webViewOptions.EffectiveAllowDevTools;
+                Core.Settings.IsStatusBarEnabled = false;
+                Core.Settings.IsWebMessageEnabled = true;
+
+                await InitializeSessionNonceScriptAsync();
+
+                if (!string.IsNullOrWhiteSpace(_webViewOptions.UserAgentOverride))
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "Failed to apply user agent override.");
+                    try
+                    {
+                        Core.Settings.UserAgent = _webViewOptions.UserAgentOverride;
+                    }
+                    catch
+                    {
+                        ValLog.Warn(nameof(WebViewRuntime), "Failed to apply user agent override.");
+                    }
                 }
-            }
 
-            if (!_eventsWired)
-            {
-                _navigationCompletedHandler ??= (_, __) => NavigationCompleted?.Invoke();
-                _navigationStartingHandler ??= (_, e) => HandleNavigationStarting(e);
-                _sourceChangedHandler ??= (_, __) => UpdateBridgeState(Core?.Source);
-                _webMessageReceivedHandler ??= (_, e) =>
+                if (!_eventsWired)
                 {
-                    if (!_bridgeArmed)
+                    _navigationCompletedHandler ??= (_, __) => NavigationCompleted?.Invoke();
+                    _navigationStartingHandler ??= (_, e) => HandleNavigationStarting(e);
+                    _sourceChangedHandler ??= (_, __) => UpdateBridgeState(Core?.Source);
+                    _webMessageReceivedHandler ??= (_, e) =>
                     {
-                        LogBridgeIgnoredMessage();
-                        return;
-                    }
+                        if (!_bridgeArmed)
+                        {
+                            LogBridgeIgnoredMessage();
+                            return;
+                        }
 
-                    var source = e.Source;
-                    var json = e.WebMessageAsJson;
-                    if (string.IsNullOrWhiteSpace(json))
-                        return;
+                        var source = e.Source;
+                        var json = e.WebMessageAsJson;
+                        if (string.IsNullOrWhiteSpace(json))
+                            return;
 
-                    if (!MessageEnvelope.TryParse(json, out var envelope))
-                    {
-                        LogRejectedWebMessage(source, "invalid_payload");
-                        return;
-                    }
+                        if (!MessageEnvelope.TryParse(json, out var envelope))
+                        {
+                            LogRejectedWebMessage(source, "invalid_payload");
+                            return;
+                        }
 
-                    if (!WebMessageOriginGuard.TryIsAllowed(source, envelope.Nonce, _sessionNonce.Value, out var sourceUri, out var reason))
-                    {
-                        LogRejectedWebMessage(source, reason ?? "nonce_or_origin_rejected");
-                        return;
-                    }
+                        if (!WebMessageOriginGuard.TryIsAllowed(source, envelope.Nonce, _sessionNonce.Value, out var sourceUri, out var reason))
+                        {
+                            LogRejectedWebMessage(source, reason ?? "nonce_or_origin_rejected");
+                            return;
+                        }
 
-                    WebMessageJsonReceived?.Invoke(new WebMessageEnvelope(json, sourceUri!));
-                };
-                _newWindowRequestedHandler ??= (_, e) => HandleNewWindowRequested(e);
+                        WebMessageJsonReceived?.Invoke(new WebMessageEnvelope(json, sourceUri!));
+                    };
+                    _newWindowRequestedHandler ??= (_, e) => HandleNewWindowRequested(e);
 
-                Core.NavigationCompleted -= _navigationCompletedHandler;
-                Core.NavigationStarting -= _navigationStartingHandler;
-                Core.SourceChanged -= _sourceChangedHandler;
-                Core.WebMessageReceived -= _webMessageReceivedHandler;
-                Core.NewWindowRequested -= _newWindowRequestedHandler;
+                    Core.NavigationCompleted -= _navigationCompletedHandler;
+                    Core.NavigationStarting -= _navigationStartingHandler;
+                    Core.SourceChanged -= _sourceChangedHandler;
+                    Core.WebMessageReceived -= _webMessageReceivedHandler;
+                    Core.NewWindowRequested -= _newWindowRequestedHandler;
 
-                Core.NavigationCompleted += _navigationCompletedHandler;
-                Core.NavigationStarting += _navigationStartingHandler;
-                Core.SourceChanged += _sourceChangedHandler;
-                Core.WebMessageReceived += _webMessageReceivedHandler;
-                Core.NewWindowRequested += _newWindowRequestedHandler;
-                _eventsWired = true;
-            }
+                    Core.NavigationCompleted += _navigationCompletedHandler;
+                    Core.NavigationStarting += _navigationStartingHandler;
+                    Core.SourceChanged += _sourceChangedHandler;
+                    Core.WebMessageReceived += _webMessageReceivedHandler;
+                    Core.NewWindowRequested += _newWindowRequestedHandler;
+                    _eventsWired = true;
+                }
+            });
         }
 
         private void HandleNewWindowRequested(CoreWebView2NewWindowRequestedEventArgs e)
