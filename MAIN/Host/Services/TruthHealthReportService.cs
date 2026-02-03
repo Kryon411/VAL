@@ -96,7 +96,7 @@ namespace VAL.Host.Services
             }
         }
 
-        private System.Collections.Generic.List<TruthHealthSnapshot> BuildReports(string? productRoot)
+        private static System.Collections.Generic.List<TruthHealthSnapshot> BuildReports(string? productRoot)
         {
             var reports = new System.Collections.Generic.List<TruthHealthSnapshot>();
             if (string.IsNullOrWhiteSpace(productRoot))

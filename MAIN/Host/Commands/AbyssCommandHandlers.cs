@@ -10,6 +10,7 @@ namespace VAL.Host.Commands
     {
         private static readonly RateLimiter RateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
+        private static readonly char[] IndexSeparators = { ',', ';', ' ' };
 
         public static void HandleSearch(HostCommand cmd)
         {
@@ -289,7 +290,7 @@ namespace VAL.Host.Commands
             if (string.IsNullOrWhiteSpace(raw))
                 yield break;
 
-            var parts = raw.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var parts = raw.Split(IndexSeparators, StringSplitOptions.RemoveEmptyEntries);
             foreach (var part in parts)
             {
                 var value = part.Trim();
@@ -325,7 +326,7 @@ namespace VAL.Host.Commands
             if (string.IsNullOrWhiteSpace(raw))
                 yield break;
 
-            var parts = raw.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var parts = raw.Split(IndexSeparators, StringSplitOptions.RemoveEmptyEntries);
             foreach (var part in parts)
             {
                 if (int.TryParse(part.Trim(), out var parsed) && parsed > 0)

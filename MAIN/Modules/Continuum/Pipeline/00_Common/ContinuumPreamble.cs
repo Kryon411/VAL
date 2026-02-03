@@ -207,14 +207,14 @@ namespace VAL.Continuum.Pipeline
             if (string.IsNullOrWhiteSpace(s)) return false;
 
             // Essence / seeded text is almost always multi-line.
-            if (s.IndexOf('\n') >= 0) return true;
+            if (s.Contains('\n')) return true;
 
             // If it's long and contains whitespace, it's almost certainly not a chat/session id.
             if (s.Length >= 120 && ContainsAnyWhitespace(s)) return true;
 
             // Common transcript markers (IndexOf used for broad framework compatibility).
-            if (s.IndexOf("ASSISTANT:", StringComparison.OrdinalIgnoreCase) >= 0) return true;
-            if (s.IndexOf("USER:", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (s.Contains("ASSISTANT:", StringComparison.OrdinalIgnoreCase)) return true;
+            if (s.Contains("USER:", StringComparison.OrdinalIgnoreCase)) return true;
 
             return false;
         }
@@ -229,7 +229,7 @@ namespace VAL.Continuum.Pipeline
                 return true;
 
             // GUID-ish heuristic (not strict regex, but safe enough for disambiguation).
-            if (s.Length >= 16 && s.Length <= 64 && s.IndexOf('-') >= 0)
+            if (s.Length >= 16 && s.Length <= 64 && s.Contains('-'))
                 return true;
 
             return false;

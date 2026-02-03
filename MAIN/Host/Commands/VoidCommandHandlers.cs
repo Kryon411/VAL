@@ -6,7 +6,7 @@ namespace VAL.Host.Commands
 {
     internal static class VoidCommandHandlers
     {
-        private static bool? _lastEnabledState = null;
+        private static bool? _lastEnabledState;
 
         public static void HandleSetEnabled(HostCommand cmd)
         {

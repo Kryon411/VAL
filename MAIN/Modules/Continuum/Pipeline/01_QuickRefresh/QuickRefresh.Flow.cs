@@ -84,7 +84,7 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
             };
 
             token.ThrowIfCancellationRequested();
-            EssenceInjectQueue.Enqueue(injectSeed);
+            EssenceInjectInbox.Enqueue(injectSeed);
         }
 
         /// <summary>

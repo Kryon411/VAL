@@ -388,11 +388,11 @@ namespace VAL.Continuum.Pipeline.Filter1
 
             var sb = new StringBuilder(headText.Length + tailText.Length + 16);
             sb.Append(headText.TrimEnd());
-            if (!headText.TrimEnd().EndsWith("..."))
+            if (!headText.TrimEnd().EndsWith("...", StringComparison.Ordinal))
                 sb.Append("...");
             sb.AppendLine();
             sb.AppendLine();
-            if (!tailText.TrimStart().StartsWith("..."))
+            if (!tailText.TrimStart().StartsWith("...", StringComparison.Ordinal))
                 sb.Append("...");
             sb.Append(tailText.TrimStart());
 

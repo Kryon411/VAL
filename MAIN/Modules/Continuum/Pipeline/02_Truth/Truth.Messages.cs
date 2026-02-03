@@ -21,7 +21,7 @@ namespace VAL.Continuum.Pipeline.Truth
         public int LineIndex { get; init; } = -1;
 
         // Optional: derived timestamp if your Truth.log embeds one.
-        public DateTimeOffset? Timestamp { get; init; } = null;
+        public DateTimeOffset? Timestamp { get; init; }
 
         // Optional: marker tags found in assistant text (goal/checkpoint/milestone/*).
         public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();

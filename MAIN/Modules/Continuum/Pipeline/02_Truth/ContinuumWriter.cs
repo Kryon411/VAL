@@ -19,9 +19,9 @@ namespace VAL.Continuum.Pipeline.Truth
             return TruthStorage.EnsureChatDir(chatId);
         }
 
-        public bool TryBeginTruthRebuild(string chatId, CancellationToken token, bool backupExisting, out string backupPath, out string tempTruthPath)
+        public bool TryBeginTruthRebuild(string chatId, bool backupExisting, out string backupPath, out string tempTruthPath, CancellationToken token)
         {
-            return TruthStorage.TryBeginTruthRebuild(chatId, token, backupExisting, out backupPath, out tempTruthPath);
+            return TruthStorage.TryBeginTruthRebuild(chatId, backupExisting, out backupPath, out tempTruthPath, token);
         }
 
         public void AbortTruthRebuild(string chatId)

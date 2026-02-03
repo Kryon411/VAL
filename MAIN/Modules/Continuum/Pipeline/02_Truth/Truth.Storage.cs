@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -45,7 +46,7 @@ namespace VAL.Continuum.Pipeline.Truth
         private static readonly ConcurrentDictionary<string, RebuildSession> _rebuildByChat =
             new ConcurrentDictionary<string, RebuildSession>(StringComparer.Ordinal);
 
-        public static bool TryBeginTruthRebuild(string chatId, CancellationToken token, bool backupExisting, out string backupPath, out string tempTruthPath)
+        public static bool TryBeginTruthRebuild(string chatId, bool backupExisting, out string backupPath, out string tempTruthPath, CancellationToken token)
         {
             backupPath = string.Empty;
             tempTruthPath = string.Empty;
@@ -65,7 +66,7 @@ namespace VAL.Continuum.Pipeline.Truth
 
                 if (backupExisting && File.Exists(finalPath))
                 {
-                    var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+                    var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
                     var dest = Path.Combine(dir, $"Truth.pre_chronicle.{stamp}.log");
                     try
                     {
@@ -277,7 +278,7 @@ namespace VAL.Continuum.Pipeline.Truth
                     if (backupExisting)
                     {
                         var dir = Path.GetDirectoryName(path) ?? EnsureChatDir(chatId);
-                        var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+                        var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
                         var dest = Path.Combine(dir, $"Truth.pre_chronicle.{stamp}.log");
 
                         try { if (File.Exists(dest)) File.Delete(dest); } catch { }
@@ -490,7 +491,7 @@ namespace VAL.Continuum.Pipeline.Truth
                 t = t.Substring("ChatGPT said".Length);
                 // Handle the rare "ChatGPT said :" capture.
                 t = t.TrimStart();
-                if (t.StartsWith(":", StringComparison.Ordinal))
+                if (t.StartsWith(':'))
                     t = t.Substring(1);
             }
 
@@ -505,9 +506,8 @@ namespace VAL.Continuum.Pipeline.Truth
         private static string Fingerprint(char roleChar, string normalizedText)
         {
             // Stable across processes/runs.
-            using var sha = SHA256.Create();
             var bytes = Encoding.UTF8.GetBytes(roleChar + "|" + normalizedText);
-            var hash = sha.ComputeHash(bytes);
+            var hash = SHA256.HashData(bytes);
             return Convert.ToHexString(hash);
         }
 
@@ -532,7 +532,7 @@ namespace VAL.Continuum.Pipeline.Truth
                         if (!string.IsNullOrWhiteSpace(dir))
                         {
                             var logPath = Path.Combine(dir, "Truth.repair.log");
-                            var line = $"{DateTime.UtcNow:O} truncated tail repair removed {removed} bytes{Environment.NewLine}";
+                            var line = FormattableString.Invariant($"{DateTime.UtcNow:O} truncated tail repair removed {removed} bytes{Environment.NewLine}");
                             AtomicFile.TryAppendAllText(logPath, line, durable: false);
                         }
                     }

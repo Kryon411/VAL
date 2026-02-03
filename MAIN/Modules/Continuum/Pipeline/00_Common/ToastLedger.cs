@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using VAL.Continuum.Pipeline.Truth;
+using VAL.Host.Json;
 
 namespace VAL.Continuum.Pipeline
 {
@@ -96,7 +97,7 @@ namespace VAL.Continuum.Pipeline
             try
             {
                 var path = GetLedgerPath(chatId);
-                var json = JsonSerializer.Serialize(model, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonSerializer.Serialize(model, ValJsonOptions.Default);
                 AtomicFile.WriteAllTextAtomic(path, json);
             }
             catch

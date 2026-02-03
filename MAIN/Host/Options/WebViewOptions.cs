@@ -17,7 +17,7 @@ namespace VAL.Host.Options
 #if DEBUG
                 return AllowDevTools;
 #else
-                return false;
+                return AllowDevTools && false;
 #endif
             }
         }

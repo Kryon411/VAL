@@ -8,7 +8,7 @@ namespace VAL.Continuum.Pipeline.Inject
     /// Producer: QuickRefreshFlow
     /// Consumer: ContinuumPump (posts to WebView via continuum.inject_text)
     /// </summary>
-    public static class EssenceInjectQueue
+    public static class EssenceInjectInbox
     {
         private static readonly Channel<EssenceInjectController.InjectSeed> Channel =
             System.Threading.Channels.Channel.CreateUnbounded<EssenceInjectController.InjectSeed>(

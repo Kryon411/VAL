@@ -2,7 +2,7 @@ using System.Threading.Channels;
 
 namespace VAL.Continuum.Pipeline.Inject
 {
-    public interface IContinuumInjectQueue
+    public interface IContinuumInjectInbox
     {
         void Enqueue(EssenceInjectController.InjectSeed seed);
         EssenceInjectController.InjectSeed? Dequeue();

@@ -1,8 +1,10 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using VAL.Continuum.Pipeline.Common;
+using VAL.Host.Json;
 using VAL.Host.Logging;
 
 namespace VAL.Host.Startup
@@ -43,7 +45,7 @@ namespace VAL.Host.Startup
             }
 
             state.ConsecutiveStartupCrashes = Math.Max(0, state.ConsecutiveStartupCrashes) + 1;
-            state.LastStartUtc = DateTime.UtcNow.ToString("O");
+            state.LastStartUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
             WriteState(state);
 
             return shouldEnterSafeMode;
@@ -57,7 +59,7 @@ namespace VAL.Host.Startup
                     ?? new StartupCrashState();
 
                 state.ConsecutiveStartupCrashes = 0;
-                state.LastSuccessUtc = DateTime.UtcNow.ToString("O");
+                state.LastSuccessUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
                 WriteState(state);
             }
             catch
@@ -110,7 +112,7 @@ namespace VAL.Host.Startup
                     Directory.CreateDirectory(directory);
                 }
 
-                var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonSerializer.Serialize(state, ValJsonOptions.Default);
                 File.WriteAllText(path, json);
             }
             catch (Exception ex)

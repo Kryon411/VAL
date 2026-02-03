@@ -83,7 +83,7 @@ namespace VAL
                         services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
                         services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
                         services.AddSingleton<VAL.Continuum.Pipeline.Truth.IContinuumWriter, VAL.Continuum.Pipeline.Truth.ContinuumWriter>();
-                        services.AddSingleton<VAL.Continuum.Pipeline.Inject.IContinuumInjectQueue, VAL.Continuum.Pipeline.Inject.ContinuumInjectQueue>();
+                        services.AddSingleton<VAL.Continuum.Pipeline.Inject.IContinuumInjectInbox, VAL.Continuum.Pipeline.Inject.ContinuumInjectInbox>();
                         services.AddSingleton<IContinuumPump, ContinuumPump>();
                         services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
                         services.AddSingleton<IWebViewRuntime, WebViewRuntime>();

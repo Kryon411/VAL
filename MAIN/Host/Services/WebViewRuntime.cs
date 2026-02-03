@@ -14,7 +14,7 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Services
 {
-    public sealed class WebViewRuntime : IWebViewRuntime
+    public sealed class WebViewRuntime : IWebViewRuntime, IDisposable
     {
         private readonly IAppPaths _appPaths;
         private readonly WebViewOptions _webViewOptions;
@@ -51,7 +51,7 @@ namespace VAL.Host.Services
 
         public async Task InitializeAsync(WebView2 control)
         {
-            if (control == null) throw new ArgumentNullException(nameof(control));
+            ArgumentNullException.ThrowIfNull(control);
 
             _dispatcher ??= control.Dispatcher;
 
@@ -253,7 +253,7 @@ namespace VAL.Host.Services
             }
         }
 
-        private void HandleNavigationStarting(CoreWebView2NavigationStartingEventArgs e)
+        private static void HandleNavigationStarting(CoreWebView2NavigationStartingEventArgs e)
         {
             var uri = e.Uri;
             if (!WebOriginPolicy.TryIsNavigationAllowed(uri, out _))
@@ -376,6 +376,11 @@ namespace VAL.Host.Services
             }
 
             _dispatcher.Invoke(action);
+        }
+
+        public void Dispose()
+        {
+            _initLock.Dispose();
         }
     }
 }

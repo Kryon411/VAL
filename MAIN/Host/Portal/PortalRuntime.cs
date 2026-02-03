@@ -28,10 +28,10 @@ namespace VAL.Host.Portal
         private static IWebMessageSender? _messageSender;   // host -> webview
         private static Action? _focusWebView;       // ensure webview focused before paste
 
-        private static uint _lastClipSeq = 0;
+        private static uint _lastClipSeq;
 
         // Debounce & dedupe
-        private static long _lastStageTicks = 0;
+        private static long _lastStageTicks;
         private static string _lastSig = "";
 
 
@@ -59,8 +59,8 @@ private static void RememberSig(string sig)
         }
     }
 }
-        private static volatile bool _suppressStage = false;
-        private static volatile bool _sending = false;
+        private static volatile bool _suppressStage;
+        private static volatile bool _sending;
 
         // --- Input constants ---
         private const uint MOD_NOREPEAT = 0x4000;

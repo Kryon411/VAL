@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -17,6 +18,8 @@ namespace VAL.Host.Abyss
     internal static class AbyssRuntime
     {
         private static readonly object Gate = new();
+        private static readonly int[] DefaultInjectIndices = { 1 };
+        private static readonly string[] SnippetLineSeparators = { "\r\n", "\n" };
         private static IWebMessageSender? _messageSender;
         private static List<AbyssSearchResult> _lastResults = new();
         private static string? _lastQuery;
@@ -162,7 +165,7 @@ namespace VAL.Host.Abyss
 
                 if (inject)
                 {
-                    InjectResults(new[] { 1 }, chatId);
+                    InjectResults(DefaultInjectIndices, chatId);
                 }
             });
         }
@@ -175,7 +178,7 @@ namespace VAL.Host.Abyss
                 return;
             }
 
-            var first = indices.FirstOrDefault();
+            var first = indices[0];
             if (first <= 0)
             {
                 ToastHub.TryShow(ToastKey.AbyssNoSelection, chatId: chatId);
@@ -383,7 +386,7 @@ namespace VAL.Host.Abyss
             if (string.IsNullOrWhiteSpace(snippet))
                 return string.Empty;
 
-            var lines = snippet.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var lines = snippet.Split(SnippetLineSeparators, StringSplitOptions.None);
             return string.Join("\n", lines.Take(3)).Trim();
         }
 
@@ -425,7 +428,7 @@ namespace VAL.Host.Abyss
             {
                 _lastQuery = queryUsed;
                 _lastQueryOriginal = queryOriginal ?? queryUsed;
-                _lastGeneratedUtc = DateTime.UtcNow.ToString("O");
+                _lastGeneratedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
             }
         }
 
