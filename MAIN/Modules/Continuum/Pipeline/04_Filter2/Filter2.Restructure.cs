@@ -18,6 +18,16 @@ namespace VAL.Continuum.Pipeline.Filter2
     /// </summary>
     public static class Filter2Restructure
     {
+        private static readonly string[] HowToProceedLines =
+        {
+            "Proceed from \"WHERE WE LEFT OFF\".",
+            "First assistant reply after injection: if WWLO is already answered, acknowledge readiness in one short line and wait.",
+            "If WWLO contains a direct instruction, answer it.",
+            "Do not restate, quote, or announce WWLO; answer it directly.",
+            "Otherwise acknowledge continuity and wait."
+        };
+        private static readonly string[] ParagraphSeparators = { "\n\n" };
+
         public static string BuildRestructuredSeed(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
             if (exchanges == null || exchanges.Count == 0)
@@ -36,14 +46,7 @@ namespace VAL.Continuum.Pipeline.Filter2
                 : string.Empty;
             AppendSection(sb, "WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", wwloBody);
 
-            var howToProceedBody = string.Join("\n", new[]
-            {
-                "Proceed from \"WHERE WE LEFT OFF\".",
-                "First assistant reply after injection: if WWLO is already answered, acknowledge readiness in one short line and wait.",
-                "If WWLO contains a direct instruction, answer it.",
-                "Do not restate, quote, or announce WWLO; answer it directly.",
-                "Otherwise acknowledge continuity and wait."
-            });
+            var howToProceedBody = string.Join("\n", HowToProceedLines);
             AppendSection(sb, "HOW TO PROCEED", howToProceedBody);
 
             var activeThreadBody = new StringBuilder();
@@ -150,9 +153,9 @@ namespace VAL.Continuum.Pipeline.Filter2
                 var t = lines[i].TrimStart();
                 if (HasAnchorTag(lines[i])) continue;
 
-                if (t.StartsWith("-", StringComparison.Ordinal) ||
-                    t.StartsWith("*", StringComparison.Ordinal) ||
-                    t.StartsWith("•", StringComparison.Ordinal) ||
+                if (t.StartsWith('-') ||
+                    t.StartsWith('*') ||
+                    t.StartsWith('•') ||
                     Regex.IsMatch(t, @"^\d+[\.\)]\s+"))
                 {
                     listy++;
@@ -196,9 +199,9 @@ namespace VAL.Continuum.Pipeline.Filter2
                     continue;
                 }
 
-                bool isListy = t.StartsWith("-", StringComparison.Ordinal) ||
-                               t.StartsWith("*", StringComparison.Ordinal) ||
-                               t.StartsWith("•", StringComparison.Ordinal) ||
+                bool isListy = t.StartsWith('-') ||
+                               t.StartsWith('*') ||
+                               t.StartsWith('•') ||
                                Regex.IsMatch(t, @"^\d+[\.\)]\s+");
 
                 if (isListy) continue;
@@ -241,10 +244,10 @@ namespace VAL.Continuum.Pipeline.Filter2
             if (result.Length < 40 && text.Length > 80)
             {
                 // Keep first 2 paragraphs and last paragraph.
-                var paras = text.Split(new[] { "\n\n" }, StringSplitOptions.None)
-                                .Select(p => p.Trim())
-                                .Where(p => p.Length > 0)
-                                .ToList();
+                var paras = text.Split(ParagraphSeparators, StringSplitOptions.None)
+                    .Select(p => p.Trim())
+                    .Where(p => p.Length > 0)
+                    .ToList();
                 if (paras.Count <= 3) return text.Trim();
 
                 var take = new List<string>();
@@ -264,14 +267,14 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine(FormatSourceLine(ex));
             var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : string.Empty;
             var user = !string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]";
-            sb.AppendLine($"USER: {user}");
+            sb.AppendLine(FormattableString.Invariant($"USER: {user}"));
             AppendAssistantBlock(sb, assistant, sanitizeAssistant);
 
             return sb.ToString().TrimEnd();
         }
 
         private static string FormatSourceLine(Filter1BuildSeed.SeedExchange ex)
-            => $"Source: Truth {FormatTruthRange(ex.UserLineIndex, ex.AssistantLineIndex)}";
+            => FormattableString.Invariant($"Source: Truth {FormatTruthRange(ex.UserLineIndex, ex.AssistantLineIndex)}");
 
         private static void AppendSection(StringBuilder sb, string title, string bodyText)
         {

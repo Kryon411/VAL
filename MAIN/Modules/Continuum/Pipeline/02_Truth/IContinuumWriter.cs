@@ -7,7 +7,7 @@ namespace VAL.Continuum.Pipeline.Truth
         void AppendTruthLine(string chatId, char role, string text);
         string GetTruthPath(string chatId);
         string EnsureChatDir(string chatId);
-        bool TryBeginTruthRebuild(string chatId, CancellationToken token, bool backupExisting, out string backupPath, out string tempTruthPath);
+        bool TryBeginTruthRebuild(string chatId, bool backupExisting, out string backupPath, out string tempTruthPath, CancellationToken token);
         void AbortTruthRebuild(string chatId);
         bool TryCommitTruthRebuild(string chatId);
     }

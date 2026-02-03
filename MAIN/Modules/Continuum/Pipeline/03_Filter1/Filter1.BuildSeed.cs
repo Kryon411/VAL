@@ -40,7 +40,7 @@ namespace VAL.Continuum.Pipeline.Filter1
 
         public static SeedResult BuildSeed(TruthView truth)
         {
-            if (truth == null) throw new ArgumentNullException(nameof(truth));
+            ArgumentNullException.ThrowIfNull(truth);
 
             var all = truth.Messages ?? Array.Empty<TruthMessage>();
             if (all.Count == 0)
@@ -124,9 +124,8 @@ namespace VAL.Continuum.Pipeline.Filter1
 
                 try
                 {
-                    using var sha = SHA256.Create();
                     var bytes = Encoding.UTF8.GetBytes(role + "|" + compact);
-                    var hash = sha.ComputeHash(bytes);
+                    var hash = SHA256.HashData(bytes);
                     return Convert.ToHexString(hash);
                 }
                 catch

@@ -43,22 +43,22 @@ namespace VAL.Host
         // a public instance method named Warn(category, message) with the same parameters.
         public static void Info(string category, string message)
         {
-            Instance.WriteCore(LogLevel.Info, category, message);
+            WriteCore(LogLevel.Info, category, message);
         }
 
         public static void Warn(string category, string message)
         {
-            Instance.WriteCore(LogLevel.Warn, category, message);
+            WriteCore(LogLevel.Warn, category, message);
         }
 
         public static void Error(string category, string message)
         {
-            Instance.WriteCore(LogLevel.Error, category, message);
+            WriteCore(LogLevel.Error, category, message);
         }
 
         public static void Verbose(string category, string message)
         {
-            Instance.WriteCore(LogLevel.Verbose, category, message);
+            WriteCore(LogLevel.Verbose, category, message);
         }
 
         internal static void AddSink(ILogSink sink)
@@ -116,7 +116,7 @@ namespace VAL.Host
             WriteCore(LogLevel.Warn, category, message);
         }
 
-        void ILog.Error(string category, string message)
+        void ILog.LogError(string category, string message)
         {
             WriteCore(LogLevel.Error, category, message);
         }
@@ -126,7 +126,7 @@ namespace VAL.Host
             WriteCore(LogLevel.Verbose, category, message);
         }
 
-        private void WriteCore(LogLevel level, string category, string message)
+        private static void WriteCore(LogLevel level, string category, string message)
         {
             if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(message))
                 return;

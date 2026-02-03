@@ -104,7 +104,11 @@ namespace VAL
             if (hwnd != IntPtr.Zero)
             {
                 int dark = 1;
-                DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+                var hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+                if (hr != 0)
+                {
+                    ValLog.Warn("MainWindow", $"Failed to set dark mode attribute (HRESULT=0x{hr:X8}).");
+                }
             }
 
             var webViewInitialized = false;

@@ -34,8 +34,8 @@ namespace VAL.Host
         private static readonly Dictionary<string, DateTime> _lastShownUtc = new();
 
         // Central catalog (policy table).
-        private static readonly IReadOnlyDictionary<ToastKey, ToastDef> Defs =
-            new Dictionary<ToastKey, ToastDef>
+        private static readonly Dictionary<ToastKey, ToastDef> Defs =
+            new()
             {
                 // -----------------
                 // Host / global

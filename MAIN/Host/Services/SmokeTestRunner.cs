@@ -71,7 +71,7 @@ namespace VAL.Host.Services
 
             AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             {
-                var exception = args.ExceptionObject as Exception ?? new Exception("Unhandled exception.");
+                var exception = args.ExceptionObject as Exception ?? new InvalidOperationException("Unhandled exception.");
                 WriteCrashReport(exception, "AppDomain");
             };
 

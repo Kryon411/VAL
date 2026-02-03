@@ -27,9 +27,9 @@ namespace VAL.Continuum
 
         private static IToastHub? _toastHub;
         private static IContinuumWriter? _writer;
-        private static IContinuumInjectQueue? _injectQueue;
+        private static IContinuumInjectInbox? _injectQueue;
 
-        public static void Configure(IToastHub? toastHub, IContinuumWriter? writer, IContinuumInjectQueue? injectQueue)
+        public static void Configure(IToastHub? toastHub, IContinuumWriter? writer, IContinuumInjectInbox? injectQueue)
         {
             if (toastHub != null)
                 _toastHub = toastHub;
@@ -43,7 +43,7 @@ namespace VAL.Continuum
 
         private static IToastHub Toasts => _toastHub ??= new ToastHubAdapter();
         private static IContinuumWriter Writer => _writer ??= new ContinuumWriter();
-        private static IContinuumInjectQueue InjectQueue => _injectQueue ??= new ContinuumInjectQueue();
+        private static IContinuumInjectInbox InjectQueue => _injectQueue ??= new ContinuumInjectInbox();
 
         // -------------------------
         // Toast Catalog v1 (final)
@@ -803,16 +803,16 @@ namespace VAL.Continuum
             // Keep this intentionally simple and robust.
             // We only want to classify chats that clearly contain the ESSENCE-M handoff payload.
             bool hasContext =
-                text.IndexOf("CONTEXT BLOCK — READ ONLY", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)", StringComparison.OrdinalIgnoreCase) >= 0;
+                text.Contains("CONTEXT BLOCK — READ ONLY", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)", StringComparison.OrdinalIgnoreCase);
 
             bool hasAuthoritativeSeed =
-                text.IndexOf("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                text.IndexOf("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) >= 0;
+                text.Contains("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase);
 
             return hasAuthoritativeSeed || hasContext;
         }
@@ -1390,7 +1390,7 @@ private static void MaybeShowChronicleSuggested(string chatId)
             string backupPath = string.Empty;
             try
             {
-                if (!Writer.TryBeginTruthRebuild(cid, chronicleToken, backupExisting: true, out backupPath, out _))
+                if (!Writer.TryBeginTruthRebuild(cid, backupExisting: true, out backupPath, out _, chronicleToken))
                 {
                     lock (Sync)
                     {

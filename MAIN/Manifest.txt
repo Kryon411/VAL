@@ -48,6 +48,7 @@ MAIN/Host/Commands/ToolsCommandHandlers.cs
 MAIN/Host/Commands/VoidCommandHandlers.cs
 MAIN/Host/ILog.cs
 MAIN/Host/IToastHub.cs
+MAIN/Host/Json/ValJsonOptions.cs
 MAIN/Host/Logging/ILogSink.cs
 MAIN/Host/Logging/LogEvent.cs
 MAIN/Host/Logging/LogLevel.cs
@@ -164,10 +165,10 @@ MAIN/Modules/Continuum/Pipeline/04_Essence/Essence.Build.cs
 MAIN/Modules/Continuum/Pipeline/04_Essence/Essence.Clean.cs
 MAIN/Modules/Continuum/Pipeline/04_Filter2/Filter2.Restructure.cs
 MAIN/Modules/Continuum/Pipeline/04_Filter2/Filter2.Rules.cs
-MAIN/Modules/Continuum/Pipeline/05_Inject/ContinuumInjectQueue.cs
+MAIN/Modules/Continuum/Pipeline/05_Inject/ContinuumInjectInbox.cs
 MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Controller.cs
-MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Queue.cs
-MAIN/Modules/Continuum/Pipeline/05_Inject/IContinuumInjectQueue.cs
+MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Inbox.cs
+MAIN/Modules/Continuum/Pipeline/05_Inject/IContinuumInjectInbox.cs
 MAIN/Modules/Continuum/Pipeline/06_Telemetry/Telemetry.ThresholdMonitor.cs
 MAIN/Modules/Portal/Portal.main.js
 MAIN/Modules/Portal/Portal.module.json

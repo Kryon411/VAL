@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
+using VAL.Host.Json;
 using VAL.Host.Logging;
 using VAL.Host.Options;
 
@@ -84,8 +86,8 @@ namespace VAL.Host
                 var message = jsonException.Message;
                 if (jsonException.LineNumber.HasValue || jsonException.BytePositionInLine.HasValue)
                 {
-                    var line = jsonException.LineNumber?.ToString() ?? "?";
-                    var position = jsonException.BytePositionInLine?.ToString() ?? "?";
+                    var line = jsonException.LineNumber?.ToString(CultureInfo.InvariantCulture) ?? "?";
+                    var position = jsonException.BytePositionInLine?.ToString(CultureInfo.InvariantCulture) ?? "?";
                     message += $" (Line {line}, Position {position})";
                 }
 
@@ -152,7 +154,7 @@ namespace VAL.Host
                     var jsonCfg = File.ReadAllText(configPath);
                     manifest = JsonSerializer.Deserialize<ModuleManifest>(
                         jsonCfg,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        ValJsonOptions.CaseInsensitive);
                 }
                 catch (Exception ex)
                 {

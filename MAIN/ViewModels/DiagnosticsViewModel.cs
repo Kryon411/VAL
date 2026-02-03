@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
@@ -66,37 +67,37 @@ namespace VAL.ViewModels
 
             builder.AppendLine("VAL Diagnostics");
             builder.AppendLine("-------------------------------");
-            builder.AppendLine($"Version: {buildInfo.Version}");
-            builder.AppendLine($"Informational Version: {buildInfo.InformationalVersion}");
-            builder.AppendLine($"Environment: {buildInfo.Environment}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Version: {buildInfo.Version}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Informational Version: {buildInfo.InformationalVersion}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Environment: {buildInfo.Environment}");
             if (!string.IsNullOrWhiteSpace(buildInfo.GitSha))
-                builder.AppendLine($"Git SHA: {buildInfo.GitSha}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"Git SHA: {buildInfo.GitSha}");
             if (!string.IsNullOrWhiteSpace(buildInfo.BuildDate))
-                builder.AppendLine($"Build Date (UTC): {buildInfo.BuildDate}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"Build Date (UTC): {buildInfo.BuildDate}");
 
             builder.AppendLine();
             builder.AppendLine("Runtime");
             builder.AppendLine("-------------------------------");
-            builder.AppendLine($"OS: {RuntimeInformation.OSDescription}");
-            builder.AppendLine($"Framework: {RuntimeInformation.FrameworkDescription}");
-            builder.AppendLine($"Process Arch: {RuntimeInformation.ProcessArchitecture}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"OS: {RuntimeInformation.OSDescription}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Framework: {RuntimeInformation.FrameworkDescription}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Process Arch: {RuntimeInformation.ProcessArchitecture}");
 
             builder.AppendLine();
             builder.AppendLine("WebView");
             builder.AppendLine("-------------------------------");
-            builder.AppendLine($"StartUrl: {webViewOptions.StartUrl}");
-            builder.AppendLine($"AllowDevTools: {webViewOptions.EffectiveAllowDevTools}");
-            builder.AppendLine($"BlockNewWindow: {webViewOptions.BlockNewWindow}");
-            builder.AppendLine($"UserAgentOverride: {(string.IsNullOrWhiteSpace(webViewOptions.UserAgentOverride) ? "(none)" : webViewOptions.UserAgentOverride)}");
-            builder.AppendLine($"WebView2 Runtime: {GetWebView2Version()}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"StartUrl: {webViewOptions.StartUrl}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"AllowDevTools: {webViewOptions.EffectiveAllowDevTools}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"BlockNewWindow: {webViewOptions.BlockNewWindow}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"UserAgentOverride: {(string.IsNullOrWhiteSpace(webViewOptions.UserAgentOverride) ? "(none)" : webViewOptions.UserAgentOverride)}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"WebView2 Runtime: {GetWebView2Version()}");
 
             builder.AppendLine();
             builder.AppendLine("Paths");
             builder.AppendLine("-------------------------------");
-            builder.AppendLine($"DataRoot: {appPaths.DataRoot}");
-            builder.AppendLine($"LogsRoot: {appPaths.LogsRoot}");
-            builder.AppendLine($"ModulesRoot: {appPaths.ModulesRoot}");
-            builder.AppendLine($"ProfileRoot: {appPaths.ProfileRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"DataRoot: {appPaths.DataRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"LogsRoot: {appPaths.LogsRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"ModulesRoot: {appPaths.ModulesRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"ProfileRoot: {appPaths.ProfileRoot}");
 
             builder.AppendLine();
             builder.AppendLine("Modules");
@@ -110,7 +111,7 @@ namespace VAL.ViewModels
                 builder.AppendLine("Enabled:");
                 foreach (var module in moduleOptions.EnabledModules)
                 {
-                    builder.AppendLine($"- {module}");
+                    builder.AppendLine(CultureInfo.InvariantCulture, $"- {module}");
                 }
             }
 
@@ -126,7 +127,7 @@ namespace VAL.ViewModels
             {
                 foreach (var status in moduleStatuses)
                 {
-                    builder.AppendLine($"- {status.Name}: {status.Status}");
+                    builder.AppendLine(CultureInfo.InvariantCulture, $"- {status.Name}: {status.Status}");
                 }
             }
 
@@ -136,8 +137,8 @@ namespace VAL.ViewModels
             builder.AppendLine("Sources:");
             builder.AppendLine("- appsettings.json");
             if (!string.IsNullOrWhiteSpace(hostEnvironment.EnvironmentName))
-                builder.AppendLine($"- appsettings.{hostEnvironment.EnvironmentName}.json");
-            builder.AppendLine($"- local override: {ResolveLocalConfigPath()}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"- appsettings.{hostEnvironment.EnvironmentName}.json");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"- local override: {ResolveLocalConfigPath()}");
             builder.AppendLine("- environment variables: prefix VAL__");
 
             return builder.ToString();

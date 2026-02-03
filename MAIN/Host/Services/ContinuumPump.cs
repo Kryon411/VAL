@@ -7,7 +7,7 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Services
 {
-    public sealed class ContinuumPump : IContinuumPump
+    public sealed class ContinuumPump : IContinuumPump, IDisposable
     {
         private static readonly RateLimiter RateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
@@ -18,7 +18,7 @@ namespace VAL.Host.Services
         private readonly IWebMessageSender _webMessageSender;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IUiThread _uiThread;
-        private readonly IContinuumInjectQueue _injectQueue;
+        private readonly IContinuumInjectInbox _injectQueue;
 
         private CancellationTokenSource? _pumpCts;
         private Task? _pumpTask;
@@ -29,7 +29,7 @@ namespace VAL.Host.Services
             IWebMessageSender webMessageSender,
             IWebViewRuntime webViewRuntime,
             IUiThread uiThread,
-            IContinuumInjectQueue injectQueue)
+            IContinuumInjectInbox injectQueue)
         {
             _commandDispatcher = commandDispatcher;
             _webMessageSender = webMessageSender;
@@ -47,7 +47,7 @@ namespace VAL.Host.Services
             _pumpTask = Task.Run(() => PumpContinuumQueueAsync(_pumpCts.Token));
         }
 
-        public void Stop()
+        public void StopPump()
         {
             var cts = _pumpCts;
             if (cts == null)
@@ -63,6 +63,10 @@ namespace VAL.Host.Services
             catch
             {
                 // ignore
+            }
+            finally
+            {
+                cts.Dispose();
             }
 
             _pumpTask = null;
@@ -154,6 +158,11 @@ namespace VAL.Host.Services
                 return;
 
             ValLog.Warn(nameof(ContinuumPump), $"Continuum inject queue backlog: {count} items.");
+        }
+
+        public void Dispose()
+        {
+            StopPump();
         }
     }
 }

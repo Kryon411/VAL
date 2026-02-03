@@ -22,8 +22,7 @@ namespace VAL.Host.Services
 
         public PrivacySettingsService(IAppPaths appPaths)
         {
-            if (appPaths == null)
-                throw new ArgumentNullException(nameof(appPaths));
+            ArgumentNullException.ThrowIfNull(appPaths);
 
             _settingsPath = Path.Combine(appPaths.DataRoot, "settings.json");
             _settings = LoadSettings();

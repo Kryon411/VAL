@@ -227,7 +227,7 @@ namespace VAL.Host.Abyss
             return latest;
         }
 
-        private static IReadOnlyList<TruthLogSnapshot> GetTruthLogSnapshots(string memoryRoot, CancellationToken cancellationToken)
+        private static List<TruthLogSnapshot> GetTruthLogSnapshots(string memoryRoot, CancellationToken cancellationToken)
         {
             var paths = EnumerateTruthLogs(memoryRoot, cancellationToken).ToList();
             var snapshots = new List<TruthLogSnapshot>(paths.Count);

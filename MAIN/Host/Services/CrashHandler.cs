@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,12 +28,11 @@ namespace VAL.Host.Services
 
         public void Register(Application application)
         {
-            if (application == null)
-                throw new ArgumentNullException(nameof(application));
+            ArgumentNullException.ThrowIfNull(application);
 
             AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             {
-                var exception = args.ExceptionObject as Exception ?? new Exception("Unhandled exception.");
+                var exception = args.ExceptionObject as Exception ?? new InvalidOperationException("Unhandled exception.");
                 HandleCrash(exception, "AppDomain");
             };
 
@@ -103,7 +103,7 @@ namespace VAL.Host.Services
 
         private static string BuildCrashDetails(Exception exception, string source)
         {
-            var timestamp = DateTimeOffset.Now.ToString("u");
+            var timestamp = DateTimeOffset.Now.ToString("u", CultureInfo.InvariantCulture);
             return $"Timestamp: {timestamp}{Environment.NewLine}Source: {source}{Environment.NewLine}{Environment.NewLine}{exception}";
         }
     }
