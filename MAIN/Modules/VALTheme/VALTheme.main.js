@@ -757,6 +757,8 @@
   let overlayEl = null;
   let canvasEl = null;
   let ctx = null;
+  let rootClassObserver = null;
+  let overlayObserver = null;
 
   let rafId = null;
 
@@ -879,10 +881,29 @@
     } catch (_) {}
   }
 
+  function applyOverlayInlineStyles() {
+    if (!overlayEl) return;
+    overlayEl.style.position = "fixed";
+    overlayEl.style.inset = "0";
+    overlayEl.style.pointerEvents = "none";
+    overlayEl.style.zIndex = "9997";
+    overlayEl.style.transition = "opacity 1s ease";
+    overlayEl.style.willChange = "opacity";
+
+    if (canvasEl) {
+      canvasEl.style.width = "100%";
+      canvasEl.style.height = "100%";
+      canvasEl.style.display = "block";
+    }
+  }
+
   function ensureOverlay() {
     if (overlayEl && canvasEl && ctx) {
       // If the overlay was removed from the DOM (e.g., SPA transition), treat refs as stale.
-      if (overlayEl.isConnected && canvasEl.isConnected) return;
+      if (overlayEl.isConnected && canvasEl.isConnected) {
+        applyOverlayInlineStyles();
+        return;
+      }
       overlayEl = null;
       canvasEl = null;
       ctx = null;
@@ -909,12 +930,22 @@
 
     overlayEl = overlay;
     canvasEl = canvas;
+    applyOverlayInlineStyles();
     ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
 
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas, { passive: true });
 
     log("Overlay created");
+  }
+
+  function ensureOverlayPresence() {
+    if (!enabled) return;
+    if (!overlayEl || !canvasEl || !ctx || !overlayEl.isConnected || !canvasEl.isConnected) {
+      try { ensureOverlay(); } catch (_) {}
+      return;
+    }
+    applyOverlayInlineStyles();
   }
 
   function removeOverlay() {
@@ -1393,9 +1424,7 @@
     if (!enabled) return;
 
     // Self-heal if ChatGPT's SPA navigation removed the overlay node.
-    if (!overlayEl || !canvasEl || !ctx || !overlayEl.isConnected || !canvasEl.isConnected) {
-      try { ensureOverlay(); } catch (_) {}
-    }
+    ensureOverlayPresence();
 
     const dt = now - lastTime;
     lastTime = now;
@@ -1603,12 +1632,55 @@
   }
 
   // -----------------------------
+  // SPA resilience
+  // -----------------------------
+  function attachResilienceObservers() {
+    try {
+      if (rootClassObserver) rootClassObserver.disconnect();
+      rootClassObserver = new MutationObserver((mutations) => {
+        if (!enabled) return;
+        for (const mutation of mutations) {
+          if (mutation.type !== "attributes" || mutation.attributeName !== "class") continue;
+          const root = document.documentElement;
+          if (!root) return;
+          if (!root.classList.contains("val-theme-enabled")) {
+            root.classList.add("val-theme-enabled");
+          }
+          ensureOverlayPresence();
+          break;
+        }
+      });
+      const root = document.documentElement;
+      if (root) {
+        rootClassObserver.observe(root, { attributes: true, attributeFilter: ["class"] });
+      }
+    } catch (_) {}
+
+    try {
+      if (overlayObserver) overlayObserver.disconnect();
+      overlayObserver = new MutationObserver(() => {
+        if (!enabled) return;
+        if (!document.getElementById("val-theme-overlay")) {
+          ensureOverlayPresence();
+          return;
+        }
+        ensureOverlayPresence();
+      });
+      const target = document.documentElement;
+      if (target) {
+        overlayObserver.observe(target, { childList: true, subtree: true });
+      }
+    } catch (_) {}
+  }
+
+  // -----------------------------
   // Boot
   // -----------------------------
   function boot() {
     loadConfigFromStorage();
     exposeApi();
     attachMessageBridge();
+    attachResilienceObservers();
 
     // Defensive cleanup in case the script was hot-reloaded or injected twice.
     // We want boot to be idempotent and not require a manual toggle.
