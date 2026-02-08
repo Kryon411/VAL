@@ -17,17 +17,23 @@ public static class HostServiceCollectionExtensions
         services.AddOptions<ValOptions>()
             .Bind(configuration.GetSection(ValOptions.SectionName))
             .PostConfigure(options => options.ApplyDefaults())
-            .Validate(options => !string.IsNullOrWhiteSpace(options.DataRoot), "Val options must include a data root.");
+            .Validate(options => !string.IsNullOrWhiteSpace(options.DataRoot), "Val options must include a data root.")
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddOptions<WebViewOptions>()
             .Bind(configuration.GetSection(WebViewOptions.SectionName))
             .PostConfigure(options => options.ApplyDefaults())
-            .Validate(options => !string.IsNullOrWhiteSpace(options.StartUrl), "WebView options must include a start URL.");
+            .Validate(options => !string.IsNullOrWhiteSpace(options.StartUrl), "WebView options must include a start URL.")
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddOptions<ModuleOptions>()
             .Bind(configuration.GetSection(ModuleOptions.SectionName))
             .PostConfigure(options => options.ApplyDefaults())
-            .Validate(options => options.EnabledModules != null, "Module options must include module list.");
+            .Validate(options => options.EnabledModules != null, "Module options must include module list.")
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddSingleton<IModuleLoader, ModuleLoaderAdapter>();
         services.AddSingleton<ISessionContext, SessionContextAdapter>();
