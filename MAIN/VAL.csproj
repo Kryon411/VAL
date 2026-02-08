@@ -54,6 +54,7 @@
 
   <ItemGroup>
     <ProjectReference Include="VAL.Contracts\VAL.Contracts.csproj" />
+    <ProjectReference Include="VAL.Host\VAL.Host.csproj" />
   </ItemGroup>
 
   <ItemGroup>

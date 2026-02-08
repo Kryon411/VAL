@@ -19,7 +19,7 @@ Last updated: 2026-01-03
 
 ## 2) Core files
 
-### `MAIN/Host/ToastManager.cs`
+### `MAIN/VAL.Host/Host/ToastManager.cs`
 **Role:** WPF toast renderer (Popup + StackPanel).  
 **Owns:** how toasts *look* and *dismiss*.  
 **Does not own:** toast identity/gating/business logic.
@@ -29,12 +29,12 @@ Key renderer behaviors you’ll see referenced elsewhere:
 - **Grouping / replace-group** to replace an earlier toast in the same group.
 - **Duration buckets** (S/M/L/Sticky) used by definitions.
 
-### `MAIN/Host/ToastKey.cs`
+### `MAIN/VAL.Host/Host/ToastKey.cs`
 **Role:** The canonical list of toast keys.
 
 ✅ Note: **`ToastKey.ContinuumArchivingEnabled` was removed** (toast fully deleted).
 
-### `MAIN/Host/ToastHub.cs`
+### `MAIN/VAL.Host/Host/ToastHub.cs`
 **Role:** The **only entry point** for showing toasts.
 
 Responsibilities (typical):
@@ -46,7 +46,7 @@ Responsibilities (typical):
   - Grouping / replace-group
 - Call `ToastManager` to render the final toast.
 
-### `MAIN/Host/ToastArchitectureMap.md`
+### `MAIN/VAL.Host/Host/ToastArchitectureMap.md`
 **Role:** This document (the canonical wiring map).
 
 ---

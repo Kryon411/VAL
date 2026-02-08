@@ -4,8 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using VAL;
 using VAL.Contracts;
 using VAL.Host.Commands;
+using VAL.Host.Services;
 
-namespace VAL.Host.Services
+namespace VAL.App.Services
 {
     public sealed class DiagnosticsWindowService : IDiagnosticsWindowService
     {

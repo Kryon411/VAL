@@ -1,9 +1,10 @@
 using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Host.Services;
 using VAL.UI.Truth;
 
-namespace VAL.Host.Services
+namespace VAL.App.Services
 {
     public sealed class TruthHealthWindowService : ITruthHealthWindowService
     {

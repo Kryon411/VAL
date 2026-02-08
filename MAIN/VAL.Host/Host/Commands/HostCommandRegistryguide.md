@@ -215,6 +215,6 @@ If you add a new *non‑Continuum* module prefix and want the same behavior, imp
 
 Place this file at:
 
-`MAIN/Host/Commands/README.md`
+`MAIN/VAL.Host/Host/Commands/README.md`
 
 so the documentation lives next to the command system it describes.
