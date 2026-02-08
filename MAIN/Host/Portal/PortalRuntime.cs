@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Threading;
 using System.Windows.Media.Imaging;
 using VAL.Contracts;
 using VAL.Host.WebMessaging;
@@ -17,13 +16,13 @@ namespace VAL.Host.Portal
     {
         private const int HOTKEY_ID = 0xB001;
         private const int WM_HOTKEY = 0x0312;
+        private const int WM_CLIPBOARDUPDATE = 0x031D;
 
         private static bool _enabled;
         private static bool _privacyAllowed = true;
         private static IntPtr _hwnd = IntPtr.Zero;
         private static HwndSource? _source;
-
-        private static DispatcherTimer? _clipTimer;
+        private static bool _clipboardListenerRegistered;
 
         private static IWebMessageSender? _messageSender;   // host -> webview
         private static Action? _focusWebView;       // ensure webview focused before paste
@@ -91,6 +90,11 @@ private static void RememberSig(string sig)
             catch { }
 
             PostDebug($"AttachWindow hwnd=0x{hwnd.ToInt64():X}");
+
+            if (_enabled && _privacyAllowed)
+            {
+                StartClipboardWatch();
+            }
         }
 
         // Auto-attach for builds where MainWindow.xaml.cs wiring is incomplete:
@@ -272,55 +276,32 @@ private static void RememberSig(string sig)
 
         private static void StartClipboardWatch()
         {
-            if (_clipTimer != null) return;
+            EnsureAttached();
 
-            _clipTimer = new DispatcherTimer
+            if (_clipboardListenerRegistered) return;
+            if (_hwnd == IntPtr.Zero)
             {
-                Interval = TimeSpan.FromMilliseconds(200)
-            };
+                PostDebug("Clipboard watch skipped: hwnd=0");
+                return;
+            }
 
-            _clipTimer.Tick += (_, __) =>
+            try
             {
-                if (!_enabled) return;
-                if (_suppressStage) return;
-
-                try
+                if (AddClipboardFormatListener(_hwnd))
                 {
-                    var seq = GetClipboardSequenceNumber();
-                    if (seq == _lastClipSeq) return;
-                    _lastClipSeq = seq;
-
-                    if (!Clipboard.ContainsImage()) return;
-
-                    var img = Clipboard.GetImage();
-                    if (img == null) return;
-
-                    // Debounce: Snipping Tool often updates clipboard twice in quick succession.
-                    var now = DateTime.UtcNow.Ticks;
-                    if (now - _lastStageTicks < TimeSpan.FromMilliseconds(850).Ticks) return;
-
-                    // Dedupe: ignore identical image signatures (common when clipboard sequence bumps twice).
-                    var sig = ComputeSignature(img);
-                    if (sig.Length > 0 && sig == _lastSig) return;
-
-                    if (HasRecentSig(sig)) return;
-
-                    if (PortalStaging.TryAdd(img))
-                    {
-                        _lastStageTicks = now;
-                        _lastSig = sig;
-                        RememberSig(sig);
-                        PostCount();
-                    }
+                    _clipboardListenerRegistered = true;
+                    PostDebug("Clipboard watch started");
                 }
-                catch (Exception ex)
+                else
                 {
-                    PostDebug("Clipboard watch error: " + ex.Message);
+                    var err = Marshal.GetLastWin32Error();
+                    PostDebug($"AddClipboardFormatListener failed err={err}");
                 }
-            };
-
-            _clipTimer.Start();
-            PostDebug("Clipboard watch started");
+            }
+            catch (Exception ex)
+            {
+                PostDebug("Clipboard watch error: " + ex.Message);
+            }
         }
 
         private static void PrimeClipboardState()
@@ -348,12 +329,62 @@ private static void RememberSig(string sig)
         {
             try
             {
-                _clipTimer?.Stop();
-                _clipTimer = null;
+                if (_clipboardListenerRegistered && _hwnd != IntPtr.Zero)
+                {
+                    if (!RemoveClipboardFormatListener(_hwnd))
+                    {
+                        var err = Marshal.GetLastWin32Error();
+                        PostDebug($"RemoveClipboardFormatListener failed err={err}");
+                    }
+                }
             }
             catch { }
+            finally
+            {
+                _clipboardListenerRegistered = false;
+            }
 
             PostDebug("Clipboard watch stopped");
+        }
+
+        private static void ProcessClipboardUpdate()
+        {
+            if (!_enabled) return;
+            if (_suppressStage) return;
+
+            try
+            {
+                var seq = GetClipboardSequenceNumber();
+                if (seq == _lastClipSeq) return;
+                _lastClipSeq = seq;
+
+                if (!Clipboard.ContainsImage()) return;
+
+                var img = Clipboard.GetImage();
+                if (img == null) return;
+
+                // Debounce: Snipping Tool often updates clipboard twice in quick succession.
+                var now = DateTime.UtcNow.Ticks;
+                if (now - _lastStageTicks < TimeSpan.FromMilliseconds(850).Ticks) return;
+
+                // Dedupe: ignore identical image signatures (common when clipboard sequence bumps twice).
+                var sig = ComputeSignature(img);
+                if (sig.Length > 0 && sig == _lastSig) return;
+
+                if (HasRecentSig(sig)) return;
+
+                if (PortalStaging.TryAdd(img))
+                {
+                    _lastStageTicks = now;
+                    _lastSig = sig;
+                    RememberSig(sig);
+                    PostCount();
+                }
+            }
+            catch (Exception ex)
+            {
+                PostDebug("Clipboard watch error: " + ex.Message);
+            }
         }
 
         private static string ComputeSignature(BitmapSource img)
@@ -542,6 +573,11 @@ private static void RememberSig(string sig)
                 catch { }
             }
 
+            if (msg == WM_CLIPBOARDUPDATE)
+            {
+                ProcessClipboardUpdate();
+            }
+
             return IntPtr.Zero;
         }
 
@@ -596,5 +632,11 @@ private static void RememberSig(string sig)
 
         [DllImport("user32.dll")]
         private static extern uint GetClipboardSequenceNumber();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool AddClipboardFormatListener(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool RemoveClipboardFormatListener(IntPtr hWnd);
     }
 }
