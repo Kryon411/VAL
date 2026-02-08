@@ -34,6 +34,10 @@
 
   <ItemGroup>
     <Compile Remove="VAL.Tests\**\*.cs" />
+    <Compile Remove="VAL.App\**\*.cs" />
+    <Compile Remove="VAL.Host\**\*.cs" />
+    <Compile Remove="VAL.Contracts\**\*.cs" />
+    <Compile Remove="VAL.Tools\**\*.cs" />
     <Compile Remove="Tools\TruthStress\**\*.cs" />
     <Compile Remove="Tools\TruthDoctor\**\*.cs" />
   </ItemGroup>
@@ -125,8 +129,21 @@
   <ItemGroup>
     <Content Remove="Tools\**\*" />
     <Content Remove="VAL.Tests\**\*" />
+    <Content Remove="VAL.App\**\*" />
+    <Content Remove="VAL.Host\**\*" />
+    <Content Remove="VAL.Contracts\**\*" />
+    <Content Remove="VAL.Tools\**\*" />
     <None Remove="Tools\**\*" />
     <None Remove="VAL.Tests\**\*" />
+    <None Remove="VAL.App\**\*" />
+    <None Remove="VAL.Host\**\*" />
+    <None Remove="VAL.Contracts\**\*" />
+    <None Remove="VAL.Tools\**\*" />
+    <Page Remove="VAL.App\**\*" />
+    <Page Remove="VAL.Host\**\*" />
+    <Page Remove="VAL.Contracts\**\*" />
+    <Page Remove="VAL.Tests\**\*" />
+    <Page Remove="VAL.Tools\**\*" />
   </ItemGroup>
 
 </Project>
