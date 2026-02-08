@@ -201,7 +201,7 @@ function isPreludeNudgeSuppressed(){
   const LS_KEY  = "VAL_Dock_"+CHAT_ID;
 
   let dock, pill, panel;
-  let portalBanner, portalPillIndicator;
+  let portalBadge, portalPillIndicator;
   let portalToggle, portalPrivacyToggle, continuumPrivacyToggle;
   let portalCount, portalPrivacyNote, portalSendBtn;
   let portalArmed = false;
@@ -389,18 +389,28 @@ function isPreludeNudgeSuppressed(){
     return wrap;
   }
 
+  let portalStageCount = 0;
+
   function updatePortalIndicators(){
-    const active = !!portalArmed;
+    const active = !!portalArmed || portalStageCount > 0;
     try {
-      if (portalBanner) portalBanner.classList.toggle("active", active);
+      if (portalBadge) portalBadge.classList.toggle("active", active);
       if (portalPillIndicator) portalPillIndicator.classList.toggle("active", active);
     } catch(_) {}
+  }
+
+  function updatePortalBadge(){
+    if (!portalBadge) return;
+    const countText = portalStageCount > 0 ? ` • ${portalStageCount}` : "";
+    const label = portalArmed ? "Portal Armed" : "Portal";
+    portalBadge.textContent = label + countText;
   }
 
   function setPortalArmed(next, opts){
     const options = opts || {};
     portalArmed = !!next;
     try { if (portalToggle) portalToggle.setState(portalArmed); } catch(_) {}
+    updatePortalBadge();
     updatePortalIndicators();
 
     if (options.sendHost) {
@@ -417,7 +427,10 @@ function isPreludeNudgeSuppressed(){
 
   function updatePortalCountDisplay(count){
     const c = Math.max(0, Math.min(10, Number(count)||0));
+    portalStageCount = c;
     try { if (portalCount) portalCount.textContent = `${c}/10`; } catch(_) {}
+    updatePortalBadge();
+    updatePortalIndicators();
     try {
       if (portalSendBtn) {
         const disabled = c <= 0;
@@ -468,10 +481,10 @@ function isPreludeNudgeSuppressed(){
   function applyPos(){
     if (!dock) return;
     if (state.x == null || state.y == null){
-      dock.style.top   = "12px";
-      dock.style.left  = "50%";
-      dock.style.right = "auto";
-      dock.style.transform = "translateX(-50%)";
+      dock.style.top   = "14px";
+      dock.style.right = "14px";
+      dock.style.left  = "auto";
+      dock.style.transform = "";
     } else {
       dock.style.left  = state.x+"px";
       dock.style.top   = state.y+"px";
@@ -543,13 +556,11 @@ function isPreludeNudgeSuppressed(){
     const header = el("div","valdock-header");
     const title  = el("div","valdock-title","CONTROL CENTRE");
     const close  = el("button","valdock-close","×");
+    portalBadge = el("div", "valdock-portal-badge", "Portal");
     close.addEventListener("click",(e)=>{ e.preventDefault(); collapse(true); }, true);
-    header.append(title, close);
+    header.append(title, portalBadge, close);
 
     const body = el("div","valdock-body");
-
-    portalBanner = el("div","valdock-portal-banner","PORTAL ARMED");
-    body.append(portalBanner);
 
     function buildSection(titleText, subtitleText, controlEl){
       const section = el("div","valdock-section");
@@ -722,7 +733,7 @@ function isPreludeNudgeSuppressed(){
       } catch(_) {}
     }, true);
 
-    const openBtn = btn("Session Folder", "ghost");
+    const openBtn = btn("Session Files", "ghost");
     attachTooltip(openBtn, "Open the folder on your computer where this session’s files are stored.");
     openBtn.addEventListener("click",(e)=>{
       e.preventDefault();
@@ -769,8 +780,8 @@ function isPreludeNudgeSuppressed(){
     const abyssSection = buildSection("Abyss", "Recall & search", null);
     const rowABtns = el("div","valdock-row valdock-actions");
     const abyssSearchBtn = btn("Search", "primary");
-    const abyssLastBtn = btn("Last", "ghost");
-    const abyssFolderBtn = btn("Session Folder", "ghost");
+    const abyssLastBtn = btn("Last Result", "ghost");
+    const abyssFolderBtn = btn("Session Files", "ghost");
 
     attachTooltip(abyssSearchBtn, "Open Abyss search and enter a recall query.");
     attachTooltip(abyssLastBtn, "Recall the most recent exchange from the latest Truth.log.");
@@ -850,14 +861,22 @@ function isPreludeNudgeSuppressed(){
     refreshStatus();
     setInterval(refreshStatus, 2000);
 
+    const advancedSection = el("details", "valdock-advanced");
+    const advancedSummary = el("summary", "valdock-advanced-summary", "Advanced");
+    const advancedBody = el("div", "valdock-advanced-body");
+    advancedBody.append(
+      dataPrivacy.section,
+      appearanceSection.section,
+      toolsSection.section
+    );
+    advancedSection.append(advancedSummary, advancedBody);
+
     // Compose
     body.append(
-      dataPrivacy.section,
       continuumSection.section,
       portalSection.section,
       abyssSection.section,
-      appearanceSection.section,
-      toolsSection.section,
+      advancedSection,
       status
     );
 
