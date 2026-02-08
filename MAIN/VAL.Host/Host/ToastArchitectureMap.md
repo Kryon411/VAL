@@ -34,7 +34,7 @@ Key renderer behaviors you’ll see referenced elsewhere:
 
 ✅ Note: **`ToastKey.ContinuumArchivingEnabled` was removed** (toast fully deleted).
 
-### `MAIN/VAL.Host/Host/ToastHub.cs`
+### `MAIN/Host/ToastHub.cs`
 **Role:** The **only entry point** for showing toasts.
 
 Responsibilities (typical):

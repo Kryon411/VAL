@@ -23,7 +23,7 @@ This document explains how VAL routes **WebView (JS modules)** messages into the
 
 **Core files (Host)**
 
-- `Host/Commands/HostCommandRouter.cs`
+- `MAIN/Host/Commands/HostCommandRouter.cs`
   - Single entry-point: parses JSON, extracts `type` and optional `chatId`, updates `SessionContext`, calls registry.
 
 - `Host/Commands/CommandRegistry.cs`
@@ -215,6 +215,6 @@ If you add a new *non‑Continuum* module prefix and want the same behavior, imp
 
 Place this file at:
 
-`MAIN/VAL.Host/Host/Commands/README.md`
+`MAIN/Host/Commands/README.md`
 
 so the documentation lives next to the command system it describes.

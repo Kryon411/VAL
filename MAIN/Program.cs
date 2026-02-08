@@ -8,6 +8,7 @@ using VAL.App.Services;
 using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
+using VAL.Host.Services.Adapters;
 using VAL.Host.Startup;
 using VAL.ViewModels;
 
@@ -47,6 +48,21 @@ namespace VAL
                     .ConfigureServices((context, services) =>
                     {
                         services.AddValHost(context.Configuration, smokeSettings, startupOptions, crashGuard);
+                        services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
+                        services.AddSingleton<IToastService, ToastServiceAdapter>();
+                        services.AddSingleton<IToastHub, ToastHubAdapter>();
+                        services.AddSingleton<IPrivacySettingsService, PrivacySettingsService>();
+                        services.AddSingleton<IDataWipeService, DataWipeService>();
+                        services.AddSingleton<ITruthHealthReportService, TruthHealthReportService>();
+                        services.AddSingleton<IDockModelService, DockModelService>();
+                        services.AddSingleton<IPortalRuntimeStateManager, PortalRuntimeStateManager>();
+                        services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
+                        services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
+                        services.AddSingleton<VAL.Continuum.Pipeline.Truth.IContinuumWriter, VAL.Continuum.Pipeline.Truth.ContinuumWriter>();
+                        services.AddSingleton<VAL.Continuum.Pipeline.Inject.IContinuumInjectInbox, VAL.Continuum.Pipeline.Inject.ContinuumInjectInbox>();
+                        services.AddSingleton<IContinuumPump, ContinuumPump>();
+                        services.AddSingleton<SmokeTestState>();
+                        services.AddSingleton<SmokeTestRunner>();
                         services.AddSingleton<ICrashHandler, CrashHandler>();
                         services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
                         services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();
