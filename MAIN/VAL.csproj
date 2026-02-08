@@ -17,7 +17,7 @@
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <DefaultItemExcludes>$(DefaultItemExcludes);VAL.Host\**\*;VAL.App\**\*;VAL.Contracts\**\*;VAL.Tools\**\*;VAL.Tests\**\*;Host\**\*</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);VAL.Host\**\*;VAL.App\**\*;VAL.Contracts\**\*;VAL.Tools\**\*;VAL.Tests\**\*</DefaultItemExcludes>
   </PropertyGroup>
 
   <!--
@@ -29,7 +29,11 @@
   -->
   <ItemGroup>
     <ApplicationDefinition Remove="App.xaml" />
+    <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Tools\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Tests\**\*.xaml" />
     <Page Remove="App.xaml" />
     <Page Remove="VAL.Host\**\*.xaml" />
     <None Include="App.xaml" Condition="Exists('App.xaml')" />
