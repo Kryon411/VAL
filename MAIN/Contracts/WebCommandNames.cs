@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Reflection;
+
 namespace VAL.Contracts
 {
     /// <summary>
@@ -69,5 +74,34 @@ namespace VAL.Contracts
         // ---- Tools ----
         public const string ToolsOpenTruthHealth = "tools.open_truth_health";
         public const string ToolsOpenDiagnostics = "tools.open_diagnostics";
+
+        private static readonly IReadOnlyDictionary<string, string> AllCommands = BuildAllCommands();
+
+        public static IReadOnlyDictionary<string, string> GetAll()
+        {
+            return AllCommands;
+        }
+
+        private static IReadOnlyDictionary<string, string> BuildAllCommands()
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            var fields = typeof(WebCommandNames).GetFields(BindingFlags.Public | BindingFlags.Static);
+            foreach (var field in fields)
+            {
+                if (field.FieldType != typeof(string))
+                    continue;
+
+                if (!field.IsLiteral || field.IsInitOnly)
+                    continue;
+
+                var value = field.GetRawConstantValue() as string;
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                result[field.Name] = value;
+            }
+
+            return new ReadOnlyDictionary<string, string>(result);
+        }
     }
 }
