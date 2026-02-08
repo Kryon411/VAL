@@ -76,10 +76,10 @@ namespace VAL.Continuum
 
         // Chronicle prompt (existing chat without a completed Chronicle archive): timed action toast.
         private const string Toast_ChroniclePromptTitle =
-            "Want to save this chat?";
+            "Create an archive for future Pulse jumps?";
 
         private const string Toast_ChroniclePromptSubtitle =
-            "Chronicle can rebuild a local Truth log so future Pulse jumps have the right context.";
+            "Chronicle can create a local archive so future Pulse jumps have the right context.";
 
 
 
@@ -790,6 +790,19 @@ namespace VAL.Continuum
             }
         }
 
+        private static bool HasNonTrivialTruthLog(string chatId)
+        {
+            try
+            {
+                var truthPath = Writer.GetTruthPath(chatId);
+                return File.Exists(truthPath) && new FileInfo(truthPath).Length >= 2048;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static bool HasChronicleMarker(string chatId)
         {
             try
@@ -1269,6 +1282,30 @@ namespace VAL.Continuum
                 }
                 if (!IsMeaningfulChatForChronicle(cid, turns)) return;
 
+                bool loggingEnabled;
+                lock (Sync) { loggingEnabled = _loggingEnabled; }
+
+                bool hasTruthLog = HasTruthLog(cid);
+                bool hasNonTrivialTruthLog = HasNonTrivialTruthLog(cid);
+
+                int turnsForCompleteness = turns;
+                if (turnsForCompleteness <= 0)
+                {
+                    lock (Sync) { turnsForCompleteness = Math.Max(turnsForCompleteness, _toastAttachLastCapturedTurns); }
+                }
+
+                bool missingArchive = !hasTruthLog;
+                bool captureIncomplete = hasTruthLog && turnsForCompleteness >= 4 && !hasNonTrivialTruthLog;
+
+                if (!missingArchive && loggingEnabled && hasNonTrivialTruthLog) return;
+                if (!(missingArchive || !loggingEnabled || captureIncomplete)) return;
+
+                string? subtitleOverride = null;
+                if (missingArchive)
+                {
+                    subtitleOverride = "Chronicle can rebuild a local Truth log so future Pulse jumps have the right context.";
+                }
+
                 // Show sticky action toast (per attach). We bypass ToastLedger so the prompt can re-appear
                 // on a fresh attach if Chronicle still hasn't been run.
                 var shown = Toasts.TryShowActions(
@@ -1283,6 +1320,7 @@ namespace VAL.Continuum
                     },
                     chatId: cid,
                     bypassLaunchQuiet: true,
+                    subtitleOverride: subtitleOverride,
                     origin: ToastOrigin.Continuum,
                     reason: reason
                 );

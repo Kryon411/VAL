@@ -132,8 +132,8 @@ namespace VAL.Host
                     ToastKey.ChroniclePrompt,
                     new ToastDef(
                         ToastKey.ChroniclePrompt,
-                        "Want to save this chat?",
-                        "Chronicle can rebuild a local Truth log so future Pulse jumps have the right context.",
+                        "Create an archive for future Pulse jumps?",
+                        "Chronicle can create a local archive so future Pulse jumps have the right context.",
                         ToastManager.ToastDurationBucket.Sticky,
                         "continuum_guidance",
                         ReplaceGroup: false,
