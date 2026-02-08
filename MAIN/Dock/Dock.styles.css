@@ -45,6 +45,12 @@
   opacity: 1;
 }
 
+.valdock-pill:focus-visible{
+  outline: 2px solid rgba(120, 180, 240, 0.75);
+  outline-offset: 3px;
+  opacity: 1;
+}
+
 .valdock-pill:active{
   transform: translateY(1px) scale(0.99);
 }
@@ -147,6 +153,11 @@
   box-shadow: none;
 }
 
+.valdock-close:focus-visible{
+  outline: 2px solid rgba(120, 180, 240, 0.75);
+  outline-offset: 2px;
+}
+
 .valdock-row{
   display: flex;
   align-items: center;
@@ -226,6 +237,11 @@
   box-shadow: none;
 }
 
+.valdock-btn:focus-visible{
+  outline: 2px solid rgba(120, 180, 240, 0.75);
+  outline-offset: 2px;
+}
+
 .valdock-btn:disabled,
 .valdock-btn-disabled{
   opacity: 0.45;
@@ -260,6 +276,11 @@
   font-size: 11px;
   box-shadow: none;
   min-height: 28px;
+}
+
+.valdock-tg-switch:focus-visible{
+  outline: 2px solid rgba(120, 180, 240, 0.75);
+  outline-offset: 2px;
 }
 
 .valdock-tg-switch.valdock-tg-disabled{
@@ -410,6 +431,15 @@
   opacity: 0.65;
 }
 
+.valdock-status-hint{
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.valdock-status-hint.is-muted{
+  opacity: 0.6;
+}
+
 .valdock-grid{
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -451,6 +481,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.valdock-advanced-summary:focus-visible{
+  outline: 2px solid rgba(120, 180, 240, 0.75);
+  outline-offset: 2px;
+  border-radius: 8px;
 }
 
 .valdock-advanced-summary::-webkit-details-marker{
