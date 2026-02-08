@@ -68,9 +68,10 @@
   display: none;
   flex-direction: column;
   gap: 0;
-  min-width: 480px;
-  max-width: 80vw;
-  max-height: min(80vh, 720px);
+  width: 380px;
+  min-width: 360px;
+  max-width: min(92vw, 400px);
+  max-height: min(72vh, 660px);
   background:
     linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
   background-color: rgba(2,10,20,0.96);
@@ -86,11 +87,11 @@
 .valdock-header{
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
   font-weight: 600;
   font-size: 15px;
-  padding: 12px 14px 10px;
+  padding: 10px 12px;
   cursor: move;
   user-select: none;
   background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
@@ -98,25 +99,6 @@
   position: sticky;
   top: 0;
   z-index: 1;
-}
-
-.valdock-portal-banner{
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: rgba(160, 24, 36, 0.35);
-  border: 1px solid rgba(255, 120, 120, 0.3);
-  color: rgba(255, 220, 220, 0.95);
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.valdock-portal-banner.active{
-  display: flex;
 }
 
 .valdock-title{
@@ -130,8 +112,30 @@
   opacity: 0.92;
 }
 
-.valdock-close{
+.valdock-portal-badge{
   grid-column: 3;
+  justify-self: center;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(160, 60, 80, 0.24);
+  border: 1px solid rgba(255, 140, 160, 0.3);
+  color: rgba(255, 220, 230, 0.92);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.valdock-portal-badge.active{
+  display: inline-flex;
+}
+
+.valdock-close{
+  grid-column: 4;
   justify-self: end;
   appearance: none;
   border: none;
@@ -186,7 +190,7 @@
     linear-gradient(135deg, rgba(255,255,255,0.06), rgba(4,18,30,0.96));
   background-color: rgba(4,18,32,0.96);
   color: rgba(245,251,255,0.75);
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 999px;
   font-size: 12px;
   cursor: pointer;
@@ -344,8 +348,8 @@
 .valdock-body{
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px 14px;
+  gap: 8px;
+  padding: 10px 12px 12px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -355,7 +359,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid rgba(120, 180, 240, 0.14);
   background:
@@ -425,6 +429,49 @@
   margin-left: auto;
 }
 
-.valdock-portal-banner{
-  margin: 0;
+.valdock-advanced{
+  border-radius: 14px;
+  border: 1px solid rgba(120, 180, 240, 0.12);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.03), rgba(4,18,30,0.75));
+  padding: 8px 10px;
+}
+
+.valdock-advanced[open]{
+  padding-bottom: 10px;
+}
+
+.valdock-advanced-summary{
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(235,245,255,0.78);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.valdock-advanced-summary::-webkit-details-marker{
+  display: none;
+}
+
+.valdock-advanced-summary::before{
+  content: "›";
+  font-size: 14px;
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+  opacity: 0.7;
+}
+
+.valdock-advanced[open] .valdock-advanced-summary::before{
+  transform: rotate(90deg);
+}
+
+.valdock-advanced-body{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
 }
