@@ -1,6 +1,11 @@
 {
   "name": "Portal",
   "version": "1.0.0",
+  "apiVersion": "1",
+  "hostMinVersion": "0.0.0",
+  "capabilities": [
+    "ui"
+  ],
   "enabled": true,
   "entryScripts": [
     "Portal.main.js"

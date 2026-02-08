@@ -11,16 +11,18 @@ namespace VAL.Host.Services.Adapters
     {
         private readonly ModuleOptions _moduleOptions;
         private readonly IAppPaths _appPaths;
+        private readonly IBuildInfo _buildInfo;
 
-        public ModuleLoaderAdapter(IOptions<ModuleOptions> moduleOptions, IAppPaths appPaths)
+        public ModuleLoaderAdapter(IOptions<ModuleOptions> moduleOptions, IAppPaths appPaths, IBuildInfo buildInfo)
         {
             _moduleOptions = moduleOptions.Value;
             _appPaths = appPaths;
+            _buildInfo = buildInfo;
         }
 
         public Task InitializeAsync(CoreWebView2 core)
         {
-            return ModuleLoader.Initialize(core, _appPaths.ModulesRoot, _appPaths.ContentRoot, _moduleOptions);
+            return ModuleLoader.Initialize(core, _appPaths.ModulesRoot, _appPaths.ContentRoot, _moduleOptions, _buildInfo.Version);
         }
     }
 }
