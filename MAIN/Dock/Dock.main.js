@@ -173,13 +173,6 @@ function suppressPreludeNudge(ms){
   try { localStorage.setItem(PRELUDE_NUDGE_SUPPRESS_KEY, String(Date.now() + (ms||0))); } catch(_) {}
 }
 
-function isPreludeNudgeSuppressed(){
-  try {
-    const until = parseInt(localStorage.getItem(PRELUDE_NUDGE_SUPPRESS_KEY) || "0", 10);
-    return Date.now() < until;
-  } catch(_) { return false; }
-}
-
 
   function getChatId(){
     try {
@@ -775,8 +768,21 @@ function isPreludeNudgeSuppressed(){
                 }
               } catch(_) {}
             }
+            if ((msg.type || "") === "portal.stage.cleared") {
+              try { setPortalCount(0); } catch(_) {}
+            }
+            if ((msg.type || "") === "portal.state") {
+              try {
+                if (typeof msg.enabled === "boolean") {
+                  setPortalArmed(msg.enabled, { sendHost: false });
+                }
+              } catch(_) {}
+            }
             if ((msg.type || "") === "privacy.settings.sync") {
               try { applyPrivacySettings(msg); } catch(_) {}
+            }
+            if ((msg.type || "") === "continuum.session.attached") {
+              try { refreshStatus(msg.chatId); } catch(_) {}
             }
 
           } catch(_) {}
@@ -912,16 +918,15 @@ function isPreludeNudgeSuppressed(){
 
     // Status
     const status = el("div","valdock-status","");
-    function refreshStatus(){
+    function refreshStatus(nextId){
       try {
-        const id = getChatId() || "unknown";
+        const id = (nextId || getChatId() || "unknown");
         status.textContent = "Current Session Id: " + id;
       } catch(_) {
         status.textContent = "Current Session Id: unknown";
       }
     }
     refreshStatus();
-    setInterval(refreshStatus, 2000);
 
     const advancedSection = el("details", "valdock-advanced");
     const advancedSummary = el("summary", "valdock-advanced-summary", "Advanced");
@@ -997,31 +1002,6 @@ function isPreludeNudgeSuppressed(){
     try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}
 
 
-
-    // New Chat helper toast: when we are on the ChatGPT "home" route (no /c/<id> yet),
-    // nudge the user to click Prelude so assistant tagging guardrails are active.
-    (function setupPreludeNudge(){
-      // Initialize lastPath to the current route so we don't emit on app load.
-      let lastPath = (location && location.pathname) ? location.pathname : "";
-      function tick(){
-        try {
-          const p = (location && location.pathname) ? location.pathname : "";
-          if (p === lastPath) return;
-          lastPath = p;
-
-          // New chat / home page is typically "/"
-          if (p === "/") {
-            // Avoid nudging during Pulse (Pulse opens a new chat automatically).
-            if (isPreludeNudgeSuppressed()) return;
-
-            // Host toast (preferred)
-            try { post({ type: "continuum.ui.new_chat" }); } catch(_) {}
-          }
-        } catch(_) {}
-      }
-      tick();
-      try { setInterval(tick, 800); } catch(_) {}
-    })();
 
     // Emit console signal
     try { console.log("[VAL Dock] Loaded for", CHAT_ID); } catch(_) {}

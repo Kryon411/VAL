@@ -58,6 +58,7 @@ namespace VAL.Contracts
         public const string PortalCommandSendStaged = "portal.command.send_staged";
         public const string PortalCommandSend = "portal.command.send";
         public const string PortalCommandSendStagedLegacy = "portal.command.sendStaged";
+        public const string PortalState = "portal.state";
 
         // ---- Privacy ----
         public const string PrivacyCommandSetContinuumLogging = "privacy.command.set_continuum_logging";
