@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Host;
 
 namespace VAL.Host.Commands
 {
@@ -20,17 +21,29 @@ namespace VAL.Host.Commands
             {
                 _lastEnabledState = enabled;
                 var toasts = GetToastHub() ?? new ToastHubAdapter();
+                var reason = ResolveReason(cmd);
 
                 if (enabled)
-                    toasts.TryShow(ToastKey.VoidEnabled);
+                    toasts.TryShow(ToastKey.VoidEnabled, origin: ToastOrigin.HostCommand, reason: reason);
                 else
-                    toasts.TryShow(ToastKey.VoidDisabled);
+                    toasts.TryShow(ToastKey.VoidDisabled, origin: ToastOrigin.HostCommand, reason: reason);
             }
         }
 
         private static IToastHub? GetToastHub()
         {
             return (Application.Current as App)?.Services.GetService<IToastHub>();
+        }
+
+        private static ToastReason ResolveReason(HostCommand cmd)
+        {
+            var host = cmd.SourceUri?.Host ?? string.Empty;
+            if (host.Contains("hotkey", StringComparison.OrdinalIgnoreCase))
+                return ToastReason.Hotkey;
+            if (host.Contains("dock", StringComparison.OrdinalIgnoreCase))
+                return ToastReason.DockClick;
+
+            return ToastReason.DockClick;
         }
     }
 }

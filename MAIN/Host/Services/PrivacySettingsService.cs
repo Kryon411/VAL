@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using VAL.Continuum;
 using VAL.Continuum.Pipeline;
+using VAL.Host;
 
 namespace VAL.Host.Services
 {
@@ -127,7 +128,7 @@ namespace VAL.Host.Services
         {
             try
             {
-                ContinuumHost.ApplyLoggingSetting(enabled, showToast: false);
+                ContinuumHost.ApplyLoggingSetting(enabled, showToast: false, reason: ToastReason.Background);
             }
             catch
             {

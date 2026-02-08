@@ -55,15 +55,27 @@ namespace VAL.Continuum.Pipeline.Telemetry
                 switch (level)
                 {
                     case 1:
-                        ToastHub.TryShow(ToastKey.TelemetrySessionSizeEarly, chatId);
+                        ToastHub.TryShow(
+                            ToastKey.TelemetrySessionSizeEarly,
+                            chatId,
+                            origin: ToastOrigin.Telemetry,
+                            reason: ToastReason.Background);
                         break;
 
                     case 2:
-                        ToastHub.TryShow(ToastKey.TelemetrySessionSizeLarge, chatId);
+                        ToastHub.TryShow(
+                            ToastKey.TelemetrySessionSizeLarge,
+                            chatId,
+                            origin: ToastOrigin.Telemetry,
+                            reason: ToastReason.Background);
                         break;
 
                     case 3:
-                        ToastHub.TryShow(ToastKey.TelemetrySessionSizeVeryLarge, chatId);
+                        ToastHub.TryShow(
+                            ToastKey.TelemetrySessionSizeVeryLarge,
+                            chatId,
+                            origin: ToastOrigin.Telemetry,
+                            reason: ToastReason.Background);
                         break;
                 }
             }

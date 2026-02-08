@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using VAL.Contracts;
+using VAL.Host;
 using VAL.Host.Logging;
 using VAL.Host.Services;
 using VAL.Host.WebMessaging;
@@ -87,14 +88,23 @@ namespace VAL.Host.Commands
                 var result = wipeService.WipeData();
 
                 var toastHub = services.GetService<IToastHub>() ?? new ToastHubAdapter();
+                var reason = ResolveReason(cmd);
 
                 if (result.Success)
                 {
-                    toastHub.TryShow(ToastKey.DataWipeCompleted, bypassLaunchQuiet: true);
+                    toastHub.TryShow(
+                        ToastKey.DataWipeCompleted,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.HostCommand,
+                        reason: reason);
                 }
                 else
                 {
-                    toastHub.TryShow(ToastKey.DataWipePartial, bypassLaunchQuiet: true);
+                    toastHub.TryShow(
+                        ToastKey.DataWipePartial,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.HostCommand,
+                        reason: reason);
                 }
             }
             catch (Exception ex)
@@ -102,7 +112,11 @@ namespace VAL.Host.Commands
                 LogCommandFailure("wipe_data", cmd, ex);
                 var services = GetServices();
                 var toastHub = services?.GetService<IToastHub>() ?? new ToastHubAdapter();
-                toastHub.TryShow(ToastKey.DataWipePartial, bypassLaunchQuiet: true);
+                toastHub.TryShow(
+                    ToastKey.DataWipePartial,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.HostCommand,
+                    reason: ResolveReason(cmd));
             }
         }
 
@@ -147,6 +161,17 @@ namespace VAL.Host.Commands
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";
             ValLog.Warn(nameof(PrivacyCommandHandlers),
                 $"Privacy command failed ({action}) for {cmd.Type} (source: {sourceHost}). {LogSanitizer.Sanitize(ex.Message)}");
+        }
+
+        private static ToastReason ResolveReason(HostCommand cmd)
+        {
+            var host = cmd.SourceUri?.Host ?? string.Empty;
+            if (host.Contains("hotkey", StringComparison.OrdinalIgnoreCase))
+                return ToastReason.Hotkey;
+            if (host.Contains("dock", StringComparison.OrdinalIgnoreCase))
+                return ToastReason.DockClick;
+
+            return ToastReason.DockClick;
         }
     }
 }
