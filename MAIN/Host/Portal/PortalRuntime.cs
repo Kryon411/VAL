@@ -142,6 +142,8 @@ private static void RememberSig(string sig)
                     // UI polish: immediately reset the counter to 0 when Portal is disarmed.
                     PostCount();
                 }
+
+                PostEnabledState();
             });
         }
 
@@ -163,6 +165,8 @@ private static void RememberSig(string sig)
                     PostCleared();
                     PostCount();
                 }
+
+                PostEnabledState();
             });
         }
 
@@ -407,6 +411,20 @@ private static void RememberSig(string sig)
                     Type = WebMessageTypes.Event,
                     Name = "portal.stage.count",
                     Payload = JsonSerializer.SerializeToElement(new { count = PortalStaging.Count })
+                });
+            }
+            catch { }
+        }
+
+        private static void PostEnabledState()
+        {
+            try
+            {
+                _messageSender?.Send(new MessageEnvelope
+                {
+                    Type = WebMessageTypes.Event,
+                    Name = WebCommandNames.PortalState,
+                    Payload = JsonSerializer.SerializeToElement(new { enabled = _enabled })
                 });
             }
             catch { }
