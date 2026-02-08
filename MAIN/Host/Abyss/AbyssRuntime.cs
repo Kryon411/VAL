@@ -305,11 +305,11 @@ namespace VAL.Host.Abyss
 
             var sb = new StringBuilder();
             sb.AppendLine("ABYSS RECALL");
-            sb.AppendLine($"Query: {query}".TrimEnd());
+            sb.AppendLine(FormattableString.Invariant($"Query: {query}").TrimEnd());
             sb.AppendLine("-----");
             sb.AppendLine(snippet);
             sb.AppendLine("-----");
-            sb.AppendLine($"Source: {result.Exchange.ChatId} • Truth.log {rangeLabel}");
+            sb.AppendLine(FormattableString.Invariant($"Source: {result.Exchange.ChatId} • Truth.log {rangeLabel}"));
 
             return sb.ToString().Trim();
         }
@@ -453,17 +453,17 @@ namespace VAL.Host.Abyss
             var sb = new StringBuilder();
 
             sb.AppendLine("Abyss Results");
-            sb.AppendLine($"Query: {query}");
-            sb.AppendLine($"Timestamp: {DateTime.UtcNow:O}");
+            sb.AppendLine(FormattableString.Invariant($"Query: {query}"));
+            sb.AppendLine(FormattableString.Invariant($"Timestamp: {DateTime.UtcNow:O}"));
             sb.AppendLine();
 
             for (int i = 0; i < results.Count; i++)
             {
                 var result = results[i];
-                sb.AppendLine($"[{i + 1}] Score: {result.Score}");
-                sb.AppendLine($"Source: {result.Exchange.ChatId}");
-                sb.AppendLine($"Truth: {Path.GetFileName(result.Exchange.TruthPath)}");
-                sb.AppendLine($"Lines (approx): {FormatLineLocator(result.Exchange)}");
+                sb.AppendLine(FormattableString.Invariant($"[{i + 1}] Score: {result.Score}"));
+                sb.AppendLine(FormattableString.Invariant($"Source: {result.Exchange.ChatId}"));
+                sb.AppendLine(FormattableString.Invariant($"Truth: {Path.GetFileName(result.Exchange.TruthPath)}"));
+                sb.AppendLine(FormattableString.Invariant($"Lines (approx): {FormatLineLocator(result.Exchange)}"));
                 sb.AppendLine("Excerpt:");
                 sb.AppendLine(BuildExcerpt(result.Exchange, 1800));
                 sb.AppendLine();

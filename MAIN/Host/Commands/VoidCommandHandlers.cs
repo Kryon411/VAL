@@ -20,11 +20,12 @@ namespace VAL.Host.Commands
             {
                 _lastEnabledState = enabled;
                 var toasts = GetToastHub() ?? new ToastHubAdapter();
+                var reason = ToastHub.ParseReason(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
 
                 if (enabled)
-                    toasts.TryShow(ToastKey.VoidEnabled);
+                    toasts.TryShow(ToastKey.VoidEnabled, origin: ToastOrigin.HostCommand, reason: reason);
                 else
-                    toasts.TryShow(ToastKey.VoidDisabled);
+                    toasts.TryShow(ToastKey.VoidDisabled, origin: ToastOrigin.HostCommand, reason: reason);
             }
         }
 

@@ -86,7 +86,7 @@ namespace VAL.Contracts
             return AllCommands;
         }
 
-        private static IReadOnlyDictionary<string, string> BuildAllCommands()
+        private static ReadOnlyDictionary<string, string> BuildAllCommands()
         {
             var result = new Dictionary<string, string>(StringComparer.Ordinal);
             var fields = typeof(WebCommandNames).GetFields(BindingFlags.Public | BindingFlags.Static);
