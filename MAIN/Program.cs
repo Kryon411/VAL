@@ -47,7 +47,7 @@ namespace VAL
                     })
                     .ConfigureServices((context, services) =>
                     {
-                        services.AddValHost(context.Configuration, smokeSettings, startupOptions, crashGuard);
+                        services.AddValHost(context.Configuration);
                         services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
                         services.AddSingleton<IToastService, ToastServiceAdapter>();
                         services.AddSingleton<IToastHub, ToastHubAdapter>();
@@ -61,8 +61,11 @@ namespace VAL
                         services.AddSingleton<VAL.Continuum.Pipeline.Truth.IContinuumWriter, VAL.Continuum.Pipeline.Truth.ContinuumWriter>();
                         services.AddSingleton<VAL.Continuum.Pipeline.Inject.IContinuumInjectInbox, VAL.Continuum.Pipeline.Inject.ContinuumInjectInbox>();
                         services.AddSingleton<IContinuumPump, ContinuumPump>();
+                        services.AddSingleton(smokeSettings);
                         services.AddSingleton<SmokeTestState>();
                         services.AddSingleton<SmokeTestRunner>();
+                        services.AddSingleton(startupOptions);
+                        services.AddSingleton(crashGuard);
                         services.AddSingleton<ICrashHandler, CrashHandler>();
                         services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
                         services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();

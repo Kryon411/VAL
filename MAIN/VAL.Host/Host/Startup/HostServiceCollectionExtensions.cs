@@ -11,10 +11,7 @@ public static class HostServiceCollectionExtensions
 {
     public static IServiceCollection AddValHost(
         this IServiceCollection services,
-        IConfiguration configuration,
-        SmokeTestSettings smokeTestSettings,
-        StartupOptions startupOptions,
-        StartupCrashGuard crashGuard)
+        IConfiguration configuration)
     {
         services.AddOptions<ValOptions>()
             .Bind(configuration.GetSection(ValOptions.SectionName))
@@ -41,10 +38,6 @@ public static class HostServiceCollectionExtensions
         services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
         services.AddSingleton<IWebViewRuntime, WebViewRuntime>();
         services.AddSingleton<IWebMessageSender, WebMessageSender>();
-        services.AddSingleton(smokeTestSettings);
-        services.AddSingleton(startupOptions);
-        services.AddSingleton(crashGuard);
-
         return services;
     }
 }
