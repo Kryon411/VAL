@@ -17,6 +17,7 @@
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DefaultItemExcludes>$(DefaultItemExcludes);VAL.Host\**\*;VAL.App\**\*;VAL.Contracts\**\*;VAL.Tools\**\*;VAL.Tests\**\*;Host\**\*</DefaultItemExcludes>
   </PropertyGroup>
 
   <!--
