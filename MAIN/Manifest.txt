@@ -23,9 +23,9 @@ MAIN/App.xaml
 MAIN/App.xaml.cs
 MAIN/appsettings.Development.json
 MAIN/appsettings.json
-MAIN/Contracts/README.md
-MAIN/Contracts/WebCommandNames.cs
-MAIN/Contracts/WebMessageTypes.cs
+MAIN/VAL.Contracts/README.md
+MAIN/VAL.Contracts/WebCommandNames.cs
+MAIN/VAL.Contracts/WebMessageTypes.cs
 MAIN/CrashWindow.xaml
 MAIN/CrashWindow.xaml.cs
 MAIN/DiagnosticsWindow.xaml
