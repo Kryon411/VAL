@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using VAL.Contracts;
 using VAL.Host;
@@ -335,8 +336,39 @@ namespace VAL.Host.Services
                 }
             };
 
+            var moduleStatuses = ModuleLoader.GetModuleStatuses().ToList();
+            var moduleIssues = moduleStatuses
+                .Where(status => !string.Equals(status.Status, "Loaded", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var moduleLoadedCount = moduleStatuses.Count - moduleIssues.Count;
+
             var advancedSections = new List<DockSection>
             {
+                new DockSection
+                {
+                    Id = "modules",
+                    Title = "Modules",
+                    Subtitle = moduleIssues.Count > 0
+                        ? "Some modules were disabled for safety."
+                        : "All modules loaded successfully.",
+                    Blocks = moduleIssues.Count > 0
+                        ? new List<DockBlock>(
+                            moduleIssues.Select(issue => new DockBlock
+                            {
+                                Type = "hint",
+                                ClassName = "valdock-section-hint",
+                                Text = $"{issue.Name}: {issue.Status}"
+                            }).ToList())
+                        : new List<DockBlock>
+                        {
+                            new DockBlock
+                            {
+                                Type = "hint",
+                                ClassName = "valdock-section-hint",
+                                Text = "No disabled modules detected."
+                            }
+                        }
+                },
                 new DockSection
                 {
                     Id = "privacy",
@@ -468,6 +500,14 @@ namespace VAL.Host.Services
             };
 
             var statusText = string.IsNullOrWhiteSpace(chatId) ? "Current Session Id: unknown" : $"Current Session Id: {chatId}";
+            if (moduleStatuses.Count > 0)
+            {
+                var issueCount = moduleIssues.Count;
+                var moduleSummary = issueCount > 0
+                    ? $"Modules: {moduleLoadedCount} loaded, {issueCount} disabled. See Advanced > Modules."
+                    : $"Modules: {moduleLoadedCount} loaded.";
+                statusText = $"{statusText} · {moduleSummary}";
+            }
 
             return new DockModel
             {

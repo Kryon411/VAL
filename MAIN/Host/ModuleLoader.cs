@@ -26,11 +26,16 @@ namespace VAL.Host
     /// </summary>
     public static class ModuleLoader
     {
+        private const string SupportedApiVersion = "1";
         private static readonly ModuleRegistrationTracker _registrationTracker = new();
         private static readonly object _statusLock = new();
         private static readonly Dictionary<string, ModuleStatusInfo> _moduleStatuses = new(StringComparer.OrdinalIgnoreCase);
         private static readonly RateLimiter RateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
+        private static readonly HashSet<string> SupportedCapabilities = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "ui"
+        };
 
         public sealed class ModuleStatusInfo
         {
@@ -50,11 +55,13 @@ namespace VAL.Host
         {
             public string? name { get; set; }
             public string? version { get; set; }
+            public string? apiVersion { get; set; }
+            public string? hostMinVersion { get; set; }
+            public string? minHostVersion { get; set; }
             public bool? enabled { get; set; }
             public string[]? entryScripts { get; set; }
             public string[]? styles { get; set; }
             public string[]? capabilities { get; set; }
-            public string? minHostVersion { get; set; }
         }
 
         public static IReadOnlyList<ModuleStatusInfo> GetModuleStatuses()
@@ -112,10 +119,30 @@ namespace VAL.Host
             }
         }
 
-        public static async Task Initialize(CoreWebView2 core, string? modulesRoot, string? contentRoot, ModuleOptions? moduleOptions = null)
+        private static Version? ParseVersion(string? version)
+        {
+            if (string.IsNullOrWhiteSpace(version))
+                return null;
+
+            var trimmed = version.Trim();
+            var metadataIndex = trimmed.IndexOfAny(new[] { '-', '+' });
+            if (metadataIndex > 0)
+                trimmed = trimmed.Substring(0, metadataIndex);
+
+            return Version.TryParse(trimmed, out var parsed) ? parsed : null;
+        }
+
+        public static async Task Initialize(
+            CoreWebView2 core,
+            string? modulesRoot,
+            string? contentRoot,
+            ModuleOptions? moduleOptions = null,
+            string? hostVersion = null)
         {
             if (core == null)
                 return;
+
+            var hostVersionParsed = ParseVersion(hostVersion);
 
             var enabledModules = moduleOptions?.EnabledModules ?? Array.Empty<string>();
             var enabledSet = enabledModules.Length > 0
@@ -188,6 +215,70 @@ namespace VAL.Host
                 if (string.IsNullOrWhiteSpace(manifest.version))
                 {
                     var reason = "Invalid manifest: version is required.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(manifest.apiVersion))
+                {
+                    var reason = "Invalid manifest: apiVersion is required.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                if (!string.Equals(manifest.apiVersion, SupportedApiVersion, StringComparison.OrdinalIgnoreCase))
+                {
+                    var reason = $"Incompatible apiVersion '{manifest.apiVersion}'. Host supports '{SupportedApiVersion}'.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                var hostMinVersionRaw = manifest.hostMinVersion ?? manifest.minHostVersion;
+                if (string.IsNullOrWhiteSpace(hostMinVersionRaw))
+                {
+                    var reason = "Invalid manifest: hostMinVersion is required.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                var hostMinVersionParsed = ParseVersion(hostMinVersionRaw);
+                if (hostMinVersionParsed == null)
+                {
+                    var reason = $"Invalid manifest: hostMinVersion '{hostMinVersionRaw}' is not a valid version.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                if (hostVersionParsed != null && hostVersionParsed < hostMinVersionParsed)
+                {
+                    var reason = $"Incompatible host version '{hostVersionParsed}'. Requires '{hostMinVersionParsed}'.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                if (manifest.capabilities == null)
+                {
+                    var reason = "Invalid manifest: capabilities is required.";
+                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
+                    return;
+                }
+
+                var invalidCapabilities = manifest.capabilities
+                    .Where(capability => string.IsNullOrWhiteSpace(capability) || !SupportedCapabilities.Contains(capability.Trim()))
+                    .Select(capability => string.IsNullOrWhiteSpace(capability) ? "<empty>" : capability.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (invalidCapabilities.Count > 0)
+                {
+                    var reason = $"Unsupported capabilities: {string.Join(", ", invalidCapabilities)}.";
                     ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;

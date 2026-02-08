@@ -1,6 +1,11 @@
 {
   "name": "Continuum",
   "version": "3.1.32",
+  "apiVersion": "1",
+  "hostMinVersion": "0.0.0",
+  "capabilities": [
+    "ui"
+  ],
   "enabled": true,
   "entryScripts": [
     "Continuum.Client.js"
