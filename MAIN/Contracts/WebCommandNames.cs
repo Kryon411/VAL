@@ -75,6 +75,10 @@ namespace VAL.Contracts
         public const string ToolsOpenTruthHealth = "tools.open_truth_health";
         public const string ToolsOpenDiagnostics = "tools.open_diagnostics";
 
+        // ---- Navigation ----
+        public const string NavCommandGoChat = "nav.command.go_chat";
+        public const string NavCommandGoBack = "nav.command.go_back";
+
         // ---- Dock ----
         public const string DockCommandRequestModel = "dock.command.request_model";
         public const string DockModel = "val.dock.model";

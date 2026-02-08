@@ -30,8 +30,10 @@ namespace VAL.Host.Services
         private EventHandler<CoreWebView2SourceChangedEventArgs>? _sourceChangedHandler;
         private EventHandler<CoreWebView2WebMessageReceivedEventArgs>? _webMessageReceivedHandler;
         private EventHandler<CoreWebView2NewWindowRequestedEventArgs>? _newWindowRequestedHandler;
+        private Uri? _lastChatUri;
 
         public CoreWebView2? Core { get; private set; }
+        public Uri? LastChatUri => _lastChatUri;
 
         public WebViewRuntime(IAppPaths appPaths, IOptions<WebViewOptions> webViewOptions, IWebViewSessionNonce sessionNonce)
         {
@@ -124,6 +126,54 @@ namespace VAL.Host.Services
                     ValLog.Warn(nameof(WebViewRuntime), "Failed to execute script in WebView2.");
                 }
             });
+        }
+
+        public void Navigate(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return;
+
+            RunOnUiThread(() =>
+            {
+                var core = Core;
+                if (core == null)
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "Navigate called before WebView2 initialization.");
+                    return;
+                }
+
+                try
+                {
+                    core.Navigate(url);
+                }
+                catch
+                {
+                    ValLog.Warn(nameof(WebViewRuntime), "Failed to navigate WebView2 to requested URL.");
+                }
+            });
+        }
+
+        public bool TryGoBack()
+        {
+            var didGoBack = false;
+            RunOnUiThread(() =>
+            {
+                var core = Core;
+                if (core == null || !core.CanGoBack)
+                    return;
+
+                try
+                {
+                    core.GoBack();
+                    didGoBack = true;
+                }
+                catch
+                {
+                    didGoBack = false;
+                }
+            });
+
+            return didGoBack;
         }
 
         private async Task InitializeCoreAsync(WebView2 control)
@@ -270,6 +320,7 @@ namespace VAL.Host.Services
                 parsed = candidate;
 
             _currentUri = parsed;
+            TrackLastChatUri(parsed);
 
             var wasArmed = _bridgeArmed;
             _bridgeArmed = WebOriginPolicy.TryIsBridgeAllowed(source, out _);
@@ -318,6 +369,26 @@ namespace VAL.Host.Services
 
             ValLog.Warn(nameof(WebViewRuntime),
                 $"Canceled navigation to unsafe or unknown URI: {uri ?? "<null>"}");
+        }
+
+        private void TrackLastChatUri(Uri? candidate)
+        {
+            if (candidate == null)
+                return;
+
+            var host = candidate.Host?.Trim();
+            if (string.IsNullOrEmpty(host))
+                return;
+
+            if (!string.Equals(host, "chatgpt.com", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(host, "chat.openai.com", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var path = candidate.AbsolutePath ?? string.Empty;
+            if (path.StartsWith("/codex", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _lastChatUri = candidate;
         }
 
         private static bool ShouldLog(ref long lastTicksRef, long intervalTicks)

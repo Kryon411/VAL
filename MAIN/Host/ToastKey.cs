@@ -42,6 +42,7 @@ namespace VAL.Host
         ActionUnavailable,
         OperationInProgress,
         OperationCancelled,
+        NavigationNoHistory,
 
         // Data wipe
         DataWipeCompleted,

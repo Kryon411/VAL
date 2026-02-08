@@ -430,6 +430,21 @@ namespace VAL.Host
                         Cooldown: TimeSpan.FromSeconds(1))
                 },
                 {
+                    ToastKey.NavigationNoHistory,
+                    new ToastDef(
+                        ToastKey.NavigationNoHistory,
+                        "There’s no page to go back to yet.",
+                        null,
+                        ToastManager.ToastDurationBucket.S,
+                        null,
+                        ReplaceGroup: false,
+                        BypassBurstDedupe: false,
+                        IsPassive: false,
+                        OncePerChat: false,
+                        LedgerId: null,
+                        Cooldown: TimeSpan.FromSeconds(1))
+                },
+                {
                     ToastKey.OperationInProgress,
                     new ToastDef(
                         ToastKey.OperationInProgress,
