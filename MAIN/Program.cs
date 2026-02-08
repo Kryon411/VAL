@@ -79,6 +79,7 @@ namespace VAL
                         services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
                         services.AddSingleton<ITruthHealthReportService, TruthHealthReportService>();
                         services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();
+                        services.AddSingleton<IDockModelService, DockModelService>();
                         services.AddSingleton<IPortalRuntimeStateManager, PortalRuntimeStateManager>();
                         services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
                         services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();

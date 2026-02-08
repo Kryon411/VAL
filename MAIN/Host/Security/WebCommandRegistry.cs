@@ -71,6 +71,9 @@ namespace VAL.Host.Security
             // ---- Tools ----
             WebCommandNames.ToolsOpenTruthHealth,
             WebCommandNames.ToolsOpenDiagnostics,
+
+            // ---- Dock ----
+            WebCommandNames.DockCommandRequestModel,
         };
 
         internal static bool IsAllowed(string type)
