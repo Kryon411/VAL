@@ -12,19 +12,27 @@ namespace VAL.Host.Services
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IPrivacySettingsService _privacySettingsService;
         private readonly IPortalRuntimeStateManager _portalRuntimeStateManager;
+        private readonly IDockModelService _dockModelService;
         private bool _initialized;
 
         public PortalRuntimeService(
             IWebMessageSender webMessageSender,
             IWebViewRuntime webViewRuntime,
             IPrivacySettingsService privacySettingsService,
-            IPortalRuntimeStateManager portalRuntimeStateManager)
+            IPortalRuntimeStateManager portalRuntimeStateManager,
+            IDockModelService dockModelService)
         {
             _webMessageSender = webMessageSender;
             _webViewRuntime = webViewRuntime;
             _privacySettingsService = privacySettingsService;
             _portalRuntimeStateManager = portalRuntimeStateManager;
+            _dockModelService = dockModelService;
             _privacySettingsService.SettingsChanged += OnPrivacySettingsChanged;
+
+            PortalRuntime.DockModelStateChanged = (enabled, privacyAllowed, count) =>
+            {
+                _dockModelService.UpdatePortalState(enabled, privacyAllowed, count);
+            };
         }
 
         public void Initialize(Action focusControl)

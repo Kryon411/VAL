@@ -56,6 +56,7 @@
   function post(msg){ try{ window.chrome?.webview?.postMessage(toEnvelope(msg)); }catch(e){} }
 
   const COMMAND_NAME_BOOTSTRAP_TYPE = "val.contracts.bootstrap";
+  const DOCK_MODEL_EVENT = "val.dock.model";
   const DEFAULT_COMMAND_NAMES = Object.freeze({
     VoidCommandSetEnabled: "void.command.set_enabled",
     ContinuumCommandPulse: "continuum.command.pulse",
@@ -71,7 +72,8 @@
     PrivacyCommandOpenDataFolder: "privacy.command.open_data_folder",
     PrivacyCommandWipeData: "privacy.command.wipe_data",
     ToolsOpenTruthHealth: "tools.open_truth_health",
-    ToolsOpenDiagnostics: "tools.open_diagnostics"
+    ToolsOpenDiagnostics: "tools.open_diagnostics",
+    DockCommandRequestModel: "dock.command.request_model"
   });
 
   let commandNames = { ...DEFAULT_COMMAND_NAMES };
@@ -98,14 +100,6 @@
   // Portal (Capture & Stage)
   // Portal should ALWAYS default to Off on load (armed state is explicit user action).
   const PORTAL_ENABLED_KEY = "VAL_PortalEnabled";
-  const PORTAL_COUNT_KEY   = "VAL_PortalStageCount";
-  const PRIVACY_DEFAULTS = Object.freeze({
-    version: 1,
-    continuumLoggingEnabled: true,
-    portalCaptureEnabled: true
-  });
-
-  let privacySettings = { ...PRIVACY_DEFAULTS };
 
   function emitAbyssCommand(type, detail){
     try {
@@ -115,23 +109,6 @@
 
   function getPortalEnabled(){ return false; } // force Off at boot
   function setPortalEnabled(next){ try { localStorage.setItem(PORTAL_ENABLED_KEY, next ? "1" : "0"); } catch(_) {} }
-
-  function getPortalCount(){
-    try {
-      const v = localStorage.getItem(PORTAL_COUNT_KEY);
-      const n = Number(v);
-      return Number.isFinite(n) ? Math.max(0, Math.min(10, n)) : 0;
-    } catch(_) {}
-    return 0;
-  }
-  function setPortalCount(n){
-    try {
-      const c = Math.max(0, Math.min(10, Number(n)||0));
-      localStorage.setItem(PORTAL_COUNT_KEY, String(c));
-      updatePortalCountDisplay(c);
-    } catch(_) {}
-  }
-
 
 
   function readBoolLS(key, fallback){
@@ -229,12 +206,17 @@ function suppressPreludeNudge(ms){
   const LS_KEY  = "VAL_Dock_"+CHAT_ID;
 
   let dock, pill, panel;
+  let dockBody;
   let portalBadge, portalPillIndicator;
-  let portalToggle, portalPrivacyToggle, continuumPrivacyToggle;
-  let portalCount, portalPrivacyNote, portalSendBtn, portalSendHint;
   let pulseStatusHint;
+  let pulseBtn;
+  let chronicleBtn;
+  let portalSendHint;
+  let currentModel = null;
+  let chronicleBusy = false;
+  let refreshLocked = false;
+  let refreshTimer = null;
   let lastFocusedElement = null;
-  let portalArmed = false;
   let isDragging = false;
   let dragOffset = [0,0];
   let dragFromPill = false;
@@ -359,7 +341,7 @@ function suppressPreludeNudge(ms){
   }
   try { window.VAL_focusComposerForPaste = focusComposerForPaste; } catch(_) {}
 
-  function toggle(label, module, initialPressed, tooltipText){
+  function createToggle(label, initialPressed, tooltipText, onToggle){
     const wrap = el("div","valdock-toggle");
     const lab  = el("div","valdock-tg-label",label);
 
@@ -384,29 +366,8 @@ function suppressPreludeNudge(ms){
       const next = !pressed;
       setState(next);
 
-      if (module==="ContinuumLogging") {
-        try {
-          post({ type:getCommandName("PrivacyCommandSetContinuumLogging"), enabled: next });
-        } catch(_) {}
-      }
-
-      if (module==="Void") {
-        try { setVoidEnabled(next); } catch(_) {}
-      }
-
-      if (module==="PortalArmed") {
-        try { setPortalArmed(next, { sendHost: true }); } catch(_) {}
-      }
-
-      if (module==="PortalPrivacy") {
-        try {
-          post({ type:getCommandName("PrivacyCommandSetPortalCapture"), enabled: next });
-          applyPrivacySettings({ ...privacySettings, portalCaptureEnabled: next });
-        } catch(_) {}
-      }
-
-      if (module==="Theme") {
-        try { setThemeEnabled(next); } catch(_) {}
+      if (typeof onToggle === "function") {
+        try { onToggle(next); } catch(_) {}
       }
     }, true);
 
@@ -419,94 +380,291 @@ function suppressPreludeNudge(ms){
     return wrap;
   }
 
-  let portalStageCount = 0;
+  function getLocalToggleState(key){
+    if (key === "Void") return getVoidEnabled();
+    if (key === "Theme") return getThemeEnabled();
+    return false;
+  }
 
-  function updatePortalIndicators(){
-    const active = !!portalArmed || portalStageCount > 0;
+  function applyLocalToggle(key, next){
+    if (key === "Void") {
+      try { setVoidEnabled(next); } catch(_) {}
+      return;
+    }
+    if (key === "Theme") {
+      try { setThemeEnabled(next); } catch(_) {}
+      return;
+    }
+  }
+
+  function updatePortalBadge(badge){
+    if (!portalBadge || !badge || typeof badge !== "object") return;
+    const count = Number(badge.count);
+    const countText = Number.isFinite(count) && count > 0 ? ` • ${count}` : "";
+    const label = badge.label || "Portal";
+    portalBadge.textContent = label + countText;
+    const active = !!badge.active;
     try {
       if (portalBadge) portalBadge.classList.toggle("active", active);
       if (portalPillIndicator) portalPillIndicator.classList.toggle("active", active);
     } catch(_) {}
   }
 
-  function updatePortalBadge(){
-    if (!portalBadge) return;
-    const countText = portalStageCount > 0 ? ` • ${portalStageCount}` : "";
-    const label = portalArmed ? "Portal Armed" : "Portal";
-    portalBadge.textContent = label + countText;
+  function setChronicleBusy(next){
+    chronicleBusy = !!next;
+    try { if (chronicleBtn) chronicleBtn.textContent = chronicleBusy ? "Cancel" : "Chronicle"; } catch(_) {}
   }
 
-  function setPortalArmed(next, opts){
-    const options = opts || {};
-    portalArmed = !!next;
-    try { if (portalToggle) portalToggle.setState(portalArmed); } catch(_) {}
-    updatePortalBadge();
-    updatePortalIndicators();
-
-    if (options.sendHost) {
-      try {
-        setPortalEnabled(portalArmed);
-        post({ type:getCommandName("PortalCommandSetEnabled"), enabled: portalArmed });
-      } catch(_) {}
-    }
-
-    if (!portalArmed) {
-      updatePortalCountDisplay(0);
-    }
-  }
-
-  function updatePortalCountDisplay(count){
-    const c = Math.max(0, Math.min(10, Number(count)||0));
-    portalStageCount = c;
-    try { if (portalCount) portalCount.textContent = `${c}/10`; } catch(_) {}
-    updatePortalBadge();
-    updatePortalIndicators();
+  function syncChronicleBusyFromDom(){
     try {
-      if (portalSendBtn) {
-        const disabled = c <= 0;
-        portalSendBtn.disabled = disabled;
-        portalSendBtn.classList.toggle("valdock-btn-disabled", disabled);
+      const hasOverlay = !!document.getElementById("val-chronicle-overlay");
+      if (hasOverlay !== chronicleBusy) setChronicleBusy(hasOverlay);
+    } catch(_) {}
+  }
+
+  function setRefreshLocked(locked){
+    refreshLocked = !!locked;
+    try {
+      if (pulseBtn) {
+        pulseBtn.disabled = refreshLocked;
+        pulseBtn.classList.toggle("valdock-btn-disabled", refreshLocked);
       }
-      if (portalSendHint) {
-        portalSendHint.textContent = c <= 0
-          ? "Stage at least one capture to enable Send."
-          : "Send will paste all staged captures into the composer.";
-        portalSendHint.classList.toggle("is-muted", c > 0);
+      if (pulseStatusHint) {
+        pulseStatusHint.textContent = refreshLocked
+          ? "Pulse is cooling down. Try again in a moment."
+          : "Pulse opens a fresh chat with a summarized handoff.";
+        pulseStatusHint.classList.toggle("is-muted", !refreshLocked);
       }
     } catch(_) {}
   }
 
-  function applyPrivacySettings(next){
-    if (!next || typeof next !== "object") return;
-    privacySettings = {
-      version: Number.isFinite(next.version) ? next.version : privacySettings.version,
-      continuumLoggingEnabled: typeof next.continuumLoggingEnabled === "boolean"
-        ? next.continuumLoggingEnabled
-        : privacySettings.continuumLoggingEnabled,
-      portalCaptureEnabled: typeof next.portalCaptureEnabled === "boolean"
-        ? next.portalCaptureEnabled
-        : privacySettings.portalCaptureEnabled
-    };
-
-    try { if (continuumPrivacyToggle) continuumPrivacyToggle.setState(privacySettings.continuumLoggingEnabled); } catch(_) {}
-    try { if (portalPrivacyToggle) portalPrivacyToggle.setState(privacySettings.portalCaptureEnabled); } catch(_) {}
-    updatePortalPrivacyState();
+  function startRefreshCooldown(ms){
+    setRefreshLocked(true);
+    if (refreshTimer) { try{ clearTimeout(refreshTimer); }catch(_){} }
+    refreshTimer = setTimeout(function(){ setRefreshLocked(false); }, ms);
   }
 
-  function updatePortalPrivacyState(){
-    const allowed = !!privacySettings.portalCaptureEnabled;
+  function requestDockModel(){
     try {
-      if (portalToggle) portalToggle.setDisabled(!allowed);
+      post({ type: getCommandName("DockCommandRequestModel"), chatId: getChatId() });
     } catch(_) {}
+  }
 
-    if (!allowed) {
-      setPortalArmed(false, { sendHost: true });
+  function sendCommand(commandName, payload, requiresChatId){
+    if (!commandName) return;
+    const msg = { type: commandName };
+    if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+      Object.assign(msg, payload);
+    }
+    if (requiresChatId) {
+      msg.chatId = getChatId();
+    }
+    try { post(msg); } catch(_) {}
+  }
+
+  function renderItem(item){
+    if (!item || typeof item !== "object") return null;
+    const type = (item.type || "").toString();
+    if (type === "button") {
+      const button = btn(item.label || "", item.kind || "primary");
+      if (item.disabled) {
+        button.disabled = true;
+        button.classList.toggle("valdock-btn-disabled", true);
+      }
+      const tooltip = item.disabled && item.disabledReason ? item.disabledReason : item.tooltip;
+      if (tooltip) attachTooltip(button, tooltip);
+
+      if (item.id === "pulse") pulseBtn = button;
+      if (item.id === "chronicle") chronicleBtn = button;
+
+      button.addEventListener("click",(e)=>{
+        e.preventDefault();
+        if (button.disabled) return;
+
+        if (item.id === "abyssSearch") {
+          try { emitAbyssCommand("abyss.command.open_query_ui", { source: "dock" }); } catch(_) {}
+          return;
+        }
+
+        if (item.id === "pulse") {
+          if (refreshLocked) return;
+          try {
+            suppressPreludeNudge(25000);
+            sendCommand(item.command?.name, item.command?.payload, true);
+            collapse(true);
+            startRefreshCooldown(8000);
+          } catch(_) {
+            setRefreshLocked(false);
+          }
+          return;
+        }
+
+        if (item.id === "chronicle" && chronicleBusy) {
+          sendCommand(getCommandName("ContinuumCommandChronicleCancel"), {}, true);
+          return;
+        }
+
+        if (item.id === "portalSend") {
+          try { focusComposerForPaste(); } catch(_) {}
+          setTimeout(()=>{
+            sendCommand(item.command?.name, item.command?.payload, item.command?.requiresChatId);
+          }, 80);
+          return;
+        }
+
+        if (item.id === "wipeData") {
+          const msg = [
+            "Wipe local VAL data?",
+            "",
+            "This will delete:",
+            "• Logs (VAL.log)",
+            "• WebView profile/cache",
+            "• Continuum session memory (Truth.log + snapshots)",
+            "• Portal staging",
+            "",
+            "Privacy settings are preserved. The app itself will not be removed."
+          ].join("\\n");
+          try {
+            if (!window.confirm(msg)) return;
+          } catch(_) { return; }
+        }
+
+        sendCommand(item.command?.name, item.command?.payload, item.command?.requiresChatId);
+      }, true);
+      return button;
     }
 
-    try {
-      if (portalPrivacyNote)
-        portalPrivacyNote.textContent = allowed ? "Hotkeys enabled" : "Disabled by Privacy setting";
-    } catch(_) {}
+    if (type === "toggle") {
+      const state = typeof item.state === "boolean"
+        ? item.state
+        : (item.localStateKey ? getLocalToggleState(item.localStateKey) : false);
+      const toggleEl = createToggle(item.label || "", state, item.tooltip, (next)=>{
+        if (item.localStateKey) {
+          applyLocalToggle(item.localStateKey, next);
+        }
+
+        if (item.id === "portalToggle") {
+          try { setPortalEnabled(next); } catch(_) {}
+        }
+
+        const commandName = item.command?.name;
+        if (!commandName) return;
+        if (commandName.startsWith("local.")) return;
+        const payload = (item.command?.payload && typeof item.command.payload === "object" && !Array.isArray(item.command.payload))
+          ? { ...item.command.payload }
+          : {};
+        payload.enabled = next;
+        sendCommand(commandName, payload, item.command?.requiresChatId);
+      });
+
+      if (item.disabled) {
+        toggleEl.setDisabled(true);
+        if (item.disabledReason) {
+          const sw = toggleEl.querySelector(".valdock-tg-switch");
+          attachTooltip(sw, item.disabledReason);
+        }
+      }
+
+      return toggleEl;
+    }
+
+    if (type === "count") {
+      const max = Number.isFinite(Number(item.max)) ? Number(item.max) : 10;
+      const count = Number.isFinite(Number(item.count)) ? Number(item.count) : 0;
+      return el("div", "valdock-count", `${count}/${max}`);
+    }
+
+    return null;
+  }
+
+  function renderBlock(block, container){
+    if (!block || typeof block !== "object" || !container) return;
+    const type = (block.type || "").toString();
+    if (type === "row") {
+      const row = el("div", block.className || "valdock-row");
+      const items = Array.isArray(block.items) ? block.items : [];
+      items.forEach((item)=>{
+        const node = renderItem(item);
+        if (node) row.append(node);
+      });
+      container.append(row);
+      return;
+    }
+
+    if (type === "hint") {
+      const hint = el("div", block.className || "valdock-section-hint", block.text || "");
+      if (block.id === "pulseStatusHint") pulseStatusHint = hint;
+      if (block.id === "portalSendHint") portalSendHint = hint;
+      container.append(hint);
+    }
+  }
+
+  function renderSection(section){
+    const sectionEl = el("div","valdock-section");
+    const header = el("div","valdock-section-header");
+    const heading = el("div","valdock-section-heading");
+    const title = el("div","valdock-section-title", section.title || "");
+    heading.append(title);
+
+    let subtitleEl = null;
+    if (section.subtitle) {
+      subtitleEl = el("div","valdock-section-subtitle", section.subtitle);
+      heading.append(subtitleEl);
+    }
+
+    header.append(heading);
+    if (section.headerControl) {
+      const control = renderItem(section.headerControl);
+      if (control) header.append(control);
+    }
+
+    const divider = el("div","valdock-section-divider");
+    const content = el("div","valdock-section-body");
+    const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+    blocks.forEach((block)=> renderBlock(block, content));
+
+    sectionEl.append(header, divider, content);
+    return { sectionEl, subtitleEl };
+  }
+
+  function renderDockModel(model){
+    if (!dockBody || !model || typeof model !== "object") return;
+    currentModel = model;
+    pulseBtn = null;
+    chronicleBtn = null;
+    pulseStatusHint = null;
+    portalSendHint = null;
+
+    dockBody.textContent = "";
+
+    const sections = Array.isArray(model.sections) ? model.sections : [];
+    sections.forEach((sectionData)=>{
+      const rendered = renderSection(sectionData);
+      dockBody.append(rendered.sectionEl);
+    });
+
+    const advancedSections = Array.isArray(model.advancedSections) ? model.advancedSections : [];
+    if (advancedSections.length > 0) {
+      const advancedSection = el("details", "valdock-advanced");
+      const advancedSummary = el("summary", "valdock-advanced-summary", "Advanced");
+      const advancedBody = el("div", "valdock-advanced-body");
+      advancedSections.forEach((sectionData)=>{
+        const rendered = renderSection(sectionData);
+        advancedBody.append(rendered.sectionEl);
+      });
+      advancedSection.append(advancedSummary, advancedBody);
+      dockBody.append(advancedSection);
+    }
+
+    const status = el("div","valdock-status", (model.status && model.status.text) ? model.status.text : "");
+    dockBody.append(status);
+
+    updatePortalBadge(model.portalBadge);
+    syncChronicleBusyFromDom();
+    if (chronicleBusy && chronicleBtn) {
+      try { chronicleBtn.textContent = "Cancel"; } catch(_) {}
+    }
+    setRefreshLocked(refreshLocked);
   }
 
 
@@ -612,6 +770,7 @@ function suppressPreludeNudge(ms){
     } else {
       lastFocusedElement = document.activeElement;
       focusFirstDockControl();
+      requestDockModel();
     }
   }
 
@@ -641,139 +800,12 @@ function suppressPreludeNudge(ms){
     header.append(title, portalBadge, close);
 
     const body = el("div","valdock-body");
+    dockBody = body;
+    panel.append(header, body);
+    dock.append(pill, panel);
 
-    function buildSection(titleText, subtitleText, controlEl){
-      const section = el("div","valdock-section");
-      const header = el("div","valdock-section-header");
-      const heading = el("div","valdock-section-heading");
-      const title = el("div","valdock-section-title", titleText);
-      heading.append(title);
-
-      let subtitleEl = null;
-      if (subtitleText) {
-        subtitleEl = el("div","valdock-section-subtitle", subtitleText);
-        heading.append(subtitleEl);
-      }
-
-      header.append(heading);
-      if (controlEl) header.append(controlEl);
-
-      const divider = el("div","valdock-section-divider");
-      const content = el("div","valdock-section-body");
-
-      section.append(header, divider, content);
-      return { section, content, subtitleEl };
-    }
-
-    // Data & Privacy
-    const dataPrivacy = buildSection(
-      "Data & Privacy",
-      "All VAL data stays on this PC. Use these tools to inspect or clear local data."
-    );
-    const rowPrivacyActions = el("div","valdock-row valdock-actions");
-    const openDataBtn = btn("Open Data Folder", "ghost");
-    const wipeDataBtn = btn("Wipe Data", "danger");
-    attachTooltip(openDataBtn, "Open the local data folder used by VAL.");
-    attachTooltip(wipeDataBtn, "Wipe local logs, profiles, and session memory. This does not remove the app.");
-    openDataBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:getCommandName("PrivacyCommandOpenDataFolder") }); } catch(_) {}
-    }, true);
-    wipeDataBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      const msg = [
-        "Wipe local VAL data?",
-        "",
-        "This will delete:",
-        "• Logs (VAL.log)",
-        "• WebView profile/cache",
-        "• Continuum session memory (Truth.log + snapshots)",
-        "• Portal staging",
-        "",
-        "Privacy settings are preserved. The app itself will not be removed."
-      ].join("\\n");
-      try {
-        if (!window.confirm(msg)) return;
-      } catch(_) { return; }
-      try { post({ type:getCommandName("PrivacyCommandWipeData") }); } catch(_) {}
-    }, true);
-    rowPrivacyActions.append(openDataBtn, wipeDataBtn);
-    dataPrivacy.content.append(rowPrivacyActions);
-
-    // Continuum
-    continuumPrivacyToggle = toggle(
-      "Continuum logging",
-      "ContinuumLogging",
-      privacySettings.continuumLoggingEnabled,
-      "Allow Continuum to write Truth.log for this session."
-    );
-    const continuumSection = buildSection("Continuum", null, continuumPrivacyToggle);
-
-    const rowBtns = el("div","valdock-grid");
-
-    let refreshLocked = false;
-    let refreshTimer = null;
-
-    function setRefreshLocked(locked){
-      refreshLocked = !!locked;
-      try {
-        pulseBtn.disabled = refreshLocked;
-        pulseBtn.classList.toggle("valdock-btn-disabled", refreshLocked);
-        if (pulseStatusHint) {
-          pulseStatusHint.textContent = refreshLocked
-            ? "Pulse is cooling down. Try again in a moment."
-            : "Pulse opens a fresh chat with a summarized handoff.";
-          pulseStatusHint.classList.toggle("is-muted", !refreshLocked);
-        }
-      } catch(_) {}
-    }
-
-    function startRefreshCooldown(ms){
-      setRefreshLocked(true);
-      if (refreshTimer) { try{ clearTimeout(refreshTimer); }catch(_){} }
-      refreshTimer = setTimeout(function(){ setRefreshLocked(false); }, ms);
-    }
-
-    const pulseBtn = btn("Pulse", "primary");
-    attachTooltip(pulseBtn, "Open a new chat with a summary of your current conversation and guidelines for a smooth transition.");
-    pulseBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      if (refreshLocked) return;
-
-      try {
-        suppressPreludeNudge(25000);
-        post({ type:getCommandName("ContinuumCommandPulse"), chatId: getChatId() });
-        collapse(true);
-        startRefreshCooldown(8000);
-      } catch(_) {
-        setRefreshLocked(false);
-      }
-    }, true);
-
-    const preludeBtn = btn("Prelude", "secondary");
-    attachTooltip(preludeBtn, "Add the session setup and instructions to the current chat.");
-    preludeBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:getCommandName("ContinuumCommandInjectPreamble"), chatId: getChatId() }); } catch(_) {}
-    }, true);
-
-
-
-    const chronicleBtn = btn("Chronicle", "ghost");
-    attachTooltip(chronicleBtn, "Scan the current chat and rebuild VAL’s memory for this session.");
-
-    let chronicleBusy = false;
-    function setChronicleBusy(next){
-      chronicleBusy = !!next;
-      try { chronicleBtn.textContent = chronicleBusy ? "Cancel" : "Chronicle"; } catch(_) {}
-    }
-
-    function syncChronicleBusyFromDom(){
-      try {
-        const hasOverlay = !!document.getElementById("val-chronicle-overlay");
-        if (hasOverlay !== chronicleBusy) setChronicleBusy(hasOverlay);
-      } catch(_) {}
-    }
+    document.body.appendChild(dock);
+    requestDockModel();
 
     // Best-effort: reflect Chronicle run state in the button label.
     syncChronicleBusyFromDom();
@@ -782,7 +814,6 @@ function suppressPreludeNudge(ms){
       mo.observe(document.body, { childList:true, subtree:true });
     } catch(_) {}
 
-    // Pre-emptively flip to "Cancel" as soon as the host starts Chronicle.
     try {
       if (window.chrome?.webview?.addEventListener) {
         window.chrome.webview.addEventListener("message", (ev)=>{
@@ -793,7 +824,7 @@ function suppressPreludeNudge(ms){
               try { msg = JSON.parse(msg); } catch(_) { return; }
             }
             if (!msg || typeof msg !== "object") return;
-            msg = unwrapEnvelope(msg);
+
             if ((msg.type || "") === COMMAND_NAME_BOOTSTRAP_TYPE) {
               try {
                 const payload = (msg.payload && typeof msg.payload === "object" && !Array.isArray(msg.payload))
@@ -803,204 +834,20 @@ function suppressPreludeNudge(ms){
               } catch(_) {}
               return;
             }
-            if ((msg.type || "") === "continuum.chronicle.start") setChronicleBusy(true);
-            if ((msg.type || "") === "portal.stage.count") {
-              try {
-                const c = Number(msg.count);
-                if (Number.isFinite(c)) {
-                  setPortalCount(c);
-                }
-              } catch(_) {}
-            }
-            if ((msg.type || "") === "portal.stage.cleared") {
-              try { setPortalCount(0); } catch(_) {}
-            }
-            if ((msg.type || "") === "portal.state") {
-              try {
-                if (typeof msg.enabled === "boolean") {
-                  setPortalArmed(msg.enabled, { sendHost: false });
-                }
-              } catch(_) {}
-            }
-            if ((msg.type || "") === "privacy.settings.sync") {
-              try { applyPrivacySettings(msg); } catch(_) {}
-            }
-            if ((msg.type || "") === "continuum.session.attached") {
-              try { refreshStatus(msg.chatId); } catch(_) {}
-            }
 
+            const unwrapped = unwrapEnvelope(msg);
+            const msgType = (unwrapped && unwrapped.type) ? unwrapped.type : msg.type;
+            if (msgType === DOCK_MODEL_EVENT) {
+              renderDockModel(unwrapped);
+              return;
+            }
+            if (msgType === "continuum.chronicle.start") setChronicleBusy(true);
+            if (msgType === "continuum.chronicle.done" || msgType === "continuum.chronicle.cancel") setChronicleBusy(false);
+            if (msgType === "continuum.session.attached") requestDockModel();
           } catch(_) {}
         });
       }
     } catch(_) {}
-    chronicleBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try {
-        if (chronicleBusy) post({ type:getCommandName("ContinuumCommandChronicleCancel"), chatId: getChatId() });
-        else post({ type:getCommandName("ContinuumCommandChronicleRebuildTruth"), chatId: getChatId() });
-      } catch(_) {}
-    }, true);
-
-    const openBtn = btn("Session Files", "ghost");
-    attachTooltip(openBtn, "Open the folder on your computer where this session’s files are stored.");
-    openBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:getCommandName("ContinuumCommandOpenSessionFolder"), chatId: getChatId() }); } catch(_) {}
-    }, true);
-
-    rowBtns.append(pulseBtn, preludeBtn, chronicleBtn, openBtn);
-    const continuumHint = el("div","valdock-section-hint","Session tools for jumps and memory.");
-    pulseStatusHint = el("div","valdock-section-hint","Pulse opens a fresh chat with a summarized handoff.");
-    pulseStatusHint.classList.add("valdock-status-hint", "is-muted");
-    continuumSection.content.append(rowBtns, continuumHint, pulseStatusHint);
-
-    // Portal
-    portalPrivacyToggle = toggle(
-      "Portal capture & hotkeys",
-      "PortalPrivacy",
-      privacySettings.portalCaptureEnabled,
-      "Allow Portal to register hotkeys and monitor the clipboard."
-    );
-    const portalSection = buildSection("Portal", "Hotkeys enabled", portalPrivacyToggle);
-    portalPrivacyNote = portalSection.subtitleEl;
-
-    const rowP = el("div","valdock-inline-row");
-    portalCount = el("div","valdock-count", "0/10");
-    portalSendBtn = btn("Send", "secondary");
-    portalSendBtn.classList.add("valdock-send");
-    attachTooltip(portalSendBtn, "Paste all staged clipboard images into the composer (max 10).");
-
-    portalSendBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { focusComposerForPaste(); } catch(_) {}
-      setTimeout(()=>{ try { post({ type:getCommandName("PortalCommandSendStaged"), max: 10 }); } catch(_) {} }, 80);
-    }, true);
-
-    portalToggle = toggle(
-      "Capture & Stage",
-      "PortalArmed",
-      false,
-      "Arm Portal. Press 1 to open Screen Snip. Any clipboard images will stage (max 10)."
-    );
-
-    rowP.append(portalToggle, portalCount, portalSendBtn);
-    portalSendHint = el("div","valdock-section-hint","Stage at least one capture to enable Send.");
-    portalSendHint.classList.add("valdock-status-hint");
-    portalSection.content.append(rowP, portalSendHint);
-
-    // Abyss
-    const abyssSection = buildSection("Abyss", "Recall & search", null);
-    const rowABtns = el("div","valdock-row valdock-actions");
-    const abyssSearchBtn = btn("Search", "primary");
-    const abyssLastBtn = btn("Last Result", "ghost");
-    const abyssFolderBtn = btn("Session Files", "ghost");
-
-    attachTooltip(abyssSearchBtn, "Open Abyss search and enter a recall query.");
-    attachTooltip(abyssLastBtn, "Recall the most recent exchange from the latest Truth.log.");
-    attachTooltip(abyssFolderBtn, "Open the folder where this session’s memory is stored.");
-
-    abyssSearchBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      emitAbyssCommand("abyss.command.open_query_ui", { source: "dock" });
-    }, true);
-
-    abyssLastBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:getCommandName("AbyssCommandLast"), chatId: getChatId(), count: 2, inject: false }); } catch(_) {}
-    }, true);
-
-    abyssFolderBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:getCommandName("ContinuumCommandOpenSessionFolder"), chatId: getChatId() }); } catch(_) {}
-    }, true);
-
-    rowABtns.append(abyssSearchBtn, abyssLastBtn, abyssFolderBtn);
-    abyssSection.content.append(rowABtns);
-
-    // Appearance
-    const appearanceSection = buildSection("Appearance", null, null);
-    const rowV = el("div","valdock-row");
-    rowV.append(
-      toggle(
-        "Void",
-        "Void",
-        getVoidEnabled()
-      )
-    );
-
-    const rowT = el("div","valdock-row");
-    rowT.append(
-      toggle(
-        "Theme",
-        "Theme",
-        getThemeEnabled()
-      )
-    );
-    appearanceSection.content.append(rowV, rowT);
-
-    // Tools
-    const toolsSection = buildSection("Tools", "Truth Health & Diagnostics", null);
-    const rowToolsBtns = el("div","valdock-grid");
-    const truthHealthBtn = btn("Truth Health", "secondary");
-    const diagnosticsBtn = btn("Diagnostics", "secondary");
-
-    attachTooltip(truthHealthBtn, "Open the Truth Health report.");
-    attachTooltip(diagnosticsBtn, "Open diagnostics for the current build.");
-
-    truthHealthBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:getCommandName("ToolsOpenTruthHealth") }); } catch(_) {}
-    }, true);
-
-    diagnosticsBtn.addEventListener("click",(e)=>{
-      e.preventDefault();
-      try { post({ type:getCommandName("ToolsOpenDiagnostics") }); } catch(_) {}
-    }, true);
-
-    rowToolsBtns.append(truthHealthBtn, diagnosticsBtn);
-    toolsSection.content.append(rowToolsBtns);
-
-    // Status
-    const status = el("div","valdock-status","");
-    function refreshStatus(nextId){
-      try {
-        const id = (nextId || getChatId() || "unknown");
-        status.textContent = "Current Session Id: " + id;
-      } catch(_) {
-        status.textContent = "Current Session Id: unknown";
-      }
-    }
-    refreshStatus();
-
-    const advancedSection = el("details", "valdock-advanced");
-    const advancedSummary = el("summary", "valdock-advanced-summary", "Advanced");
-    const advancedBody = el("div", "valdock-advanced-body");
-    advancedBody.append(
-      dataPrivacy.section,
-      appearanceSection.section,
-      toolsSection.section
-    );
-    advancedSection.append(advancedSummary, advancedBody);
-
-    // Compose
-    body.append(
-      continuumSection.section,
-      portalSection.section,
-      abyssSection.section,
-      advancedSection,
-      status
-    );
-
-    panel.append(header, body);
-    dock.append(pill, panel);
-
-    // Portal safety: always start disarmed, and reset count display.
-    try {
-      setPortalArmed(false, { sendHost: true });
-      setPortalCount(0);
-    } catch(_) {}
-    try { updatePortalPrivacyState(); } catch(_) {}
-    document.body.appendChild(dock);
 
     // Clicking minimized pill expands
     pill.addEventListener("click",(e)=>{ e.preventDefault(); collapse(false); }, true);

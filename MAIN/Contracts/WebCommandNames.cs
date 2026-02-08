@@ -75,6 +75,10 @@ namespace VAL.Contracts
         public const string ToolsOpenTruthHealth = "tools.open_truth_health";
         public const string ToolsOpenDiagnostics = "tools.open_diagnostics";
 
+        // ---- Dock ----
+        public const string DockCommandRequestModel = "dock.command.request_model";
+        public const string DockModel = "val.dock.model";
+
         private static readonly IReadOnlyDictionary<string, string> AllCommands = BuildAllCommands();
 
         public static IReadOnlyDictionary<string, string> GetAll()

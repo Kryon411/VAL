@@ -249,6 +249,14 @@ namespace VAL.Host.Commands
                 Array.Empty<string>(),
                 ToolsCommandHandlers.HandleOpenDiagnostics
             ));
+
+            // ---- Dock ----
+            Register(new CommandSpec(
+                WebCommandNames.DockCommandRequestModel,
+                "Dock",
+                Array.Empty<string>(),
+                DockCommandHandlers.HandleRequestModel
+            ));
         }
 
         private static void HandleContinuumCommand(HostCommand cmd)

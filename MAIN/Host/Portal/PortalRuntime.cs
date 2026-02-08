@@ -30,6 +30,8 @@ namespace VAL.Host.Portal
 
         private static uint _lastClipSeq;
 
+        internal static Action<bool, bool, int>? DockModelStateChanged;
+
         // Debounce & dedupe
         private static long _lastStageTicks;
         private static string _lastSig = "";
@@ -414,6 +416,8 @@ private static void RememberSig(string sig)
                 });
             }
             catch { }
+
+            NotifyDockModelState();
         }
 
         private static void PostEnabledState()
@@ -428,6 +432,8 @@ private static void RememberSig(string sig)
                 });
             }
             catch { }
+
+            NotifyDockModelState();
         }
 
         private static void PostCleared()
@@ -440,6 +446,15 @@ private static void RememberSig(string sig)
                     Name = "portal.stage.cleared",
                     Payload = JsonSerializer.SerializeToElement(new { })
                 });
+            }
+            catch { }
+        }
+
+        private static void NotifyDockModelState()
+        {
+            try
+            {
+                DockModelStateChanged?.Invoke(_enabled, _privacyAllowed, PortalStaging.Count);
             }
             catch { }
         }
