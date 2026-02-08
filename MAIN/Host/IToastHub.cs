@@ -17,7 +17,9 @@ namespace VAL.Host
             bool? replaceGroupOverride = null,
             bool? bypassBurstDedupeOverride = null,
             bool? oncePerChatOverride = null,
-            string? ledgerIdOverride = null);
+            string? ledgerIdOverride = null,
+            ToastOrigin origin = ToastOrigin.Unknown,
+            ToastReason reason = ToastReason.Unknown);
 
         bool TryShowActions(
             ToastKey key,
@@ -29,9 +31,14 @@ namespace VAL.Host
             string? groupKeyOverride = null,
             bool? replaceGroupOverride = null,
             bool? oncePerChatOverride = null,
-            string? ledgerIdOverride = null);
+            string? ledgerIdOverride = null,
+            ToastOrigin origin = ToastOrigin.Unknown,
+            ToastReason reason = ToastReason.Unknown);
 
-        void TryShowOperationCancelled(string groupKey);
+        void TryShowOperationCancelled(
+            string groupKey,
+            ToastOrigin origin = ToastOrigin.Unknown,
+            ToastReason reason = ToastReason.Unknown);
 
         void DismissGroup(string groupKey);
     }

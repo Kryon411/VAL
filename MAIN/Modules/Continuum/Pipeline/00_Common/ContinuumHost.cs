@@ -153,6 +153,7 @@ namespace VAL.Continuum
         private static bool _chronicleInFlight;
         private static string? _chronicleRequestId;
         private static DateTime _chronicleStartedUtc = DateTime.MinValue;
+        private static ToastReason _chronicleCancelReason = ToastReason.Background;
 
 
         // Chronicle running flag (toast suppression + sequencing only).
@@ -259,7 +260,8 @@ namespace VAL.Continuum
 
             if (type.Equals(WebCommandNames.ContinuumCommandToggleLogging, StringComparison.OrdinalIgnoreCase))
             {
-                HandleToggleLogging(msg.enabled ?? true);
+                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                HandleToggleLogging(msg.enabled ?? true, reason);
                 return;
             }
 
@@ -277,7 +279,8 @@ namespace VAL.Continuum
 
             if (type.Equals(WebCommandNames.ContinuumUiComposerInteraction, StringComparison.OrdinalIgnoreCase))
             {
-                HandleChronicleComposerInteraction(msg.chatId, msg.capturedTurns ?? 0);
+                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                HandleChronicleComposerInteraction(msg.chatId, msg.capturedTurns ?? 0, reason);
                 return;
             }
 
@@ -285,7 +288,8 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.ContinuumCommandInjectPreamble, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandInjectPrelude, StringComparison.OrdinalIgnoreCase))
             {
-                HandleInjectPrelude(msg.chatId);
+                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                HandleInjectPrelude(msg.chatId, reason);
                 return;
             }
 
@@ -374,7 +378,8 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.ContinuumCommandPulse, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandRefreshQuick, StringComparison.OrdinalIgnoreCase))
             {
-                HandlePulse(msg.chatId);
+                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                HandlePulse(msg.chatId, reason);
                 return;
             }
 
@@ -387,14 +392,16 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.ContinuumCommandChronicleCancel, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandCancelChronicle, StringComparison.OrdinalIgnoreCase))
             {
-                HandleChronicleCancel(msg.chatId);
+                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                HandleChronicleCancel(msg.chatId, reason);
                 return;
             }
 
             if (type.Equals(WebCommandNames.ContinuumCommandChronicleRebuildTruth, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandChronicle, StringComparison.OrdinalIgnoreCase))
             {
-                HandleChronicleRebuild(msg.chatId);
+                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                HandleChronicleRebuild(msg.chatId, reason);
                 return;
             }
 
@@ -577,7 +584,7 @@ namespace VAL.Continuum
 
 
 
-        internal static void ApplyLoggingSetting(bool enable, bool showToast)
+        internal static void ApplyLoggingSetting(bool enable, bool showToast, ToastReason reason = ToastReason.Background)
         {
             bool showPausedToast = false;
             lock (Sync)
@@ -591,13 +598,17 @@ namespace VAL.Continuum
             // User-invoked: bypass launch quiet period.
             if (showToast && showPausedToast)
             {
-                Toasts.TryShow(ToastKey.ContinuumArchivingPaused, bypassLaunchQuiet: true);
+                Toasts.TryShow(
+                    ToastKey.ContinuumArchivingPaused,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: reason);
             }
         }
 
-        private static void HandleToggleLogging(bool enable)
+        private static void HandleToggleLogging(bool enable, ToastReason reason)
         {
-            ApplyLoggingSetting(enable, showToast: true);
+            ApplyLoggingSetting(enable, showToast: true, reason: reason);
         }
 
         
@@ -642,11 +653,13 @@ namespace VAL.Continuum
                     {
                         ("Prelude", () =>
                         {
-                            try { HandleInjectPrelude(null); } catch { }
+                            try { HandleInjectPrelude(null, ToastReason.DockClick); } catch { }
                         }),
                         ("Dismiss", () => { })
                     },
-                    bypassLaunchQuiet: true
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: ToastHub.ParseReason(msg.reason, ToastReason.DockClick)
                 );
             }
             catch
@@ -675,10 +688,13 @@ namespace VAL.Continuum
                 _preludeAvailableShownForCurrentNewChat = true;
             }
 
-            Toasts.TryShow(ToastKey.PreludeAvailable);
+            Toasts.TryShow(
+                ToastKey.PreludeAvailable,
+                origin: ToastOrigin.Continuum,
+                reason: ToastReason.Background);
         }
 
-        private static void HandleInjectPrelude(string? chatId)
+        private static void HandleInjectPrelude(string? chatId, ToastReason reason)
         {
             // Manual Prelude injection: drop Context.Prelude.txt into the current composer (no autosend).
             var cid = SessionContext.ResolveChatId(chatId);
@@ -690,7 +706,11 @@ namespace VAL.Continuum
             var prelude = ContinuumPreamble.LoadPrelude(cid);
             if (string.IsNullOrWhiteSpace(prelude))
             {
-                Toasts.TryShow(ToastKey.ActionUnavailable, bypassLaunchQuiet: true);
+                Toasts.TryShow(
+                    ToastKey.ActionUnavailable,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: reason);
                 return;
             }
 
@@ -730,13 +750,7 @@ namespace VAL.Continuum
         // -------------------------
         // Pulse
         // -------------------------
-        private static void ToastPulse(ToastKey key, string? chatId)
-        {
-            // Pulse toasts are grouped and replaced via ToastHub defaults.
-            Toasts.TryShow(key, chatId: chatId, bypassLaunchQuiet: true);
-        }
-
-        private static void ToastPulseActionUnavailable(string? chatId)
+        private static void ToastPulseActionUnavailable(string? chatId, ToastReason reason)
         {
             // ActionUnavailable is shared across the app; for Pulse we keep it in the "pulse" group.
             Toasts.TryShow(
@@ -744,17 +758,23 @@ namespace VAL.Continuum
                 chatId: chatId,
                 bypassLaunchQuiet: true,
                 groupKeyOverride: "pulse",
-                replaceGroupOverride: true);
+                replaceGroupOverride: true,
+                origin: ToastOrigin.Continuum,
+                reason: reason);
         }
 
-        private static void ToastOperationInProgress()
+        private static void ToastOperationInProgress(ToastReason reason)
         {
-            Toasts.TryShow(ToastKey.OperationInProgress, bypassLaunchQuiet: true);
+            Toasts.TryShow(
+                ToastKey.OperationInProgress,
+                bypassLaunchQuiet: true,
+                origin: ToastOrigin.Continuum,
+                reason: reason);
         }
 
-        private static void ToastOperationCancelled(string groupKey)
+        private static void ToastOperationCancelled(string groupKey, ToastReason reason)
         {
-            Toasts.TryShowOperationCancelled(groupKey);
+            Toasts.TryShowOperationCancelled(groupKey, ToastOrigin.Continuum, reason);
         }
 
         private static bool HasTruthLog(string chatId)
@@ -839,21 +859,26 @@ namespace VAL.Continuum
         }
 
 
-        private static void HandlePulse(string? chatId)
+        private static void HandlePulse(string? chatId, ToastReason reason)
         {
             var cid = SessionContext.ResolveChatId(chatId);
 
             // Brand-new chat / invalid context: Pulse unavailable.
             if (string.IsNullOrWhiteSpace(cid) || cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase))
             {
-                ToastPulse(ToastKey.PulseUnavailable, cid);
+                Toasts.TryShow(
+                    ToastKey.PulseUnavailable,
+                    chatId: cid,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: reason);
                 return;
             }
 
             // Single-flight guard: only one long-running operation at a time.
             if (OperationCoordinator.IsBusy)
             {
-                ToastOperationInProgress();
+                ToastOperationInProgress(reason);
                 return;
             }
 
@@ -867,7 +892,12 @@ namespace VAL.Continuum
                 if (!chronicleRunning)
                 {
                     // ToastHub applies the once-per-chat ledger gate for this nudge.
-                    ToastPulse(ToastKey.PulseNoTruthLogFound, cid);
+                    Toasts.TryShow(
+                        ToastKey.PulseNoTruthLogFound,
+                        chatId: cid,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: reason);
                 }
 
                 return;
@@ -875,17 +905,22 @@ namespace VAL.Continuum
 
             if (!OperationCoordinator.TryBegin(GuardedOperationKind.Pulse, out _))
             {
-                ToastOperationInProgress();
+                ToastOperationInProgress(reason);
                 return;
             }
 
-            if (!TryBeginRefresh(cid))
+            if (!TryBeginRefresh(cid, reason))
             {
                 OperationCoordinator.End(GuardedOperationKind.Pulse);
                 return;
             }
 
-            ToastPulse(ToastKey.PulseInitiated, cid);
+            Toasts.TryShow(
+                ToastKey.PulseInitiated,
+                chatId: cid,
+                bypassLaunchQuiet: true,
+                origin: ToastOrigin.Continuum,
+                reason: reason);
 
             // Preflight: ask the client to flush any pending captures before we read Truth.log.
             // This prevents the common "last assistant message missing" tail failure.
@@ -896,19 +931,24 @@ namespace VAL.Continuum
             }
         }
 
-        private static bool TryBeginRefresh(string chatId)
+        private static bool TryBeginRefresh(string chatId, ToastReason reason)
         {
             lock (Sync)
             {
                 if (!SessionContext.IsSessionAttached)
                 {
-                    ToastPulseActionUnavailable(chatId);
+                    ToastPulseActionUnavailable(chatId, reason);
                     return false;
                 }
 
                 if (_refreshInFlight)
                 {
-                    ToastPulse(ToastKey.PulseAlreadyRunning, chatId);
+                    Toasts.TryShow(
+                        ToastKey.PulseAlreadyRunning,
+                        chatId: chatId,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: reason);
                     return false;
                 }
 
@@ -917,7 +957,7 @@ namespace VAL.Continuum
                     var delta = DateTime.UtcNow - _lastRefreshCompletedUtc;
                     if (delta < RefreshCooldown)
                     {
-                        ToastPulseActionUnavailable(chatId);
+                        ToastPulseActionUnavailable(chatId, reason);
                         return false;
                     }
                 }
@@ -951,7 +991,12 @@ namespace VAL.Continuum
 
             if (endedRefresh && showReadyToast && !string.IsNullOrWhiteSpace(chatId))
             {
-                ToastPulse(ToastKey.PulseReady, chatId);
+                Toasts.TryShow(
+                    ToastKey.PulseReady,
+                    chatId: chatId,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: ToastReason.Background);
             }
         }
 
@@ -1029,7 +1074,7 @@ namespace VAL.Continuum
                                 if (OperationCoordinator.IsCancellationRequested(GuardedOperationKind.Pulse))
                                 {
                                     FinishRefresh(chatId, showReadyToast: false);
-                                    ToastOperationCancelled("pulse");
+                                    ToastOperationCancelled("pulse", ToastReason.Background);
                                     return;
                                 }
 
@@ -1082,7 +1127,7 @@ namespace VAL.Continuum
                 if (OperationCoordinator.IsCancellationRequested(GuardedOperationKind.Pulse))
                 {
                     FinishRefresh(cid, showReadyToast: false);
-                    ToastOperationCancelled("pulse");
+                    ToastOperationCancelled("pulse", ToastReason.Background);
                     return;
                 }
 
@@ -1098,7 +1143,7 @@ namespace VAL.Continuum
                 if (OperationCoordinator.IsCancellationRequested(GuardedOperationKind.Pulse))
                 {
                     FinishRefresh(chatId, showReadyToast: false);
-                    ToastOperationCancelled("pulse");
+                    ToastOperationCancelled("pulse", ToastReason.Background);
                     return;
                 }
 
@@ -1108,12 +1153,12 @@ namespace VAL.Continuum
             catch (OperationCanceledException)
             {
                 FinishRefresh(chatId, showReadyToast: false);
-                ToastOperationCancelled("pulse");
+                ToastOperationCancelled("pulse", ToastReason.Background);
             }
             catch
             {
                 // Catalog v1: no detailed exception toasts.
-                ToastPulseActionUnavailable(chatId);
+                ToastPulseActionUnavailable(chatId, ToastReason.Background);
 
                 // Clear refresh state (no "ready" toast on failure).
                 FinishRefresh(chatId, showReadyToast: false);
@@ -1140,7 +1185,7 @@ namespace VAL.Continuum
         // Chronicle: rebuild Truth.log from the UI (user-invoked recovery tool)
         // -------------------------
                 
-        private static void HandleChronicleComposerInteraction(string? chatId, int capturedTurns)
+        private static void HandleChronicleComposerInteraction(string? chatId, int capturedTurns, ToastReason reason)
         {
             try
             {
@@ -1232,12 +1277,14 @@ namespace VAL.Continuum
                     {
                         ("Chronicle", () =>
                         {
-                            try { HandleChronicleRebuild(cid); } catch { }
+                            try { HandleChronicleRebuild(cid, ToastReason.DockClick); } catch { }
                         }),
                         ("Not now", () => { })
                     },
                     chatId: cid,
-                    bypassLaunchQuiet: true
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: reason
                 );
 
                 if (shown)
@@ -1297,7 +1344,7 @@ namespace VAL.Continuum
             }
         }
 
-private static void MaybeShowChronicleSuggested(string chatId)
+        private static void MaybeShowChronicleSuggested(string chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return;
             if (chatId.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return;
@@ -1313,7 +1360,11 @@ private static void MaybeShowChronicleSuggested(string chatId)
                 var truthPath = Writer.GetTruthPath(chatId);
                 if (!File.Exists(truthPath) || new FileInfo(truthPath).Length <= 4)
                 {
-                    Toasts.TryShow(ToastKey.ChronicleSuggested, chatId: chatId);
+                    Toasts.TryShow(
+                        ToastKey.ChronicleSuggested,
+                        chatId: chatId,
+                        origin: ToastOrigin.Continuum,
+                        reason: ToastReason.Attach);
                 }
             }
             catch
@@ -1323,13 +1374,14 @@ private static void MaybeShowChronicleSuggested(string chatId)
         }
 
 
-        private static void HandleChronicleCancel(string? chatId)
+        private static void HandleChronicleCancel(string? chatId, ToastReason reason)
         {
             try
             {
                 if (!OperationCoordinator.IsRunning(GuardedOperationKind.Chronicle))
                     return;
 
+                _chronicleCancelReason = reason;
                 OperationCoordinator.RequestCancel();
 
                 // Ask the client to stop its scroll+scan loop.
@@ -1358,25 +1410,32 @@ private static void MaybeShowChronicleSuggested(string chatId)
         }
 
 
-        private static void HandleChronicleRebuild(string? chatId)
+        private static void HandleChronicleRebuild(string? chatId, ToastReason reason)
         {
             var cid = SessionContext.ResolveChatId(chatId);
             if (string.IsNullOrWhiteSpace(cid) || cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase))
             {
-                Toasts.TryShow(ToastKey.ChronicleUnavailable, chatId: cid, bypassLaunchQuiet: true);
+                Toasts.TryShow(
+                    ToastKey.ChronicleUnavailable,
+                    chatId: cid,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: reason);
                 return;
             }
+
+            _chronicleCancelReason = ToastReason.Background;
 
             // Single-flight guard: only one long-running operation at a time.
             if (OperationCoordinator.IsBusy)
             {
-                ToastOperationInProgress();
+                ToastOperationInProgress(reason);
                 return;
             }
 
             if (!OperationCoordinator.TryBegin(GuardedOperationKind.Chronicle, out var chronicleToken))
             {
-                ToastOperationInProgress();
+                ToastOperationInProgress(reason);
                 return;
             }
 
@@ -1384,19 +1443,31 @@ private static void MaybeShowChronicleSuggested(string chatId)
             {
                 if (!SessionContext.IsSessionAttached)
                 {
-                    Toasts.TryShow(ToastKey.ActionUnavailable, bypassLaunchQuiet: true);
+                    Toasts.TryShow(
+                        ToastKey.ActionUnavailable,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: reason);
                     OperationCoordinator.End(GuardedOperationKind.Chronicle);
                     return;
                 }
                 if (_refreshInFlight)
                 {
-                    Toasts.TryShow(ToastKey.ActionUnavailable, bypassLaunchQuiet: true);
+                    Toasts.TryShow(
+                        ToastKey.ActionUnavailable,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: reason);
                     OperationCoordinator.End(GuardedOperationKind.Chronicle);
                     return;
                 }
                 if (_chronicleInFlight)
                 {
-                    Toasts.TryShow(ToastKey.ActionUnavailable, bypassLaunchQuiet: true);
+                    Toasts.TryShow(
+                        ToastKey.ActionUnavailable,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: reason);
                     OperationCoordinator.End(GuardedOperationKind.Chronicle);
                     return;
                 }
@@ -1421,7 +1492,11 @@ private static void MaybeShowChronicleSuggested(string chatId)
                     }
 
                     OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    Toasts.TryShow(ToastKey.ActionUnavailable, bypassLaunchQuiet: true);
+                    Toasts.TryShow(
+                        ToastKey.ActionUnavailable,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: reason);
                     return;
                 }
 
@@ -1440,7 +1515,11 @@ private static void MaybeShowChronicleSuggested(string chatId)
                 }
 
                 OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                Toasts.TryShow(ToastKey.ActionUnavailable, bypassLaunchQuiet: true);
+                Toasts.TryShow(
+                    ToastKey.ActionUnavailable,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: reason);
                 return;
             }
 
@@ -1456,7 +1535,9 @@ private static void MaybeShowChronicleSuggested(string chatId)
                         bypassLaunchQuiet: true,
                         groupKeyOverride: ToastGroup_Chronicle,
                         replaceGroupOverride: true,
-                        bypassBurstDedupeOverride: true);
+                        bypassBurstDedupeOverride: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: reason);
                     lock (Sync) { _chronicleInFlight = false; _chronicleRunning = false; _chronicleRequestId = null; }
                     try { Writer.AbortTruthRebuild(cid); } catch { }
                     OperationCoordinator.End(GuardedOperationKind.Chronicle);
@@ -1479,7 +1560,12 @@ private static void MaybeShowChronicleSuggested(string chatId)
                     })
                 });
                 // Sticky instruction toast: remains visible until Chronicle completes (then replaced).
-                Toasts.TryShow(ToastKey.ChronicleStarted, chatId: cid, bypassLaunchQuiet: true);
+                Toasts.TryShow(
+                    ToastKey.ChronicleStarted,
+                    chatId: cid,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: reason);
             }
             catch
             {
@@ -1492,7 +1578,9 @@ private static void MaybeShowChronicleSuggested(string chatId)
                     bypassLaunchQuiet: true,
                     groupKeyOverride: ToastGroup_Chronicle,
                     replaceGroupOverride: true,
-                    bypassBurstDedupeOverride: true);
+                    bypassBurstDedupeOverride: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: reason);
             }
         }
 
@@ -1547,7 +1635,8 @@ private static void MaybeShowChronicleSuggested(string chatId)
                 {
                     try { Writer.AbortTruthRebuild(cid); } catch { }
 
-                    ToastOperationCancelled(ToastGroup_Chronicle);
+                    ToastOperationCancelled(ToastGroup_Chronicle, _chronicleCancelReason);
+                    _chronicleCancelReason = ToastReason.Background;
                     TryAppendChronicleAudit(cid, $"Chronicle CANCELLED | Utc={DateTime.UtcNow:o} | Captured={captured} | Ms={ms}");
                     OperationCoordinator.End(GuardedOperationKind.Chronicle);
                     return;
@@ -1562,7 +1651,9 @@ private static void MaybeShowChronicleSuggested(string chatId)
                         bypassLaunchQuiet: true,
                         groupKeyOverride: ToastGroup_Chronicle,
                         replaceGroupOverride: true,
-                        bypassBurstDedupeOverride: true);
+                        bypassBurstDedupeOverride: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: ToastReason.Background);
 
                     TryAppendChronicleAudit(cid, $"Chronicle FAILED    | Utc={DateTime.UtcNow:o} | Error={msg.error} | Captured={captured} | Ms={ms}");
                     OperationCoordinator.End(GuardedOperationKind.Chronicle);
@@ -1576,7 +1667,9 @@ private static void MaybeShowChronicleSuggested(string chatId)
                         bypassLaunchQuiet: true,
                         groupKeyOverride: ToastGroup_Chronicle,
                         replaceGroupOverride: true,
-                        bypassBurstDedupeOverride: true);
+                        bypassBurstDedupeOverride: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: ToastReason.Background);
 
                     TryAppendChronicleAudit(cid, $"Chronicle FAILED    | Utc={DateTime.UtcNow:o} | Error=commit_failed | Captured={captured} | Ms={ms}");
                     OperationCoordinator.End(GuardedOperationKind.Chronicle);
@@ -1594,7 +1687,12 @@ private static void MaybeShowChronicleSuggested(string chatId)
                     _chroniclePromptLastShownUtcByChat.Remove(cid);
                 }
                 // Replace the sticky "do not send" toast with the completion toast.
-                Toasts.TryShow(ToastKey.ChronicleCompleted, chatId: cid, bypassLaunchQuiet: true);
+                Toasts.TryShow(
+                    ToastKey.ChronicleCompleted,
+                    chatId: cid,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: ToastReason.Background);
 
                 TryAppendChronicleAudit(cid, $"Chronicle COMPLETED | Utc={DateTime.UtcNow:o} | Captured={captured} | Ms={ms}");
                 OperationCoordinator.End(GuardedOperationKind.Chronicle);
@@ -1611,7 +1709,9 @@ private static void MaybeShowChronicleSuggested(string chatId)
                         bypassLaunchQuiet: true,
                         groupKeyOverride: ToastGroup_Chronicle,
                         replaceGroupOverride: true,
-                        bypassBurstDedupeOverride: true);
+                        bypassBurstDedupeOverride: true,
+                        origin: ToastOrigin.Continuum,
+                        reason: ToastReason.Background);
                 }
                 catch { }
             }
@@ -1668,7 +1768,11 @@ private static void MaybeShowChronicleSuggested(string chatId)
             }
             catch
             {
-                Toasts.TryShow(ToastKey.ActionUnavailable, bypassLaunchQuiet: true);
+                Toasts.TryShow(
+                    ToastKey.ActionUnavailable,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.Continuum,
+                    reason: ToastReason.Background);
             }
         }
 

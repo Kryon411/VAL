@@ -136,7 +136,7 @@
     writeBoolLS(VOID_ENABLED_KEY, v);
     window.valVoidEnabled = v;
     // Host toast (activation only is handled host-side).
-    try { post({ type: getCommandName("VoidCommandSetEnabled"), enabled: v }); } catch(_) {}
+    try { post({ type: getCommandName("VoidCommandSetEnabled"), enabled: v, reason: "dock_click" }); } catch(_) {}
     try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}
   }
 
@@ -450,12 +450,13 @@ function suppressPreludeNudge(ms){
     } catch(_) {}
   }
 
-  function sendCommand(commandName, payload, requiresChatId){
+  function sendCommand(commandName, payload, requiresChatId, reason){
     if (!commandName) return;
     const msg = { type: commandName };
     if (payload && typeof payload === "object" && !Array.isArray(payload)) {
       Object.assign(msg, payload);
     }
+    if (reason) msg.reason = reason;
     if (requiresChatId) {
       msg.chatId = getChatId();
     }
@@ -490,7 +491,7 @@ function suppressPreludeNudge(ms){
           if (refreshLocked) return;
           try {
             suppressPreludeNudge(25000);
-            sendCommand(item.command?.name, item.command?.payload, true);
+            sendCommand(item.command?.name, item.command?.payload, true, "dock_click");
             collapse(true);
             startRefreshCooldown(8000);
           } catch(_) {
@@ -500,14 +501,14 @@ function suppressPreludeNudge(ms){
         }
 
         if (item.id === "chronicle" && chronicleBusy) {
-          sendCommand(getCommandName("ContinuumCommandChronicleCancel"), {}, true);
+          sendCommand(getCommandName("ContinuumCommandChronicleCancel"), {}, true, "dock_click");
           return;
         }
 
         if (item.id === "portalSend") {
           try { focusComposerForPaste(); } catch(_) {}
           setTimeout(()=>{
-            sendCommand(item.command?.name, item.command?.payload, item.command?.requiresChatId);
+            sendCommand(item.command?.name, item.command?.payload, item.command?.requiresChatId, "dock_click");
           }, 80);
           return;
         }
@@ -529,7 +530,7 @@ function suppressPreludeNudge(ms){
           } catch(_) { return; }
         }
 
-        sendCommand(item.command?.name, item.command?.payload, item.command?.requiresChatId);
+        sendCommand(item.command?.name, item.command?.payload, item.command?.requiresChatId, "dock_click");
       }, true);
       return button;
     }
@@ -554,7 +555,7 @@ function suppressPreludeNudge(ms){
           ? { ...item.command.payload }
           : {};
         payload.enabled = next;
-        sendCommand(commandName, payload, item.command?.requiresChatId);
+        sendCommand(commandName, payload, item.command?.requiresChatId, "dock_click");
       });
 
       if (item.disabled) {

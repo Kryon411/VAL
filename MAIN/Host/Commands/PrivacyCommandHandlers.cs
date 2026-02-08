@@ -87,14 +87,23 @@ namespace VAL.Host.Commands
                 var result = wipeService.WipeData();
 
                 var toastHub = services.GetService<IToastHub>() ?? new ToastHubAdapter();
+                var reason = ToastHub.ParseReason(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
 
                 if (result.Success)
                 {
-                    toastHub.TryShow(ToastKey.DataWipeCompleted, bypassLaunchQuiet: true);
+                    toastHub.TryShow(
+                        ToastKey.DataWipeCompleted,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.HostCommand,
+                        reason: reason);
                 }
                 else
                 {
-                    toastHub.TryShow(ToastKey.DataWipePartial, bypassLaunchQuiet: true);
+                    toastHub.TryShow(
+                        ToastKey.DataWipePartial,
+                        bypassLaunchQuiet: true,
+                        origin: ToastOrigin.HostCommand,
+                        reason: reason);
                 }
             }
             catch (Exception ex)
@@ -102,7 +111,11 @@ namespace VAL.Host.Commands
                 LogCommandFailure("wipe_data", cmd, ex);
                 var services = GetServices();
                 var toastHub = services?.GetService<IToastHub>() ?? new ToastHubAdapter();
-                toastHub.TryShow(ToastKey.DataWipePartial, bypassLaunchQuiet: true);
+                toastHub.TryShow(
+                    ToastKey.DataWipePartial,
+                    bypassLaunchQuiet: true,
+                    origin: ToastOrigin.HostCommand,
+                    reason: ToastReason.Background);
             }
         }
 

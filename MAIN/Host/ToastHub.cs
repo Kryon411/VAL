@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using VAL.Continuum.Pipeline;
 
@@ -12,6 +13,7 @@ namespace VAL.Host
     /// </summary>
     public static class ToastHub
     {
+        private const string LogCategory = nameof(ToastHub);
         // -----------------------------
         // Internal definition container
         // -----------------------------
@@ -30,8 +32,11 @@ namespace VAL.Host
         );
 
         private static readonly object Gate = new object();
+        private static readonly object ReasonGate = new object();
         // Cooldown de-dupe is per (key + context) so chat-specific nudges don't suppress each other.
         private static readonly Dictionary<string, DateTime> _lastShownUtc = new();
+        private static readonly Dictionary<string, DateTime> _reasonDedupeUtc = new();
+        private static readonly TimeSpan ReasonDedupeWindow = TimeSpan.FromSeconds(2);
 
         // Central catalog (policy table).
         private static readonly Dictionary<ToastKey, ToastDef> Defs =
@@ -555,25 +560,42 @@ namespace VAL.Host
             bool? replaceGroupOverride = null,
             bool? bypassBurstDedupeOverride = null,
             bool? oncePerChatOverride = null,
-            string? ledgerIdOverride = null)
+            string? ledgerIdOverride = null,
+            ToastOrigin origin = ToastOrigin.Unknown,
+            ToastReason reason = ToastReason.Unknown)
         {
             if (!Defs.TryGetValue(key, out var def))
                 return false;
 
             // Launch quiet period applies only to passive/system nudges.
             if (def.IsPassive && !bypassLaunchQuiet && ToastManager.IsLaunchQuietPeriodActive)
+            {
+                LogSuppressed(key, origin, reason, "launch-quiet", chatId);
                 return false;
+            }
+
+            if (ShouldSuppressByReason(key, reason))
+            {
+                LogSuppressed(key, origin, reason, "reason-dedupe", chatId);
+                return false;
+            }
 
             // Once-per-chat gating (persisted via ToastLedger).
             var oncePerChat = oncePerChatOverride ?? def.OncePerChat;
             if (oncePerChat)
             {
                 if (string.IsNullOrWhiteSpace(chatId))
+                {
+                    LogSuppressed(key, origin, reason, "once-per-chat:missing-chat", chatId);
                     return false;
+                }
 
                 var lid = ledgerIdOverride ?? def.LedgerId ?? ("toast." + key);
                 if (!ToastLedger.TryMarkShown(chatId, lid))
+                {
+                    LogSuppressed(key, origin, reason, "once-per-chat:ledger", chatId);
                     return false;
+                }
             }
 
             var title = titleOverride ?? def.Title;
@@ -596,7 +618,10 @@ namespace VAL.Host
                     if (_lastShownUtc.TryGetValue(cooldownKey, out var last))
                     {
                         if ((now - last) < def.Cooldown)
+                        {
+                            LogSuppressed(key, origin, reason, "cooldown", chatId);
                             return false;
+                        }
                     }
 
                     _lastShownUtc[cooldownKey] = now;
@@ -627,23 +652,40 @@ namespace VAL.Host
             string? groupKeyOverride = null,
             bool? replaceGroupOverride = null,
             bool? oncePerChatOverride = null,
-            string? ledgerIdOverride = null)
+            string? ledgerIdOverride = null,
+            ToastOrigin origin = ToastOrigin.Unknown,
+            ToastReason reason = ToastReason.Unknown)
         {
             if (!Defs.TryGetValue(key, out var def))
                 return false;
 
             if (def.IsPassive && !bypassLaunchQuiet && ToastManager.IsLaunchQuietPeriodActive)
+            {
+                LogSuppressed(key, origin, reason, "launch-quiet", chatId);
                 return false;
+            }
+
+            if (ShouldSuppressByReason(key, reason))
+            {
+                LogSuppressed(key, origin, reason, "reason-dedupe", chatId);
+                return false;
+            }
 
             var oncePerChat = oncePerChatOverride ?? def.OncePerChat;
             if (oncePerChat)
             {
                 if (string.IsNullOrWhiteSpace(chatId))
+                {
+                    LogSuppressed(key, origin, reason, "once-per-chat:missing-chat", chatId);
                     return false;
+                }
 
                 var lid = ledgerIdOverride ?? def.LedgerId ?? ("toast." + key);
                 if (!ToastLedger.TryMarkShown(chatId, lid))
+                {
+                    LogSuppressed(key, origin, reason, "once-per-chat:ledger", chatId);
                     return false;
+                }
             }
 
             var title = titleOverride ?? def.Title;
@@ -663,7 +705,10 @@ namespace VAL.Host
                     if (_lastShownUtc.TryGetValue(cooldownKey, out var last))
                     {
                         if ((now - last) < def.Cooldown)
+                        {
+                            LogSuppressed(key, origin, reason, "cooldown", chatId);
                             return false;
+                        }
                     }
 
                     _lastShownUtc[cooldownKey] = now;
@@ -675,7 +720,10 @@ namespace VAL.Host
             return true;
         }
 
-        public static void TryShowOperationCancelled(string groupKey)
+        public static void TryShowOperationCancelled(
+            string groupKey,
+            ToastOrigin origin = ToastOrigin.Unknown,
+            ToastReason reason = ToastReason.Unknown)
         {
             // Use the OperationCancelled definition, but let callers choose the group bucket.
             TryShow(
@@ -684,7 +732,56 @@ namespace VAL.Host
                 bypassLaunchQuiet: true,
                 groupKeyOverride: groupKey,
                 replaceGroupOverride: true,
-                bypassBurstDedupeOverride: true);
+                bypassBurstDedupeOverride: true,
+                origin: origin,
+                reason: reason);
+        }
+
+        public static ToastReason ParseReason(string? reason, ToastReason fallback = ToastReason.Background)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                return fallback;
+
+            var normalized = reason.Trim().ToLowerInvariant();
+
+            if (normalized.Contains("dock") || normalized.Contains("click") || normalized.Contains("pointer"))
+                return ToastReason.DockClick;
+
+            if (normalized.Contains("hotkey") || normalized.Contains("keydown") || normalized.Contains("keyboard"))
+                return ToastReason.Hotkey;
+
+            if (normalized.Contains("attach"))
+                return ToastReason.Attach;
+
+            if (normalized.Contains("background"))
+                return ToastReason.Background;
+
+            return fallback;
+        }
+
+        private static bool ShouldSuppressByReason(ToastKey key, ToastReason reason)
+        {
+            var now = DateTime.UtcNow;
+            var dedupeKey = $"{key}|{reason}";
+            lock (ReasonGate)
+            {
+                var stale = _reasonDedupeUtc.Where(kv => (now - kv.Value) > ReasonDedupeWindow)
+                                            .Select(kv => kv.Key)
+                                            .ToList();
+                foreach (var k in stale) _reasonDedupeUtc.Remove(k);
+
+                if (_reasonDedupeUtc.TryGetValue(dedupeKey, out var last) && (now - last) <= ReasonDedupeWindow)
+                    return true;
+
+                _reasonDedupeUtc[dedupeKey] = now;
+                return false;
+            }
+        }
+
+        private static void LogSuppressed(ToastKey key, ToastOrigin origin, ToastReason reason, string detail, string? chatId)
+        {
+            var chatTag = string.IsNullOrWhiteSpace(chatId) ? "n/a" : chatId;
+            ValLog.Verbose(LogCategory, $"Suppressed toast {key} (origin={origin}, reason={reason}, chat={chatTag}, detail={detail}).");
         }
     }
 }

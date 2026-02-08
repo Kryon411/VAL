@@ -169,11 +169,11 @@ namespace VAL.Continuum.Pipeline.Filter2
                 var t = l.Trim();
                 if (HasAnchorTag(t)) continue;
 
-                if (t.IndexOf("do these", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    t.IndexOf("checks in order", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    t.IndexOf("tell me which", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    t.IndexOf("report back", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    t.IndexOf("answer just this", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (t.Contains("do these", StringComparison.OrdinalIgnoreCase) ||
+                    t.Contains("checks in order", StringComparison.OrdinalIgnoreCase) ||
+                    t.Contains("tell me which", StringComparison.OrdinalIgnoreCase) ||
+                    t.Contains("report back", StringComparison.OrdinalIgnoreCase) ||
+                    t.Contains("answer just this", StringComparison.OrdinalIgnoreCase))
                 {
                     procedural++;
                 }
@@ -208,11 +208,11 @@ namespace VAL.Continuum.Pipeline.Filter2
 
                 // Drop common "ops prompt" lines that are only relevant at runtime.
                 var tt = raw.Trim();
-                if (tt.IndexOf("do these", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    tt.IndexOf("checks in order", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    tt.IndexOf("tell me which", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    tt.IndexOf("report back", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    tt.IndexOf("answer just this", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (tt.Contains("do these", StringComparison.OrdinalIgnoreCase) ||
+                    tt.Contains("checks in order", StringComparison.OrdinalIgnoreCase) ||
+                    tt.Contains("tell me which", StringComparison.OrdinalIgnoreCase) ||
+                    tt.Contains("report back", StringComparison.OrdinalIgnoreCase) ||
+                    tt.Contains("answer just this", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
