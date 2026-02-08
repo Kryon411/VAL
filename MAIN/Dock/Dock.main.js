@@ -55,6 +55,41 @@
 
   function post(msg){ try{ window.chrome?.webview?.postMessage(toEnvelope(msg)); }catch(e){} }
 
+  const COMMAND_NAME_BOOTSTRAP_TYPE = "val.contracts.bootstrap";
+  const DEFAULT_COMMAND_NAMES = Object.freeze({
+    VoidCommandSetEnabled: "void.command.set_enabled",
+    ContinuumCommandPulse: "continuum.command.pulse",
+    ContinuumCommandInjectPreamble: "continuum.command.inject_preamble",
+    ContinuumCommandChronicleCancel: "continuum.command.chronicle_cancel",
+    ContinuumCommandChronicleRebuildTruth: "continuum.command.chronicle_rebuild_truth",
+    ContinuumCommandOpenSessionFolder: "continuum.command.open_session_folder",
+    AbyssCommandLast: "abyss.command.last",
+    PortalCommandSetEnabled: "portal.command.set_enabled",
+    PortalCommandSendStaged: "portal.command.send_staged",
+    PrivacyCommandSetContinuumLogging: "privacy.command.set_continuum_logging",
+    PrivacyCommandSetPortalCapture: "privacy.command.set_portal_capture",
+    PrivacyCommandOpenDataFolder: "privacy.command.open_data_folder",
+    PrivacyCommandWipeData: "privacy.command.wipe_data",
+    ToolsOpenTruthHealth: "tools.open_truth_health",
+    ToolsOpenDiagnostics: "tools.open_diagnostics"
+  });
+
+  let commandNames = { ...DEFAULT_COMMAND_NAMES };
+
+  function applyCommandNames(update){
+    if (!update || typeof update !== "object") return;
+    Object.keys(update).forEach((key)=>{
+      const value = update[key];
+      if (typeof value === "string" && value.trim()) {
+        commandNames[key] = value;
+      }
+    });
+  }
+
+  function getCommandName(key){
+    return commandNames[key] || DEFAULT_COMMAND_NAMES[key] || key;
+  }
+
   // Persisted module flags (so Control Centre reflects real module state on load)
   const VOID_ENABLED_KEY = "VAL_VoidEnabled";
 
@@ -124,7 +159,7 @@
     writeBoolLS(VOID_ENABLED_KEY, v);
     window.valVoidEnabled = v;
     // Host toast (activation only is handled host-side).
-    try { post({ type: "void.command.set_enabled", enabled: v }); } catch(_) {}
+    try { post({ type: getCommandName("VoidCommandSetEnabled"), enabled: v }); } catch(_) {}
     try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}
   }
 
@@ -351,7 +386,7 @@ function suppressPreludeNudge(ms){
 
       if (module==="ContinuumLogging") {
         try {
-          post({ type:"privacy.command.set_continuum_logging", enabled: next });
+          post({ type:getCommandName("PrivacyCommandSetContinuumLogging"), enabled: next });
         } catch(_) {}
       }
 
@@ -365,7 +400,7 @@ function suppressPreludeNudge(ms){
 
       if (module==="PortalPrivacy") {
         try {
-          post({ type:"privacy.command.set_portal_capture", enabled: next });
+          post({ type:getCommandName("PrivacyCommandSetPortalCapture"), enabled: next });
           applyPrivacySettings({ ...privacySettings, portalCaptureEnabled: next });
         } catch(_) {}
       }
@@ -411,7 +446,7 @@ function suppressPreludeNudge(ms){
     if (options.sendHost) {
       try {
         setPortalEnabled(portalArmed);
-        post({ type:"portal.command.set_enabled", enabled: portalArmed });
+        post({ type:getCommandName("PortalCommandSetEnabled"), enabled: portalArmed });
       } catch(_) {}
     }
 
@@ -642,7 +677,7 @@ function suppressPreludeNudge(ms){
     attachTooltip(wipeDataBtn, "Wipe local logs, profiles, and session memory. This does not remove the app.");
     openDataBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-      try { post({ type:"privacy.command.open_data_folder" }); } catch(_) {}
+      try { post({ type:getCommandName("PrivacyCommandOpenDataFolder") }); } catch(_) {}
     }, true);
     wipeDataBtn.addEventListener("click",(e)=>{
       e.preventDefault();
@@ -660,7 +695,7 @@ function suppressPreludeNudge(ms){
       try {
         if (!window.confirm(msg)) return;
       } catch(_) { return; }
-      try { post({ type:"privacy.command.wipe_data" }); } catch(_) {}
+      try { post({ type:getCommandName("PrivacyCommandWipeData") }); } catch(_) {}
     }, true);
     rowPrivacyActions.append(openDataBtn, wipeDataBtn);
     dataPrivacy.content.append(rowPrivacyActions);
@@ -707,7 +742,7 @@ function suppressPreludeNudge(ms){
 
       try {
         suppressPreludeNudge(25000);
-        post({ type:"continuum.command.pulse", chatId: getChatId() });
+        post({ type:getCommandName("ContinuumCommandPulse"), chatId: getChatId() });
         collapse(true);
         startRefreshCooldown(8000);
       } catch(_) {
@@ -719,7 +754,7 @@ function suppressPreludeNudge(ms){
     attachTooltip(preludeBtn, "Add the session setup and instructions to the current chat.");
     preludeBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-      try { post({ type:"continuum.command.inject_preamble", chatId: getChatId() }); } catch(_) {}
+      try { post({ type:getCommandName("ContinuumCommandInjectPreamble"), chatId: getChatId() }); } catch(_) {}
     }, true);
 
 
@@ -759,6 +794,15 @@ function suppressPreludeNudge(ms){
             }
             if (!msg || typeof msg !== "object") return;
             msg = unwrapEnvelope(msg);
+            if ((msg.type || "") === COMMAND_NAME_BOOTSTRAP_TYPE) {
+              try {
+                const payload = (msg.payload && typeof msg.payload === "object" && !Array.isArray(msg.payload))
+                  ? msg.payload
+                  : (msg.commandNames && typeof msg.commandNames === "object" ? msg.commandNames : (msg.commands && typeof msg.commands === "object" ? msg.commands : null));
+                applyCommandNames(payload);
+              } catch(_) {}
+              return;
+            }
             if ((msg.type || "") === "continuum.chronicle.start") setChronicleBusy(true);
             if ((msg.type || "") === "portal.stage.count") {
               try {
@@ -792,8 +836,8 @@ function suppressPreludeNudge(ms){
     chronicleBtn.addEventListener("click",(e)=>{
       e.preventDefault();
       try {
-        if (chronicleBusy) post({ type:"continuum.command.chronicle_cancel", chatId: getChatId() });
-        else post({ type:"continuum.command.chronicle_rebuild_truth", chatId: getChatId() });
+        if (chronicleBusy) post({ type:getCommandName("ContinuumCommandChronicleCancel"), chatId: getChatId() });
+        else post({ type:getCommandName("ContinuumCommandChronicleRebuildTruth"), chatId: getChatId() });
       } catch(_) {}
     }, true);
 
@@ -801,7 +845,7 @@ function suppressPreludeNudge(ms){
     attachTooltip(openBtn, "Open the folder on your computer where this session’s files are stored.");
     openBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-      try { post({ type:"continuum.command.open_session_folder", chatId: getChatId() }); } catch(_) {}
+      try { post({ type:getCommandName("ContinuumCommandOpenSessionFolder"), chatId: getChatId() }); } catch(_) {}
     }, true);
 
     rowBtns.append(pulseBtn, preludeBtn, chronicleBtn, openBtn);
@@ -829,7 +873,7 @@ function suppressPreludeNudge(ms){
     portalSendBtn.addEventListener("click",(e)=>{
       e.preventDefault();
       try { focusComposerForPaste(); } catch(_) {}
-      setTimeout(()=>{ try { post({ type:"portal.command.send_staged", max: 10 }); } catch(_) {} }, 80);
+      setTimeout(()=>{ try { post({ type:getCommandName("PortalCommandSendStaged"), max: 10 }); } catch(_) {} }, 80);
     }, true);
 
     portalToggle = toggle(
@@ -862,12 +906,12 @@ function suppressPreludeNudge(ms){
 
     abyssLastBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-      try { post({ type:"abyss.command.last", chatId: getChatId(), count: 2, inject: false }); } catch(_) {}
+      try { post({ type:getCommandName("AbyssCommandLast"), chatId: getChatId(), count: 2, inject: false }); } catch(_) {}
     }, true);
 
     abyssFolderBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-      try { post({ type:"continuum.command.open_session_folder", chatId: getChatId() }); } catch(_) {}
+      try { post({ type:getCommandName("ContinuumCommandOpenSessionFolder"), chatId: getChatId() }); } catch(_) {}
     }, true);
 
     rowABtns.append(abyssSearchBtn, abyssLastBtn, abyssFolderBtn);
@@ -905,12 +949,12 @@ function suppressPreludeNudge(ms){
 
     truthHealthBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-      try { post({ type:"tools.open_truth_health" }); } catch(_) {}
+      try { post({ type:getCommandName("ToolsOpenTruthHealth") }); } catch(_) {}
     }, true);
 
     diagnosticsBtn.addEventListener("click",(e)=>{
       e.preventDefault();
-      try { post({ type:"tools.open_diagnostics" }); } catch(_) {}
+      try { post({ type:getCommandName("ToolsOpenDiagnostics") }); } catch(_) {}
     }, true);
 
     rowToolsBtns.append(truthHealthBtn, diagnosticsBtn);

@@ -515,6 +515,12 @@ namespace VAL.Continuum
             }
             catch { }
 
+            try
+            {
+                SendContractsBootstrap(cid);
+            }
+            catch { }
+
             // Suppress all archive-related guidance/lifecycle toasts while Chronicle is running.
             if (chronicleRunning) return;
 
@@ -551,6 +557,21 @@ namespace VAL.Continuum
                     }
                 }
                 catch { }
+            });
+        }
+
+        private static void SendContractsBootstrap(string? chatId)
+        {
+            var post = PostToWebMessage;
+            if (post == null)
+                return;
+
+            var payload = WebCommandNames.GetAll();
+            post(new MessageEnvelope
+            {
+                Type = WebMessageTypes.ContractsBootstrap,
+                ChatId = chatId,
+                Payload = JsonSerializer.SerializeToElement(payload)
             });
         }
 

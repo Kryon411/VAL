@@ -13,5 +13,6 @@ namespace VAL.Contracts
         public const string Command = "command";
         public const string Event = "event";
         public const string Log = "log";
+        public const string ContractsBootstrap = "val.contracts.bootstrap";
     }
 }
