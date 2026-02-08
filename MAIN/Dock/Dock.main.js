@@ -203,7 +203,9 @@ function isPreludeNudgeSuppressed(){
   let dock, pill, panel;
   let portalBadge, portalPillIndicator;
   let portalToggle, portalPrivacyToggle, continuumPrivacyToggle;
-  let portalCount, portalPrivacyNote, portalSendBtn;
+  let portalCount, portalPrivacyNote, portalSendBtn, portalSendHint;
+  let pulseStatusHint;
+  let lastFocusedElement = null;
   let portalArmed = false;
   let isDragging = false;
   let dragOffset = [0,0];
@@ -437,6 +439,12 @@ function isPreludeNudgeSuppressed(){
         portalSendBtn.disabled = disabled;
         portalSendBtn.classList.toggle("valdock-btn-disabled", disabled);
       }
+      if (portalSendHint) {
+        portalSendHint.textContent = c <= 0
+          ? "Stage at least one capture to enable Send."
+          : "Send will paste all staged captures into the composer.";
+        portalSendHint.classList.toggle("is-muted", c > 0);
+      }
     } catch(_) {}
   }
 
@@ -533,13 +541,50 @@ function isPreludeNudgeSuppressed(){
     saveState();
   }
 
+  function getDockFocusableElements(){
+    if (!dock) return [];
+    const selectors = [
+      "button",
+      "summary",
+      "[href]",
+      "input",
+      "select",
+      "textarea",
+      "[tabindex]:not([tabindex='-1'])"
+    ];
+    const nodes = Array.from(dock.querySelectorAll(selectors.join(",")));
+    return nodes.filter((node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      if (node.hasAttribute("disabled")) return false;
+      if (node.getAttribute("aria-disabled") === "true") return false;
+      return node.offsetParent !== null;
+    });
+  }
+
+  function focusFirstDockControl(){
+    const focusables = getDockFocusableElements();
+    if (focusables.length > 0) {
+      try { focusables[0].focus({ preventScroll: true }); } catch(_) { try { focusables[0].focus(); } catch(__) {} }
+    }
+  }
+
   function collapse(toCollapsed){
     state.collapsed = !!toCollapsed;
     if (!pill || !panel) return;
     try { hideTooltip(); } catch(_) {}
     pill.style.display  = state.collapsed ? "block" : "none";
     panel.style.display = state.collapsed ? "none"  : "flex";
+    pill.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
     saveState();
+
+    if (state.collapsed) {
+      if (lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
+        try { pill.focus({ preventScroll: true }); } catch(_) { try { pill.focus(); } catch(__) {} }
+      }
+    } else {
+      lastFocusedElement = document.activeElement;
+      focusFirstDockControl();
+    }
   }
 
   function buildDock(){
@@ -547,7 +592,12 @@ function isPreludeNudgeSuppressed(){
     pill  = el("button","valdock-pill","Control Centre");
     portalPillIndicator = el("span","valdock-pill-indicator","●");
     pill.append(portalPillIndicator);
+    pill.setAttribute("aria-controls", "valdock-panel");
+    pill.setAttribute("aria-expanded", "false");
     panel = el("div","valdock-panel");
+    panel.id = "valdock-panel";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", "Control Centre");
 
     // Drag handlers
     dock.addEventListener("mousedown", onDown, true);
@@ -555,6 +605,8 @@ function isPreludeNudgeSuppressed(){
     // Header
     const header = el("div","valdock-header");
     const title  = el("div","valdock-title","CONTROL CENTRE");
+    title.id = "valdock-title";
+    panel.setAttribute("aria-labelledby", "valdock-title");
     const close  = el("button","valdock-close","×");
     portalBadge = el("div", "valdock-portal-badge", "Portal");
     close.addEventListener("click",(e)=>{ e.preventDefault(); collapse(true); }, true);
@@ -639,6 +691,12 @@ function isPreludeNudgeSuppressed(){
       try {
         pulseBtn.disabled = refreshLocked;
         pulseBtn.classList.toggle("valdock-btn-disabled", refreshLocked);
+        if (pulseStatusHint) {
+          pulseStatusHint.textContent = refreshLocked
+            ? "Pulse is cooling down. Try again in a moment."
+            : "Pulse opens a fresh chat with a summarized handoff.";
+          pulseStatusHint.classList.toggle("is-muted", !refreshLocked);
+        }
       } catch(_) {}
     }
 
@@ -742,7 +800,9 @@ function isPreludeNudgeSuppressed(){
 
     rowBtns.append(pulseBtn, preludeBtn, chronicleBtn, openBtn);
     const continuumHint = el("div","valdock-section-hint","Session tools for jumps and memory.");
-    continuumSection.content.append(rowBtns, continuumHint);
+    pulseStatusHint = el("div","valdock-section-hint","Pulse opens a fresh chat with a summarized handoff.");
+    pulseStatusHint.classList.add("valdock-status-hint", "is-muted");
+    continuumSection.content.append(rowBtns, continuumHint, pulseStatusHint);
 
     // Portal
     portalPrivacyToggle = toggle(
@@ -774,7 +834,9 @@ function isPreludeNudgeSuppressed(){
     );
 
     rowP.append(portalToggle, portalCount, portalSendBtn);
-    portalSection.content.append(rowP);
+    portalSendHint = el("div","valdock-section-hint","Stage at least one capture to enable Send.");
+    portalSendHint.classList.add("valdock-status-hint");
+    portalSection.content.append(rowP, portalSendHint);
 
     // Abyss
     const abyssSection = buildSection("Abyss", "Recall & search", null);
@@ -893,6 +955,39 @@ function isPreludeNudgeSuppressed(){
 
     // Clicking minimized pill expands
     pill.addEventListener("click",(e)=>{ e.preventDefault(); collapse(false); }, true);
+
+    // Keyboard support: ESC closes, Tab wraps within open dock
+    dock.addEventListener("keydown", (e)=>{
+      if (state.collapsed) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        collapse(true);
+        return;
+      }
+      if (e.key === "Tab") {
+        const focusables = getDockFocusableElements();
+        if (focusables.length === 0) return;
+        const currentIndex = focusables.indexOf(document.activeElement);
+        const lastIndex = focusables.length - 1;
+        if (e.shiftKey) {
+          if (currentIndex <= 0 || document.activeElement === dock) {
+            e.preventDefault();
+            focusables[lastIndex].focus();
+          }
+        } else if (currentIndex === lastIndex) {
+          e.preventDefault();
+          focusables[0].focus();
+        }
+      }
+    }, true);
+
+    document.addEventListener("keydown", (e)=>{
+      if (state.collapsed) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        collapse(true);
+      }
+    }, true);
 
     // Initial state
     if (state.collapsed) collapse(true); else collapse(false);
