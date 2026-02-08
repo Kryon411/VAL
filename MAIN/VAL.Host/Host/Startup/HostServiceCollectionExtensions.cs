@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using VAL.Host.Options;
 using VAL.Host.Security;
 using VAL.Host.Services;
+using VAL.Host.Services.Adapters;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Startup;
