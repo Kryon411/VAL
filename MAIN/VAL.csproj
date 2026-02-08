@@ -28,7 +28,9 @@
   -->
   <ItemGroup>
     <ApplicationDefinition Remove="App.xaml" />
+    <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
     <Page Remove="App.xaml" />
+    <Page Remove="VAL.Host\**\*.xaml" />
     <None Include="App.xaml" Condition="Exists('App.xaml')" />
   </ItemGroup>
 
