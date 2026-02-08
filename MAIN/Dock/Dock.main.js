@@ -73,6 +73,8 @@
     PrivacyCommandWipeData: "privacy.command.wipe_data",
     ToolsOpenTruthHealth: "tools.open_truth_health",
     ToolsOpenDiagnostics: "tools.open_diagnostics",
+    NavCommandGoChat: "nav.command.go_chat",
+    NavCommandGoBack: "nav.command.go_back",
     DockCommandRequestModel: "dock.command.request_model"
   });
 

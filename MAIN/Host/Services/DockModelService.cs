@@ -496,6 +496,47 @@ namespace VAL.Host.Services
                             }
                         }
                     }
+                },
+                new DockSection
+                {
+                    Id = "navigation",
+                    Title = "Navigation",
+                    Subtitle = "Return to Chat or step back in history.",
+                    Blocks = new List<DockBlock>
+                    {
+                        new DockBlock
+                        {
+                            Type = "row",
+                            ClassName = "valdock-row valdock-actions",
+                            Items = new List<DockItem>
+                            {
+                                new DockItem
+                                {
+                                    Id = "navChat",
+                                    Type = "button",
+                                    Label = "Chat",
+                                    Kind = "secondary",
+                                    Tooltip = "Return to the main Chat UI.",
+                                    Command = new DockCommand
+                                    {
+                                        Name = WebCommandNames.NavCommandGoChat
+                                    }
+                                },
+                                new DockItem
+                                {
+                                    Id = "navBack",
+                                    Type = "button",
+                                    Label = "Back",
+                                    Kind = "ghost",
+                                    Tooltip = "Go back to the previous page if available.",
+                                    Command = new DockCommand
+                                    {
+                                        Name = WebCommandNames.NavCommandGoBack
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             };
 

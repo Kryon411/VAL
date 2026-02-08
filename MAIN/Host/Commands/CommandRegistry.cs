@@ -250,6 +250,21 @@ namespace VAL.Host.Commands
                 ToolsCommandHandlers.HandleOpenDiagnostics
             ));
 
+            // ---- Navigation ----
+            Register(new CommandSpec(
+                WebCommandNames.NavCommandGoChat,
+                "Navigation",
+                Array.Empty<string>(),
+                NavigationCommandHandlers.HandleGoChat
+            ));
+
+            Register(new CommandSpec(
+                WebCommandNames.NavCommandGoBack,
+                "Navigation",
+                Array.Empty<string>(),
+                NavigationCommandHandlers.HandleGoBack
+            ));
+
             // ---- Dock ----
             Register(new CommandSpec(
                 WebCommandNames.DockCommandRequestModel,
