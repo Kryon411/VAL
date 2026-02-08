@@ -157,6 +157,8 @@
     <Page Remove="VAL.Contracts\**\*" />
     <Page Remove="VAL.Tests\**\*" />
     <Page Remove="VAL.Tools\**\*" />
+    <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
+    <Page Remove="VAL.Host\**\*.xaml" />
   </ItemGroup>
 
 </Project>
