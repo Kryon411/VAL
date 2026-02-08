@@ -138,6 +138,12 @@
     <Content Remove="VAL.Host\**\*" />
     <Content Remove="VAL.Contracts\**\*" />
     <Content Remove="VAL.Tools\**\*" />
+    <EmbeddedResource Remove="Tools\**\*" />
+    <EmbeddedResource Remove="VAL.Tests\**\*" />
+    <EmbeddedResource Remove="VAL.App\**\*" />
+    <EmbeddedResource Remove="VAL.Host\**\*" />
+    <EmbeddedResource Remove="VAL.Contracts\**\*" />
+    <EmbeddedResource Remove="VAL.Tools\**\*" />
     <None Remove="Tools\**\*" />
     <None Remove="VAL.Tests\**\*" />
     <None Remove="VAL.App\**\*" />
