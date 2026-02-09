@@ -22,10 +22,15 @@
 
   <ItemGroup>
     <Compile Remove="VAL.Host\**\*.cs" />
+    <Compile Remove="VAL.Host\**\*.g.cs" />
     <Compile Remove="VAL.App\**\*.cs" />
+    <Compile Remove="VAL.App\**\*.g.cs" />
     <Compile Remove="VAL.Contracts\**\*.cs" />
+    <Compile Remove="VAL.Contracts\**\*.g.cs" />
     <Compile Remove="VAL.Tools\**\*.cs" />
+    <Compile Remove="VAL.Tools\**\*.g.cs" />
     <Compile Remove="VAL.Tests\**\*.cs" />
+    <Compile Remove="VAL.Tests\**\*.g.cs" />
     <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
