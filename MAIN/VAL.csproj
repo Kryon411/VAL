@@ -61,11 +61,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="**\App.xaml.cs" />
-    <Compile Include="App.xaml.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3595.46" />
 
     <!-- DI Host / Composition Root dependencies -->
