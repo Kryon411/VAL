@@ -1,6 +1,6 @@
 using System;
-using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Host;
 using VAL.Host.Services;
 
 namespace VAL.Host.Commands
@@ -47,7 +47,7 @@ namespace VAL.Host.Commands
 
         private static IServiceProvider? GetServices()
         {
-            return (Application.Current as App)?.Services;
+            return ValHostServices.Services;
         }
     }
 }
