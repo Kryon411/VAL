@@ -4,10 +4,11 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using VAL.Host;
 using VAL;
+using VAL.Host;
+using VAL.Host.Services;
 
-namespace VAL.Host.Services
+namespace VAL.App.Services
 {
     public sealed class CrashHandler : ICrashHandler
     {
