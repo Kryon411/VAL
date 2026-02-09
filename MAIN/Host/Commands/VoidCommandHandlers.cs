@@ -1,6 +1,6 @@
 using System;
-using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Host;
 
 namespace VAL.Host.Commands
 {
@@ -31,7 +31,7 @@ namespace VAL.Host.Commands
 
         private static IToastHub? GetToastHub()
         {
-            return (Application.Current as App)?.Services.GetService<IToastHub>();
+            return ValHostServices.Services?.GetService<IToastHub>();
         }
     }
 }

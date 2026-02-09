@@ -1,6 +1,6 @@
 using System;
-using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Host;
 using VAL.Host.Logging;
 using VAL.Host.Services;
 
@@ -68,7 +68,7 @@ namespace VAL.Host.Commands
 
         private static IPortalRuntimeStateManager? GetRuntime()
         {
-            return (Application.Current as App)?.Services.GetService<IPortalRuntimeStateManager>();
+            return ValHostServices.Services?.GetService<IPortalRuntimeStateManager>();
         }
     }
 }
