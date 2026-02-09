@@ -23,7 +23,7 @@ This document explains how VAL routes **WebView (JS modules)** messages into the
 
 **Core files (Host)**
 
-- `Host/Commands/HostCommandRouter.cs`
+- `MAIN/Host/Commands/HostCommandRouter.cs`
   - Single entry-point: parses JSON, extracts `type` and optional `chatId`, updates `SessionContext`, calls registry.
 
 - `Host/Commands/CommandRegistry.cs`
