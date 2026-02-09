@@ -48,23 +48,13 @@
     <EmbeddedResource Remove="VAL.Tests\**\*" />
   </ItemGroup>
 
-  <!--
-    Phase 1 (DI Host) is currently using Program.Main as the SINGLE entry point.
-    That means App.xaml must NOT participate as a WPF ApplicationDefinition, or WPF may generate
-    a second entry point and/or require InitializeComponent() on App.
-
-    If App.xaml exists, keep it as a plain file (None) so it can be re-enabled later.
-  -->
   <ItemGroup>
-    <ApplicationDefinition Remove="App.xaml" />
     <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Tools\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Tests\**\*.xaml" />
-    <Page Remove="App.xaml" />
     <Page Remove="VAL.Host\**\*.xaml" />
-    <None Include="App.xaml" Condition="Exists('App.xaml')" />
   </ItemGroup>
 
   <ItemGroup>
