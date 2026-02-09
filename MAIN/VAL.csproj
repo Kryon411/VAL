@@ -57,6 +57,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="VAL.Host\VAL.Host.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
@@ -128,6 +132,14 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Tests\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Tools\**\*.xaml" />
   </ItemGroup>
 
   <ItemGroup>
