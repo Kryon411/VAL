@@ -1,7 +1,7 @@
 using System;
-using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using VAL.Contracts;
+using VAL.Host;
 using VAL.Host.Logging;
 using VAL.Host.Services;
 using VAL.Host.WebMessaging;
@@ -148,7 +148,7 @@ namespace VAL.Host.Commands
 
         private static IServiceProvider? GetServices()
         {
-            return (Application.Current as App)?.Services;
+            return ValHostServices.Services;
         }
 
         private static void LogCommandFailure(string action, HostCommand cmd, Exception ex)

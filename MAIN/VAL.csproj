@@ -17,29 +17,52 @@
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <DefaultItemExcludes>$(DefaultItemExcludes);VAL.Host\**\*;VAL.App\**\*;VAL.Contracts\**\*;VAL.Tools\**\*;VAL.Tests\**\*;Host\**\*;**\bin\**\*;**\obj\**\*</DefaultItemExcludes>
   </PropertyGroup>
 
-  <!--
-    Phase 1 (DI Host) is currently using Program.Main as the SINGLE entry point.
-    That means App.xaml must NOT participate as a WPF ApplicationDefinition, or WPF may generate
-    a second entry point and/or require InitializeComponent() on App.
-
-    If App.xaml exists, keep it as a plain file (None) so it can be re-enabled later.
-  -->
   <ItemGroup>
-    <ApplicationDefinition Remove="App.xaml" />
-    <Page Remove="App.xaml" />
-    <None Include="App.xaml" Condition="Exists('App.xaml')" />
+    <Page Include="CrashWindow.xaml" />
+    <Page Include="DiagnosticsWindow.xaml" />
+    <Page Include="MainWindow.xaml" />
+    <Page Include="UI\VALWindowTheme.xaml" />
+    <Page Include="UI\Truth\TruthHealthWindow.xaml" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="VAL.Tests\**\*.cs" />
-    <Compile Remove="VAL.App\**\*.cs" />
+    <Compile Remove="Host\**\*.cs" />
+    <Compile Remove="Host\**\*.g.cs" />
     <Compile Remove="VAL.Host\**\*.cs" />
+    <Compile Remove="VAL.Host\**\*.g.cs" />
+    <Compile Remove="VAL.App\**\*.cs" />
+    <Compile Remove="VAL.App\**\*.g.cs" />
     <Compile Remove="VAL.Contracts\**\*.cs" />
+    <Compile Remove="VAL.Contracts\**\*.g.cs" />
     <Compile Remove="VAL.Tools\**\*.cs" />
-    <Compile Remove="Tools\TruthStress\**\*.cs" />
-    <Compile Remove="Tools\TruthDoctor\**\*.cs" />
+    <Compile Remove="VAL.Tools\**\*.g.cs" />
+    <Compile Remove="VAL.Tests\**\*.cs" />
+    <Compile Remove="VAL.Tests\**\*.g.cs" />
+    <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Tools\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Tests\**\*.xaml" />
+    <Page Remove="App.xaml" />
+    <Page Remove="VAL.Host\**\*.xaml" />
+    <Page Remove="VAL.App\**\*.xaml" />
+    <Page Remove="VAL.Contracts\**\*.xaml" />
+    <Page Remove="VAL.Tools\**\*.xaml" />
+    <Page Remove="VAL.Tests\**\*.xaml" />
+    <None Remove="VAL.Host\**\*" />
+    <None Remove="VAL.App\**\*" />
+    <None Remove="VAL.Contracts\**\*" />
+    <None Remove="VAL.Tools\**\*" />
+    <None Remove="VAL.Tests\**\*" />
+    <EmbeddedResource Remove="VAL.Host\**\*" />
+    <EmbeddedResource Remove="VAL.App\**\*" />
+    <EmbeddedResource Remove="VAL.Contracts\**\*" />
+    <EmbeddedResource Remove="VAL.Tools\**\*" />
+    <EmbeddedResource Remove="VAL.Tests\**\*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -54,6 +77,7 @@
 
   <ItemGroup>
     <ProjectReference Include="VAL.Contracts\VAL.Contracts.csproj" />
+    <ProjectReference Include="VAL.Host\VAL.Host.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -137,17 +161,29 @@
     <Content Remove="VAL.Host\**\*" />
     <Content Remove="VAL.Contracts\**\*" />
     <Content Remove="VAL.Tools\**\*" />
+    <Content Remove="Host\**\*" />
+    <EmbeddedResource Remove="Tools\**\*" />
+    <EmbeddedResource Remove="VAL.Tests\**\*" />
+    <EmbeddedResource Remove="VAL.App\**\*" />
+    <EmbeddedResource Remove="VAL.Host\**\*" />
+    <EmbeddedResource Remove="VAL.Contracts\**\*" />
+    <EmbeddedResource Remove="VAL.Tools\**\*" />
+    <EmbeddedResource Remove="Host\**\*" />
     <None Remove="Tools\**\*" />
     <None Remove="VAL.Tests\**\*" />
     <None Remove="VAL.App\**\*" />
     <None Remove="VAL.Host\**\*" />
     <None Remove="VAL.Contracts\**\*" />
     <None Remove="VAL.Tools\**\*" />
+    <None Remove="Host\**\*" />
     <Page Remove="VAL.App\**\*" />
     <Page Remove="VAL.Host\**\*" />
     <Page Remove="VAL.Contracts\**\*" />
     <Page Remove="VAL.Tests\**\*" />
     <Page Remove="VAL.Tools\**\*" />
+    <Page Remove="Host\**\*" />
+    <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
+    <Page Remove="VAL.Host\**\*.xaml" />
   </ItemGroup>
 
 </Project>
