@@ -54,12 +54,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ApplicationDefinition Remove="**\App.xaml" />
+    <ApplicationDefinition Include="App.xaml" />
     <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Tools\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Tests\**\*.xaml" />
     <Page Remove="VAL.Host\**\*.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="**\App.xaml.cs" />
+    <Compile Include="App.xaml.cs" />
   </ItemGroup>
 
   <ItemGroup>
