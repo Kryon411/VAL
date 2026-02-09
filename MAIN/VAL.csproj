@@ -20,6 +20,34 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);VAL.Host\**\*;VAL.App\**\*;VAL.Contracts\**\*;VAL.Tools\**\*;VAL.Tests\**\*</DefaultItemExcludes>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="VAL.Host\**\*.cs" />
+    <Compile Remove="VAL.App\**\*.cs" />
+    <Compile Remove="VAL.Contracts\**\*.cs" />
+    <Compile Remove="VAL.Tools\**\*.cs" />
+    <Compile Remove="VAL.Tests\**\*.cs" />
+    <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Tools\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Tests\**\*.xaml" />
+    <Page Remove="VAL.Host\**\*.xaml" />
+    <Page Remove="VAL.App\**\*.xaml" />
+    <Page Remove="VAL.Contracts\**\*.xaml" />
+    <Page Remove="VAL.Tools\**\*.xaml" />
+    <Page Remove="VAL.Tests\**\*.xaml" />
+    <None Remove="VAL.Host\**\*" />
+    <None Remove="VAL.App\**\*" />
+    <None Remove="VAL.Contracts\**\*" />
+    <None Remove="VAL.Tools\**\*" />
+    <None Remove="VAL.Tests\**\*" />
+    <EmbeddedResource Remove="VAL.Host\**\*" />
+    <EmbeddedResource Remove="VAL.App\**\*" />
+    <EmbeddedResource Remove="VAL.Contracts\**\*" />
+    <EmbeddedResource Remove="VAL.Tools\**\*" />
+    <EmbeddedResource Remove="VAL.Tests\**\*" />
+  </ItemGroup>
+
   <!--
     Phase 1 (DI Host) is currently using Program.Main as the SINGLE entry point.
     That means App.xaml must NOT participate as a WPF ApplicationDefinition, or WPF may generate
