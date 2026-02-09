@@ -36,6 +36,7 @@
     <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Tools\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Tests\**\*.xaml" />
+    <Page Remove="App.xaml" />
     <Page Remove="VAL.Host\**\*.xaml" />
     <Page Remove="VAL.App\**\*.xaml" />
     <Page Remove="VAL.Contracts\**\*.xaml" />
