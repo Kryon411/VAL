@@ -54,13 +54,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ApplicationDefinition Remove="**\App.xaml" />
-    <Page Remove="**\App.xaml" />
-    <None Remove="**\App.xaml" />
-    <ApplicationDefinition Include="App.xaml" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3595.46" />
 
     <!-- DI Host / Composition Root dependencies -->
