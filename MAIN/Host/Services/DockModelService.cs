@@ -443,6 +443,18 @@ namespace VAL.Host.Services
                             {
                                 new DockItem
                                 {
+                                    Id = "voidInsertNoCodeBlocks",
+                                    Type = "button",
+                                    Label = "Insert: No code blocks",
+                                    Kind = "secondary",
+                                    Tooltip = "Append a short note to the composer asking for plain-text responses.",
+                                    Command = new DockCommand
+                                    {
+                                        Name = "local.void_insert_no_code_blocks"
+                                    }
+                                },
+                                new DockItem
+                                {
                                     Id = "theme",
                                     Type = "toggle",
                                     Label = "Theme",
