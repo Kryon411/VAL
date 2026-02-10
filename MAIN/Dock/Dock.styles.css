@@ -511,3 +511,26 @@
   gap: 8px;
   margin-top: 8px;
 }
+
+.valdock-toast{
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 10005;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  background: rgba(2, 10, 20, 0.94);
+  border: 1px solid rgba(120, 180, 240, 0.26);
+  color: rgba(245,251,255,0.9);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.valdock-toast.visible{
+  opacity: 1;
+}
+

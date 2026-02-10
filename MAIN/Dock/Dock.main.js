@@ -102,6 +102,7 @@
   // Portal (Capture & Stage)
   // Portal should ALWAYS default to Off on load (armed state is explicit user action).
   const PORTAL_ENABLED_KEY = "VAL_PortalEnabled";
+  const VOID_NO_CODE_BLOCKS_TEXT = "Please avoid code blocks in your responses; they are hidden on my side.";
 
   function emitAbyssCommand(type, detail){
     try {
@@ -343,6 +344,125 @@ function suppressPreludeNudge(ms){
   }
   try { window.VAL_focusComposerForPaste = focusComposerForPaste; } catch(_) {}
 
+  function showDockToast(message){
+    try {
+      if (!message) return;
+      let toast = document.getElementById("val-dock-toast");
+      if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "val-dock-toast";
+        toast.className = "valdock-toast";
+        document.body.appendChild(toast);
+      }
+
+      toast.textContent = message;
+      toast.classList.add("visible");
+
+      if (showDockToast._timer) {
+        try { clearTimeout(showDockToast._timer); } catch(_) {}
+      }
+
+      showDockToast._timer = setTimeout(()=>{
+        try { toast.classList.remove("visible"); } catch(_) {}
+      }, 1700);
+    } catch(_) {}
+  }
+
+  function getComposerElement(){
+    const selectors = [
+      "#prompt-textarea",
+      "textarea#prompt-textarea",
+      "textarea[data-testid='prompt-textarea']",
+      "textarea[placeholder*='Message']",
+      "textarea[placeholder*='Send']",
+      "div.ProseMirror[contenteditable='true']",
+      "[role='textbox'][contenteditable='true']",
+      "div[contenteditable='true'][role='textbox']"
+    ];
+
+    for (const selector of selectors) {
+      const node = document.querySelector(selector);
+      if (node) return node;
+    }
+
+    return null;
+  }
+
+  function appendTextToTextarea(composer, text){
+    if (!composer || !(composer instanceof HTMLTextAreaElement)) return false;
+
+    const current = composer.value || "";
+    const prefix = current.trim().length > 0 ? "\n" : "";
+    const insertion = prefix + text;
+    const start = current.length;
+
+    const prevSelStart = Number.isFinite(composer.selectionStart) ? composer.selectionStart : null;
+    const prevSelEnd = Number.isFinite(composer.selectionEnd) ? composer.selectionEnd : null;
+    const prevScrollTop = composer.scrollTop;
+
+    composer.focus();
+    composer.setSelectionRange(start, start);
+    composer.setRangeText(insertion, start, start, "end");
+    composer.dispatchEvent(new Event("input", { bubbles: true }));
+
+    if (prevSelStart !== null && prevSelEnd !== null) {
+      try {
+        composer.setSelectionRange(prevSelStart, prevSelEnd);
+        composer.scrollTop = prevScrollTop;
+      } catch(_) {}
+    }
+
+    return true;
+  }
+
+  function appendTextToContentEditable(composer, text){
+    if (!composer || !(composer instanceof HTMLElement) || !composer.isContentEditable) return false;
+
+    let previousRange = null;
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const candidate = sel.getRangeAt(0);
+        if (composer.contains(candidate.startContainer)) {
+          previousRange = candidate.cloneRange();
+        }
+      }
+    } catch(_) {}
+
+    const current = (composer.textContent || "").trim();
+    const prefix = current.length > 0 ? "\n" : "";
+    composer.appendChild(document.createTextNode(prefix + text));
+    composer.dispatchEvent(new Event("input", { bubbles: true }));
+
+    if (previousRange) {
+      try {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(previousRange);
+      } catch(_) {}
+    }
+
+    return true;
+  }
+
+  function insertVoidNoCodeBlocksHelper(){
+    const composer = getComposerElement();
+    if (!composer) {
+      showDockToast("Composer not found.");
+      return;
+    }
+
+    let inserted = false;
+    try {
+      inserted = appendTextToTextarea(composer, VOID_NO_CODE_BLOCKS_TEXT);
+      if (!inserted) inserted = appendTextToContentEditable(composer, VOID_NO_CODE_BLOCKS_TEXT);
+    } catch(_) {
+      inserted = false;
+    }
+
+    showDockToast(inserted ? "Inserted: No code blocks note." : "Unable to insert into composer.");
+  }
+
   function createToggle(label, initialPressed, tooltipText, onToggle){
     const wrap = el("div","valdock-toggle");
     const lab  = el("div","valdock-tg-label",label);
@@ -512,6 +632,11 @@ function suppressPreludeNudge(ms){
           setTimeout(()=>{
             sendCommand(item.command?.name, item.command?.payload, item.command?.requiresChatId, "dock_click");
           }, 80);
+          return;
+        }
+
+        if (item.id === "voidInsertNoCodeBlocks") {
+          insertVoidNoCodeBlocksHelper();
           return;
         }
 
