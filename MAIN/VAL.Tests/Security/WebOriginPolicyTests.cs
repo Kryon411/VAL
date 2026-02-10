@@ -44,6 +44,19 @@ namespace VAL.Tests.Security
             Assert.NotNull(uri);
         }
 
+
+        [Theory]
+        [InlineData("https://openai.com/")]
+        [InlineData("https://appleid.apple.com/")]
+        [InlineData("https://login.microsoftonline.com/")]
+        public void TryIsNavigationAllowedIncludesCanonicalLoginOrigins(string source)
+        {
+            var result = WebOriginPolicy.TryIsNavigationAllowed(source, out var uri);
+
+            Assert.True(result);
+            Assert.NotNull(uri);
+        }
+
         [Theory]
         [InlineData("http://chatgpt.com/")]
         [InlineData("file:///C:/x")]
