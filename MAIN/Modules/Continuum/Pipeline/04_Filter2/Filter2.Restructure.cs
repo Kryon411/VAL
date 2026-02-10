@@ -116,7 +116,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine(FormatSourceLine(ex));
             var user = SelectWwloText(ex.UserTextUncut, ex.UserText);
             var userOut = !string.IsNullOrWhiteSpace(user) ? user.Trim() : "[USER: empty]";
-            sb.AppendLine($"USER: {userOut}");
+            sb.AppendLine(FormattableString.Invariant($"USER: {userOut}"));
 
             var assistant = SelectWwloText(ex.AssistantTextUncut, ex.AssistantText);
             AppendAssistantBlock(sb, assistant, sanitizeAssistant: false);

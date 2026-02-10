@@ -6,6 +6,42 @@ namespace VAL.Host
 {
     internal static class CommandRegistryFactory
     {
+        private static readonly string[] RequiredEnabled = { "enabled" };
+        private static readonly string[] RequiredIndices = { "indices" };
+        private static readonly string[] ContinuumTypes =
+        {
+            WebCommandNames.ContinuumCaptureFlushAck,
+            WebCommandNames.ContinuumSessionAttach,
+            WebCommandNames.ContinuumSessionAttached,
+            WebCommandNames.ContinuumCommandToggleLogging,
+
+            WebCommandNames.ContinuumUiNewChat,
+            WebCommandNames.ContinuumUiPreludePrompt,
+            WebCommandNames.ContinuumUiComposerInteraction,
+
+            WebCommandNames.ContinuumCommandInjectPreamble,
+            WebCommandNames.ContinuumCommandInjectPrelude,
+
+            WebCommandNames.ContinuumTruthAppend,
+            WebCommandNames.TruthAppend,
+            WebCommandNames.ContinuumTruth,
+
+            WebCommandNames.ContinuumCommandPulse,
+            WebCommandNames.ContinuumCommandRefreshQuick,
+
+            WebCommandNames.ContinuumCommandOpenSessionFolder,
+
+            WebCommandNames.ContinuumCommandChronicleCancel,
+            WebCommandNames.ContinuumCommandCancelChronicle,
+            WebCommandNames.ContinuumCommandChronicleRebuildTruth,
+            WebCommandNames.ContinuumCommandChronicle,
+            WebCommandNames.ContinuumChronicleProgress,
+            WebCommandNames.ContinuumChronicleDone,
+
+            WebCommandNames.InjectSuccess,
+            WebCommandNames.ContinuumEvent,
+        };
+
         public static void RegisterCommands(
             CommandRegistry registry,
             Action<HostCommand> handleContinuumCommand,
@@ -35,54 +71,19 @@ namespace VAL.Host
             Action<HostCommand> handleAbyssInjectPrompt,
             Action<HostCommand> handleAbyssInject)
         {
-            if (registry == null)
-                throw new ArgumentNullException(nameof(registry));
+            ArgumentNullException.ThrowIfNull(registry);
 
             // ---- Void ----
             registry.Register(new CommandSpec(
                 WebCommandNames.VoidCommandSetEnabled,
                 "Void",
-                new[] { "enabled" },
+                RequiredEnabled,
                 handleVoidSetEnabled
             ));
 
             // ---- Continuum ----
             // Explicit list so the host has a single discoverable map of supported commands.
-            var continuumTypes = new[]
-            {
-                WebCommandNames.ContinuumCaptureFlushAck,
-                WebCommandNames.ContinuumSessionAttach,
-                WebCommandNames.ContinuumSessionAttached,
-                WebCommandNames.ContinuumCommandToggleLogging,
-
-                WebCommandNames.ContinuumUiNewChat,
-                WebCommandNames.ContinuumUiPreludePrompt,
-                WebCommandNames.ContinuumUiComposerInteraction,
-
-                WebCommandNames.ContinuumCommandInjectPreamble,
-                WebCommandNames.ContinuumCommandInjectPrelude,
-
-                WebCommandNames.ContinuumTruthAppend,
-                WebCommandNames.TruthAppend,
-                WebCommandNames.ContinuumTruth,
-
-                WebCommandNames.ContinuumCommandPulse,
-                WebCommandNames.ContinuumCommandRefreshQuick,
-
-                WebCommandNames.ContinuumCommandOpenSessionFolder,
-
-                WebCommandNames.ContinuumCommandChronicleCancel,
-                WebCommandNames.ContinuumCommandCancelChronicle,
-                WebCommandNames.ContinuumCommandChronicleRebuildTruth,
-                WebCommandNames.ContinuumCommandChronicle,
-                WebCommandNames.ContinuumChronicleProgress,
-                WebCommandNames.ContinuumChronicleDone,
-
-                WebCommandNames.InjectSuccess,
-                WebCommandNames.ContinuumEvent,
-            };
-
-            foreach (var t in continuumTypes)
+            foreach (var t in ContinuumTypes)
             {
                 registry.Register(new CommandSpec(
                     t,
@@ -124,7 +125,7 @@ namespace VAL.Host
             registry.Register(new CommandSpec(
                 WebCommandNames.AbyssCommandInjectResults,
                 "Abyss",
-                new[] { "indices" },
+                RequiredIndices,
                 handleAbyssInjectResults
             ));
 
@@ -181,7 +182,7 @@ namespace VAL.Host
             registry.Register(new CommandSpec(
                 WebCommandNames.PortalCommandSetEnabled,
                 "Portal",
-                new[] { "enabled" },
+                RequiredEnabled,
                 handlePortalSetEnabled
             ));
 
@@ -225,14 +226,14 @@ namespace VAL.Host
             registry.Register(new CommandSpec(
                 WebCommandNames.PrivacyCommandSetContinuumLogging,
                 "Privacy",
-                new[] { "enabled" },
+                RequiredEnabled,
                 handlePrivacySetContinuumLogging
             ));
 
             registry.Register(new CommandSpec(
                 WebCommandNames.PrivacyCommandSetPortalCapture,
                 "Privacy",
-                new[] { "enabled" },
+                RequiredEnabled,
                 handlePrivacySetPortalCapture
             ));
 
