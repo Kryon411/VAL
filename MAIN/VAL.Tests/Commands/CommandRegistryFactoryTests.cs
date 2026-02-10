@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Text.Json;
 using VAL.Contracts;
+using VAL.Host;
 using VAL.Host.Commands;
 using Xunit;
 
