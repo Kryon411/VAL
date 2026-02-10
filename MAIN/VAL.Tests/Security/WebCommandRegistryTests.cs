@@ -29,5 +29,13 @@ namespace VAL.Tests.Security
 
             Assert.False(result);
         }
+
+        [Fact]
+        public void IsAllowedReturnsTrueForDeprecatedNavigationType()
+        {
+            var result = WebCommandRegistry.IsAllowed(WebCommandNames.NavCommandGoChat);
+
+            Assert.True(result);
+        }
     }
 }
