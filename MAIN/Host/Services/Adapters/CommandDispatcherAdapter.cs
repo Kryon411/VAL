@@ -15,9 +15,9 @@ namespace VAL.Host.Services.Adapters
             _router = router;
         }
 
-        public void HandleWebMessageJson(WebMessageEnvelope envelope)
+        public HostCommandExecutionResult HandleWebMessageJson(WebMessageEnvelope envelope)
         {
-            _router.HandleWebMessage(envelope);
+            return _router.HandleWebMessage(envelope);
         }
 
         public MessageEnvelope? CreateContinuumInjectEnvelope(EssenceInjectController.InjectSeed seed)

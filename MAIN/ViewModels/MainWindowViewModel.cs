@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using VAL.Host;
 using VAL.Host.Services;
+using VAL.Host.Commands;
+using VAL.Host.Logging;
 using VAL.Host.Startup;
 
 namespace VAL.ViewModels
@@ -130,12 +132,55 @@ namespace VAL.ViewModels
         {
             try
             {
-                _commandDispatcher.HandleWebMessageJson(envelope);
+                var result = _commandDispatcher.HandleWebMessageJson(envelope);
+                HandleCommandResult(result);
             }
             catch
             {
                 ValLog.Warn(nameof(MainWindowViewModel), "Failed to handle web message.");
+                ToastManager.ShowCatalog(
+                    "Command failed.",
+                    "The action could not be completed. See Logs/VAL.log for details.",
+                    ToastManager.ToastDurationBucket.M,
+                    groupKey: "host.command.error",
+                    replaceGroup: true,
+                    bypassBurstDedupe: true);
             }
+        }
+
+        private static void HandleCommandResult(HostCommandExecutionResult result)
+        {
+            if (!result.IsDockInvocation)
+                return;
+
+            if (result.IsBlocked)
+            {
+                ToastManager.ShowCatalog(
+                    result.Reason,
+                    null,
+                    ToastManager.ToastDurationBucket.M,
+                    groupKey: "host.command.blocked",
+                    replaceGroup: true,
+                    bypassBurstDedupe: true);
+                return;
+            }
+
+            if (!result.IsError)
+                return;
+
+            var commandName = string.IsNullOrWhiteSpace(result.CommandName) ? "<unknown>" : result.CommandName;
+            var diagnostic = string.IsNullOrWhiteSpace(result.DiagnosticDetail) ? "none" : result.DiagnosticDetail;
+            var exception = result.Exception == null ? "none" : LogSanitizer.Sanitize(result.Exception.ToString());
+            ValLog.Warn(nameof(MainWindowViewModel),
+                $"Dock command failed '{commandName}' (reason: {result.Reason}, diagnostic: {diagnostic}, exception: {exception}).");
+
+            ToastManager.ShowCatalog(
+                result.Reason,
+                "The action failed. See Logs/VAL.log for details.",
+                ToastManager.ToastDurationBucket.M,
+                groupKey: "host.command.error",
+                replaceGroup: true,
+                bypassBurstDedupe: true);
         }
 
         public bool ShouldCancelClose(Func<bool> confirmExit)

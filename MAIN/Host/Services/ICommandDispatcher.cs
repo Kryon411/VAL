@@ -4,7 +4,7 @@ namespace VAL.Host.Services
 {
     public interface ICommandDispatcher
     {
-        void HandleWebMessageJson(VAL.Host.WebMessaging.WebMessageEnvelope envelope);
+        VAL.Host.Commands.HostCommandExecutionResult HandleWebMessageJson(VAL.Host.WebMessaging.WebMessageEnvelope envelope);
         VAL.Host.WebMessaging.MessageEnvelope? CreateContinuumInjectEnvelope(EssenceInjectController.InjectSeed seed);
     }
 }
