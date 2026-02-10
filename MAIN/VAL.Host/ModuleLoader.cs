@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Buffers;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
@@ -119,13 +120,15 @@ namespace VAL.Host
             }
         }
 
+        private static readonly SearchValues<char> MetadataSeparators = SearchValues.Create("-+");
+
         private static Version? ParseVersion(string? version)
         {
             if (string.IsNullOrWhiteSpace(version))
                 return null;
 
             var trimmed = version.Trim();
-            var metadataIndex = trimmed.IndexOfAny(new[] { '-', '+' });
+            var metadataIndex = trimmed.AsSpan().IndexOfAny(MetadataSeparators);
             if (metadataIndex > 0)
                 trimmed = trimmed.Substring(0, metadataIndex);
 
