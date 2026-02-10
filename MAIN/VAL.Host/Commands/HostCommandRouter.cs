@@ -31,38 +31,40 @@ namespace VAL.Host.Commands
             _diagnosticsReporter = diagnosticsReporter;
         }
 
-        public void HandleWebMessage(WebMessageEnvelope webMessage)
+        public HostCommandExecutionResult HandleWebMessage(WebMessageEnvelope webMessage)
         {
             var json = webMessage.Json;
             if (string.IsNullOrWhiteSpace(json))
-                return;
+                return HostCommandExecutionResult.Blocked("<empty>", "Command payload was empty.", isDockInvocation: false, diagnosticDetail: "empty-json");
 
             if (!WebMessageType.TryGetType(json, out var messageType))
-                return;
+                return HostCommandExecutionResult.Blocked("<unknown>", "Command payload was invalid.", isDockInvocation: false, diagnosticDetail: "invalid-message-type");
 
             if (!WebCommandRegistry.IsAllowed(messageType))
             {
                 LogBlockedType(messageType, webMessage.SourceUri, "message-type-allowlist");
-                return;
+                return HostCommandExecutionResult.Blocked(messageType, "Command is not allowed by host policy.", isDockInvocation: false, diagnosticDetail: "message-type-allowlist");
             }
 
             if (!MessageEnvelope.TryParse(json, out var parsedEnvelope))
-                return;
+                return HostCommandExecutionResult.Blocked(messageType, "Command payload could not be parsed.", IsDockMessageSource(null), diagnosticDetail: "envelope-parse-failed");
+
+            var isDockInvocation = IsDockMessageSource(parsedEnvelope.Source);
 
             if (!string.Equals(parsedEnvelope.Type, WebMessageTypes.Command, StringComparison.OrdinalIgnoreCase))
-                return;
+                return HostCommandExecutionResult.Blocked(parsedEnvelope.Type ?? "<unknown>", "Message type is not dispatchable.", isDockInvocation, diagnosticDetail: "non-command-envelope");
 
             var commandName = parsedEnvelope.Name?.Trim();
             if (string.IsNullOrWhiteSpace(commandName))
             {
                 ValLog.Warn(nameof(HostCommandRouter), "Web message missing command name.");
-                return;
+                return HostCommandExecutionResult.Blocked("<missing>", "Command name was missing.", isDockInvocation, diagnosticDetail: "missing-command-name");
             }
 
             if (!WebCommandRegistry.IsAllowed(commandName))
             {
                 LogBlockedType(commandName, webMessage.SourceUri, "command-allowlist");
-                return;
+                return HostCommandExecutionResult.Blocked(commandName, "Command is not allowed by host policy.", isDockInvocation, diagnosticDetail: "command-allowlist");
             }
 
             // Central session tracking.
@@ -72,25 +74,24 @@ namespace VAL.Host.Commands
             if (payload.HasValue && payload.Value.ValueKind == JsonValueKind.Object)
             {
                 var cmd = new HostCommand(commandName, json, parsedEnvelope.ChatId, webMessage.SourceUri, payload.Value);
-                Dispatch(cmd);
-                return;
+                return Dispatch(cmd, isDockInvocation);
             }
 
             using var emptyDoc = JsonDocument.Parse("{}");
             var fallbackCmd = new HostCommand(commandName, json, parsedEnvelope.ChatId, webMessage.SourceUri, emptyDoc.RootElement);
-            Dispatch(fallbackCmd);
+            return Dispatch(fallbackCmd, isDockInvocation);
         }
 
-        private void Dispatch(HostCommand cmd)
+        private HostCommandExecutionResult Dispatch(HostCommand cmd, bool isDockInvocation)
         {
             var result = _commandRegistry.Dispatch(cmd);
             if (result.IsAccepted)
-                return;
+                return HostCommandExecutionResult.Success(cmd.Type, isDockInvocation);
 
             if (IsDiagnosticsCommand(cmd))
             {
                 _diagnosticsReporter?.ReportDiagnosticsFailure(cmd, result.Exception, result.Status.ToString());
-                return;
+                return HostCommandExecutionResult.Error(cmd.Type, "Diagnostics command failed.", isDockInvocation, result.Exception, result.Status.ToString());
             }
 
             switch (result.Status)
@@ -98,7 +99,7 @@ namespace VAL.Host.Commands
                 case CommandDispatchStatus.RejectedHandlerException:
                     ValLog.Warn(nameof(HostCommandRouter),
                         $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: handler-exception, detail: {result.Detail}, exception: {result.Exception?.GetType().Name}).");
-                    return;
+                    return HostCommandExecutionResult.Error(cmd.Type, "Command failed while executing.", isDockInvocation, result.Exception, result.Detail);
 
                 case CommandDispatchStatus.RejectedMissingRequiredField:
                 case CommandDispatchStatus.RejectedUnknownType:
@@ -106,13 +107,18 @@ namespace VAL.Host.Commands
                 case CommandDispatchStatus.RejectedEmptyType:
                     ValLog.Warn(nameof(HostCommandRouter),
                         $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: {result.Status}, detail: {result.Detail}).");
-                    return;
+                    return HostCommandExecutionResult.Blocked(cmd.Type, "Command was blocked by host validation.", isDockInvocation, result.Detail);
 
                 default:
                     ValLog.Warn(nameof(HostCommandRouter),
                         $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: unknown-rejection).");
-                    return;
+                    return HostCommandExecutionResult.Error(cmd.Type, "Command failed with an unknown host error.", isDockInvocation, result.Exception, result.Detail);
             }
+        }
+
+        private static bool IsDockMessageSource(string? source)
+        {
+            return string.Equals(source?.Trim(), "dock", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsDiagnosticsCommand(HostCommand cmd)
