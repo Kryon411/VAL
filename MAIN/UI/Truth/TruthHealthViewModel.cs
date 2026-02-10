@@ -21,6 +21,7 @@ namespace VAL.UI.Truth
         private string _bytesRemoved = string.Empty;
         private string _advisoryText = string.Empty;
         private string _statusMessage = string.Empty;
+        private string _reportText = string.Empty;
 
         public TruthHealthViewModel(ITruthHealthReportService reportService)
         {
@@ -93,6 +94,12 @@ namespace VAL.UI.Truth
             private set => SetProperty(ref _statusMessage, value);
         }
 
+        public string ReportText
+        {
+            get => _reportText;
+            private set => SetProperty(ref _reportText, value);
+        }
+
         private void Refresh()
         {
             var result = _reportService.GetCurrentSnapshot();
@@ -109,6 +116,7 @@ namespace VAL.UI.Truth
                 LastRepairUtc = "Unavailable";
                 BytesRemoved = "Unavailable";
                 AdvisoryText = string.Empty;
+                ReportText = BuildReportText();
                 return;
             }
 
@@ -125,6 +133,23 @@ namespace VAL.UI.Truth
             LastRepairUtc = report.LastRepairUtc?.ToString("O", CultureInfo.InvariantCulture) ?? "-";
             BytesRemoved = report.LastRepairBytesRemoved?.ToString(CultureInfo.InvariantCulture) ?? "-";
             AdvisoryText = result.Snapshot.IsLargeLog ? "Large log" : string.Empty;
+            ReportText = BuildReportText();
+        }
+
+        private string BuildReportText()
+        {
+            return string.Join("\n", new[]
+            {
+                $"Chat Id: {ChatId}",
+                $"Truth.log: {TruthPath}",
+                $"Size: {SizeText}",
+                $"Physical lines: {PhysicalLineCount}",
+                $"Parsed entries: {ParsedEntryCount}",
+                $"Last parsed line: {LastParsedLine}",
+                $"Last repair (UTC): {LastRepairUtc}",
+                $"Bytes removed: {BytesRemoved}",
+                $"Advisory: {(string.IsNullOrWhiteSpace(AdvisoryText) ? "-" : AdvisoryText)}"
+            });
         }
 
         private void SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
