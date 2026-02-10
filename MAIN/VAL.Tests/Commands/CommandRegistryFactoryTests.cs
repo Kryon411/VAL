@@ -17,36 +17,7 @@ namespace VAL.Tests.Commands
         {
             var registry = new CommandRegistry();
 
-            var ex = Record.Exception(() =>
-                CommandRegistryFactory.RegisterCommands(
-                    registry,
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { },
-                    _ => { }));
+            var ex = Record.Exception(() => RegisterAllCommands(registry));
 
             Assert.Null(ex);
         }
@@ -55,35 +26,7 @@ namespace VAL.Tests.Commands
         public void RegisterCommandsFencesDeprecatedNavigationCommand()
         {
             var registry = new CommandRegistry();
-            CommandRegistryFactory.RegisterCommands(
-                registry,
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { },
-                _ => { });
+            RegisterAllCommands(registry);
 
             using var doc = JsonDocument.Parse("{}");
             var command = CreateHostCommand(WebCommandNames.NavCommandGoChat, doc.RootElement);
@@ -92,6 +35,40 @@ namespace VAL.Tests.Commands
 
             Assert.Equal(CommandDispatchStatus.RejectedDeprecated, result.Status);
             Assert.Contains("deprecated", result.Detail, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void RegisterAllCommands(CommandRegistry registry)
+        {
+            Action<HostCommand> noop = _ => { };
+
+            CommandRegistryFactory.RegisterCommands(
+                registry,
+                handleContinuumCommand: noop,
+                handleVoidSetEnabled: noop,
+                handlePortalSetEnabled: noop,
+                handlePortalOpenSnip: noop,
+                handlePortalSendStaged: noop,
+                handlePrivacySetContinuumLogging: noop,
+                handlePrivacySetPortalCapture: noop,
+                handlePrivacyOpenDataFolder: noop,
+                handlePrivacyWipeData: noop,
+                handleToolsOpenTruthHealth: noop,
+                handleToolsOpenDiagnostics: noop,
+                handleNavigationGoChat: noop,
+                handleNavigationGoBack: noop,
+                handleDockRequestModel: noop,
+                handleAbyssOpenQueryUi: noop,
+                handleAbyssSearch: noop,
+                handleAbyssRetryLast: noop,
+                handleAbyssInjectResult: noop,
+                handleAbyssInjectResults: noop,
+                handleAbyssLast: noop,
+                handleAbyssOpenSource: noop,
+                handleAbyssClearResults: noop,
+                handleAbyssDisregard: noop,
+                handleAbyssGetResults: noop,
+                handleAbyssInjectPrompt: noop,
+                handleAbyssInject: noop);
         }
 
         private static HostCommand CreateHostCommand(string type, JsonElement root)
