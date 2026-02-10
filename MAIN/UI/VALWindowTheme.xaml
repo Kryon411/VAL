@@ -6,6 +6,9 @@
     <SolidColorBrush x:Key="VAL.AccentBrush" Color="#4EC5FF" />
     <SolidColorBrush x:Key="VAL.SoftBorderBrush" Color="#14FFFFFF" />
     <SolidColorBrush x:Key="VAL.ButtonBackgroundBrush" Color="#0B141D" />
+    <SolidColorBrush x:Key="VAL.PrimaryButtonBackgroundBrush" Color="#1E7FB1" />
+    <SolidColorBrush x:Key="VAL.PrimaryButtonHoverBrush" Color="#2599D4" />
+    <SolidColorBrush x:Key="VAL.PrimaryButtonPressedBrush" Color="#17658C" />
     <SolidColorBrush x:Key="VAL.ButtonHoverBrush" Color="#1F4EC5FF" />
     <SolidColorBrush x:Key="VAL.ButtonPressedBrush" Color="#334EC5FF" />
     <SolidColorBrush x:Key="VAL.TextBoxBackgroundBrush" Color="#F5020A14" />
@@ -32,6 +35,21 @@
         <Setter Property="KeyboardNavigation.ControlTabNavigation" Value="Cycle" />
     </Style>
 
+    <Style x:Key="VAL.ToolWindowOuterBorder" TargetType="Border">
+        <Setter Property="Margin" Value="12" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Background" Value="{StaticResource VAL.WindowBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource VAL.SoftBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style x:Key="VAL.ToolWindowHeaderText" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+
     <Style TargetType="{x:Type TextBlock}">
         <Setter Property="Foreground" Value="{StaticResource VAL.TextForegroundBrush}" />
     </Style>
@@ -46,6 +64,14 @@
         <Setter Property="Padding" Value="10" />
         <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource VAL.FocusVisual}" />
+    </Style>
+
+    <Style x:Key="VAL.ToolWindowReportViewer" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="IsReadOnly" Value="True" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Margin" Value="0,10,0,0" />
+        <Setter Property="Padding" Value="12" />
     </Style>
 
     <Style TargetType="{x:Type RichTextBox}">
@@ -76,6 +102,24 @@
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
                 <Setter Property="Background" Value="{StaticResource VAL.ButtonPressedBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{StaticResource VAL.MutedForegroundBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="VAL.ToolWindowSecondaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}" />
+
+    <Style x:Key="VAL.ToolWindowPrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource VAL.PrimaryButtonBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource VAL.AccentBrush}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource VAL.PrimaryButtonHoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{StaticResource VAL.PrimaryButtonPressedBrush}" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
                 <Setter Property="Foreground" Value="{StaticResource VAL.MutedForegroundBrush}" />

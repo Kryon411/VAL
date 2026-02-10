@@ -4,14 +4,12 @@
         Title="VAL Diagnostics"
         Height="620"
         Width="860"
+        MinHeight="420"
+        MinWidth="560"
+        ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
         Style="{DynamicResource VALWindowTheme}">
-    <Border Margin="12"
-            Padding="16"
-            CornerRadius="14"
-            Background="{StaticResource VAL.WindowBackgroundBrush}"
-            BorderBrush="{StaticResource VAL.SoftBorderBrush}"
-            BorderThickness="1">
+    <Border Style="{StaticResource VAL.ToolWindowOuterBorder}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -20,43 +18,39 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Text="Diagnostics"
-                       FontSize="15"
-                       FontWeight="SemiBold"
-                       Margin="0,0,0,6" />
+            <TextBlock Text="Diagnostics" Style="{StaticResource VAL.ToolWindowHeaderText}" />
 
             <Separator Grid.Row="1" />
 
             <TextBox Grid.Row="2"
                      Text="{Binding DiagnosticsText, Mode=OneWay}"
-                     IsReadOnly="True"
-                     TextWrapping="Wrap"
-                     FontSize="12"
-                     Margin="0,10,0,0" />
+                     Style="{StaticResource VAL.ToolWindowReportViewer}" />
 
-            <StackPanel Grid.Row="3"
-                        Margin="0,12,0,0"
-                        Orientation="Vertical">
-                <WrapPanel Margin="0,0,0,8"
-                           HorizontalAlignment="Right">
+            <StackPanel Grid.Row="3" Margin="0,16,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+                <WrapPanel>
                     <Button Content="Copy Diagnostics"
                             Width="140"
                             Margin="0,0,8,0"
+                            Style="{StaticResource VAL.ToolWindowPrimaryButton}"
                             Command="{Binding CopyDiagnosticsCommand}" />
                     <Button Content="Open Logs"
                             Width="110"
                             Margin="0,0,8,0"
+                            Style="{StaticResource VAL.ToolWindowSecondaryButton}"
                             Command="{Binding OpenLogsFolderCommand}" />
                     <Button Content="Open Data"
                             Width="110"
                             Margin="0,0,8,0"
+                            Style="{StaticResource VAL.ToolWindowSecondaryButton}"
                             Command="{Binding OpenDataFolderCommand}" />
                     <Button Content="Open Modules"
                             Width="120"
                             Margin="0,0,8,0"
+                            Style="{StaticResource VAL.ToolWindowSecondaryButton}"
                             Command="{Binding OpenModulesFolderCommand}" />
                     <Button Content="Open Profile"
                             Width="110"
+                            Style="{StaticResource VAL.ToolWindowSecondaryButton}"
                             Command="{Binding OpenProfileFolderCommand}" />
                 </WrapPanel>
             </StackPanel>
