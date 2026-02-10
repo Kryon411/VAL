@@ -6,7 +6,7 @@ namespace VAL.Tests.Modules
     public sealed class ModuleRegistrationTrackerTests
     {
         [Fact]
-        public void TryMarkRegistered_TracksPerCore()
+        public void TryMarkRegisteredTracksPerCore()
         {
             var tracker = new ModuleRegistrationTracker();
             var coreA = new object();

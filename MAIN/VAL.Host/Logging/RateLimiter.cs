@@ -4,11 +4,11 @@ using System.Diagnostics;
 
 namespace VAL.Host.Logging
 {
-    internal sealed class RateLimiter
+    public sealed class RateLimiter
     {
         private readonly ConcurrentDictionary<string, long> _lastTicks = new(StringComparer.Ordinal);
 
-        internal bool Allow(string key, TimeSpan interval)
+        public bool Allow(string key, TimeSpan interval)
         {
             if (string.IsNullOrWhiteSpace(key))
                 return true;

@@ -11,7 +11,7 @@ namespace VAL.Tests.Security
         [Theory]
         [InlineData("https://chatgpt.com/")]
         [InlineData("https://chat.openai.com/c/abc")]
-        public void TryIsAllowed_AllowsChatGptHosts(string source)
+        public void TryIsAllowedAllowsChatGptHosts(string source)
         {
             var result = WebMessageOriginGuard.TryIsAllowed(source, ExpectedNonce, ExpectedNonce, out var uri, out var reason);
 
@@ -28,7 +28,7 @@ namespace VAL.Tests.Security
         [InlineData("file:///C:/test.html")]
         [InlineData("")]
         [InlineData("not a uri")]
-        public void TryIsAllowed_RejectsInvalidOrigins(string source)
+        public void TryIsAllowedRejectsInvalidOrigins(string source)
         {
             var result = WebMessageOriginGuard.TryIsAllowed(source, ExpectedNonce, ExpectedNonce, out var uri, out var reason);
 
@@ -38,7 +38,7 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void TryIsAllowed_RejectsMissingNonce()
+        public void TryIsAllowedRejectsMissingNonce()
         {
             var result = WebMessageOriginGuard.TryIsAllowed("https://chatgpt.com/", null, ExpectedNonce, out var uri, out var reason);
 
@@ -48,7 +48,7 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void TryIsAllowed_RejectsMismatchedNonce()
+        public void TryIsAllowedRejectsMismatchedNonce()
         {
             var result = WebMessageOriginGuard.TryIsAllowed("https://chatgpt.com/", "wrong", ExpectedNonce, out var uri, out var reason);
 

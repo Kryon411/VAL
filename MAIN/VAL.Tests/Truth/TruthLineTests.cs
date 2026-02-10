@@ -11,7 +11,7 @@ namespace VAL.Tests.Truth
         [InlineData("U|", 'U', "")]
         [InlineData("A|line1\\nline2", 'A', "line1\\nline2")]
         [InlineData("A|hi|extra", 'A', "hi|extra")]
-        public void TryParse_ValidLines_ParseRoleAndPayload(string line, char expectedRole, string expectedPayload)
+        public void TryParseValidLinesParseRoleAndPayload(string line, char expectedRole, string expectedPayload)
         {
             var result = TruthLine.TryParse(line, out var role, out var payload);
 
@@ -25,7 +25,7 @@ namespace VAL.Tests.Truth
         [InlineData(" ")]
         [InlineData("X|hi")]
         [InlineData("Ahi")]
-        public void TryParse_InvalidLines_ReturnsFalse(string line)
+        public void TryParseInvalidLinesReturnsFalse(string line)
         {
             var ex = Record.Exception(() => TruthLine.TryParse(line, out var role, out var payload));
 

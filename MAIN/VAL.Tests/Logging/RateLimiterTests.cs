@@ -8,7 +8,7 @@ namespace VAL.Tests.Logging
     public sealed class RateLimiterTests
     {
         [Fact]
-        public void Allow_ReturnsTrueThenFalseWithinInterval()
+        public void AllowReturnsTrueThenFalseWithinInterval()
         {
             var limiter = new RateLimiter();
             var interval = TimeSpan.FromMilliseconds(200);
@@ -18,7 +18,7 @@ namespace VAL.Tests.Logging
         }
 
         [Fact]
-        public void Allow_ReturnsTrueAfterInterval()
+        public void AllowReturnsTrueAfterInterval()
         {
             var limiter = new RateLimiter();
             var interval = TimeSpan.FromMilliseconds(100);

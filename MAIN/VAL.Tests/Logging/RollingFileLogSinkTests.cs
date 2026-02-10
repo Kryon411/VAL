@@ -10,7 +10,7 @@ namespace VAL.Tests.Logging
     public sealed class RollingFileLogSinkTests
     {
         [Fact]
-        public void Write_CreatesLogFile()
+        public void WriteCreatesLogFile()
         {
             var dir = Path.Combine(Path.GetTempPath(), "val-log-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
@@ -30,7 +30,7 @@ namespace VAL.Tests.Logging
         }
 
         [Fact]
-        public void Write_RotatesWhenSizeExceeded()
+        public void WriteRotatesWhenSizeExceeded()
         {
             var dir = Path.Combine(Path.GetTempPath(), "val-log-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);

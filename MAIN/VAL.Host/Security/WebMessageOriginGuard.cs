@@ -2,9 +2,9 @@ using System;
 
 namespace VAL.Host.Security
 {
-    internal static class WebMessageOriginGuard
+    public static class WebMessageOriginGuard
     {
-        internal static bool TryIsAllowed(
+        public static bool TryIsAllowed(
             string? source,
             string? nonce,
             string expectedNonce,

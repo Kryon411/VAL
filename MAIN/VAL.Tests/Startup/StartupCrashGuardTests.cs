@@ -9,7 +9,7 @@ namespace VAL.Tests.Startup
     public sealed class StartupCrashGuardTests
     {
         [Fact]
-        public void Evaluate_WhenCrashCountAtThreshold_EntersSafeMode()
+        public void EvaluateWhenCrashCountAtThresholdEntersSafeMode()
         {
             var productRoot = CreateTempRoot();
             WriteState(productRoot, 2);
@@ -21,7 +21,7 @@ namespace VAL.Tests.Startup
         }
 
         [Fact]
-        public void MarkSuccess_ResetsCrashCount()
+        public void MarkSuccessResetsCrashCount()
         {
             var productRoot = CreateTempRoot();
             WriteState(productRoot, 3);
@@ -38,7 +38,7 @@ namespace VAL.Tests.Startup
         }
 
         [Fact]
-        public void Evaluate_WhenStateCorrupt_EntersSafeMode()
+        public void EvaluateWhenStateCorruptEntersSafeMode()
         {
             var productRoot = CreateTempRoot();
             var statePath = Path.Combine(productRoot, "State", "startup.json");

@@ -1,6 +1,6 @@
 namespace VAL.Host.Logging
 {
-    internal interface ILogSink
+    public interface ILogSink
     {
         void Write(LogEvent logEvent);
     }

@@ -14,7 +14,7 @@ namespace VAL.Tests.Truth
     public sealed class TruthConcurrencyTests
     {
         [Fact(Timeout = 15000)]
-        public async Task ConcurrentWritersAndReaders_DoNotThrow_AndMaintainMonotonicLineNumbers()
+        public async Task ConcurrentWritersAndReadersDoNotThrowAndMaintainMonotonicLineNumbers()
         {
             var (path, cleanup) = CreateTempFile();
             var exceptions = new ConcurrentQueue<Exception>();

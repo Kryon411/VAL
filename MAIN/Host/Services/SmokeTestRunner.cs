@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -276,7 +277,7 @@ namespace VAL.Host.Services
             }
         }
 
-        private async Task WaitForModulesAsync(SmokeTestResult result, CancellationToken token)
+        private static async Task WaitForModulesAsync(SmokeTestResult result, CancellationToken token)
         {
             var pollInterval = TimeSpan.FromMilliseconds(250);
             var expected = new HashSet<string>(ExpectedModules, StringComparer.OrdinalIgnoreCase);
@@ -404,14 +405,14 @@ namespace VAL.Host.Services
             var builder = new StringBuilder();
 
             builder.AppendLine("VAL Smoke Test Report");
-            builder.AppendLine($"Result: {(result.Passed ? "PASS" : "FAIL")}");
-            builder.AppendLine($"ExitCode: {result.ExitCode}");
-            builder.AppendLine($"Started: {result.StartTime:u}");
-            builder.AppendLine($"Finished: {result.EndTime:u}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Result: {(result.Passed ? "PASS" : "FAIL")}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"ExitCode: {result.ExitCode}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Started: {result.StartTime:u}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Finished: {result.EndTime:u}");
 
             if (!string.IsNullOrWhiteSpace(result.FailureReason))
             {
-                builder.AppendLine($"FailureReason: {result.FailureReason}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"FailureReason: {result.FailureReason}");
             }
 
             if (result.Exception != null)
@@ -422,33 +423,33 @@ namespace VAL.Host.Services
 
             builder.AppendLine();
             builder.AppendLine("BuildInfo");
-            builder.AppendLine($"Version: {_buildInfo.Version}");
-            builder.AppendLine($"InformationalVersion: {_buildInfo.InformationalVersion}");
-            builder.AppendLine($"Environment: {_buildInfo.Environment}");
-            builder.AppendLine($"BuildDate: {_buildInfo.BuildDate}");
-            builder.AppendLine($"GitSha: {_buildInfo.GitSha}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Version: {_buildInfo.Version}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"InformationalVersion: {_buildInfo.InformationalVersion}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Environment: {_buildInfo.Environment}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"BuildDate: {_buildInfo.BuildDate}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"GitSha: {_buildInfo.GitSha}");
 
             builder.AppendLine();
             builder.AppendLine("Paths");
-            builder.AppendLine($"ContentRoot: {_appPaths.ContentRoot}");
-            builder.AppendLine($"DataRoot: {_appPaths.DataRoot}");
-            builder.AppendLine($"LogsRoot: {_appPaths.LogsRoot}");
-            builder.AppendLine($"ModulesRoot: {_appPaths.ModulesRoot}");
-            builder.AppendLine($"ProfileRoot: {_appPaths.ProfileRoot}");
-            builder.AppendLine($"SmokeReportPath: {result.ReportPath}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"ContentRoot: {_appPaths.ContentRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"DataRoot: {_appPaths.DataRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"LogsRoot: {_appPaths.LogsRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"ModulesRoot: {_appPaths.ModulesRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"ProfileRoot: {_appPaths.ProfileRoot}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"SmokeReportPath: {result.ReportPath}");
 
             builder.AppendLine();
             builder.AppendLine("Options");
-            builder.AppendLine($"ValOptionsLoaded: {result.ValOptions != null}");
-            builder.AppendLine($"WebViewOptionsLoaded: {result.WebViewOptions != null}");
-            builder.AppendLine($"ModuleOptionsLoaded: {result.ModuleOptions != null}");
-            builder.AppendLine($"LogAppendSucceeded: {result.LogAppendSucceeded}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"ValOptionsLoaded: {result.ValOptions != null}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"WebViewOptionsLoaded: {result.WebViewOptions != null}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"ModuleOptionsLoaded: {result.ModuleOptions != null}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"LogAppendSucceeded: {result.LogAppendSucceeded}");
 
             builder.AppendLine();
             builder.AppendLine("WebView2");
-            builder.AppendLine($"CoreReady: {result.WebViewReady}");
-            builder.AppendLine($"RuntimeVersion: {result.WebViewRuntimeVersion}");
-            builder.AppendLine($"AvailableRuntimeVersion: {result.AvailableWebViewRuntimeVersion}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"CoreReady: {result.WebViewReady}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"RuntimeVersion: {result.WebViewRuntimeVersion}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"AvailableRuntimeVersion: {result.AvailableWebViewRuntimeVersion}");
             if (result.WebViewCheckSkipped)
             {
                 builder.AppendLine("WebView2Check: SKIPPED (CI)");
@@ -456,16 +457,16 @@ namespace VAL.Host.Services
 
             builder.AppendLine();
             builder.AppendLine("Router");
-            builder.AppendLine($"CommandDispatcherAvailable: {_commandDispatcher != null}");
-            builder.AppendLine($"WebMessageSenderAvailable: {_webMessageSender != null}");
-            builder.AppendLine($"MessageSenderWired: {result.MessageSenderWired}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"CommandDispatcherAvailable: {_commandDispatcher != null}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"WebMessageSenderAvailable: {_webMessageSender != null}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"MessageSenderWired: {result.MessageSenderWired}");
 
             builder.AppendLine();
             builder.AppendLine("Module Statuses");
 
             foreach (var status in result.ModuleStatuses ?? new List<ModuleLoader.ModuleStatusInfo>())
             {
-                builder.AppendLine($"- {status.Name} | {status.Status} | {status.Path}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"- {status.Name} | {status.Status} | {status.Path}");
             }
 
             return builder.ToString();

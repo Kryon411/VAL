@@ -61,7 +61,7 @@ namespace VAL.Host
             WriteCore(LogLevel.Verbose, category, message);
         }
 
-        internal static void AddSink(ILogSink sink)
+        public static void AddSink(ILogSink sink)
         {
             if (sink == null)
                 return;
@@ -80,7 +80,7 @@ namespace VAL.Host
             }
         }
 
-        internal static IReadOnlyList<LogEvent> GetRecent(int max = RecentCapacity)
+        public static IReadOnlyList<LogEvent> GetRecent(int max = RecentCapacity)
         {
             if (max <= 0)
                 return Array.Empty<LogEvent>();

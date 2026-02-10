@@ -1,6 +1,6 @@
 namespace VAL.Host.Logging
 {
-    internal enum LogLevel
+    public enum LogLevel
     {
         Verbose,
         Info,

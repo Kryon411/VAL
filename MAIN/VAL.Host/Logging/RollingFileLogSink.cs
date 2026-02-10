@@ -6,7 +6,7 @@ using VAL.Host;
 
 namespace VAL.Host.Logging
 {
-    internal sealed class RollingFileLogSink : ILogSink
+    public sealed class RollingFileLogSink : ILogSink
     {
         private readonly object _sync = new();
         private readonly UTF8Encoding _encoding = new(false);

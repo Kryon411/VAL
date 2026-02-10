@@ -7,7 +7,7 @@ namespace VAL.Tests.Security
     public sealed class WebCommandRegistryTests
     {
         [Fact]
-        public void IsAllowed_ReturnsTrueForKnownType()
+        public void IsAllowedReturnsTrueForKnownType()
         {
             var result = WebCommandRegistry.IsAllowed(WebMessageTypes.Command);
 
@@ -15,7 +15,7 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void IsAllowed_ReturnsFalseForUnknownType()
+        public void IsAllowedReturnsFalseForUnknownType()
         {
             var result = WebCommandRegistry.IsAllowed("unknown.command");
 
@@ -23,7 +23,7 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void IsAllowed_ReturnsFalseForUnknownContinuumType()
+        public void IsAllowedReturnsFalseForUnknownContinuumType()
         {
             var result = WebCommandRegistry.IsAllowed("continuum.custom.command");
 

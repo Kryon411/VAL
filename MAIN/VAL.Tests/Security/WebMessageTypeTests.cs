@@ -7,7 +7,7 @@ namespace VAL.Tests.Security
     public sealed class WebMessageTypeTests
     {
         [Fact]
-        public void TryGetType_ReturnsTypeWhenPresent()
+        public void TryGetTypeReturnsTypeWhenPresent()
         {
             var json = $"{{\"type\":\"{WebMessageTypes.Command}\",\"name\":\"{WebCommandNames.VoidCommandSetEnabled}\"}}";
 
@@ -18,7 +18,7 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void TryGetType_ReturnsFalseWhenMissingType()
+        public void TryGetTypeReturnsFalseWhenMissingType()
         {
             var json = $"{{\"name\":\"{WebCommandNames.VoidCommandSetEnabled}\"}}";
 
@@ -29,7 +29,7 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void TryGetType_ReturnsFalseWhenTypeIsNotString()
+        public void TryGetTypeReturnsFalseWhenTypeIsNotString()
         {
             var json = "{\"type\":42}";
 
@@ -40,7 +40,7 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void TryGetType_ReturnsFalseForMalformedJson()
+        public void TryGetTypeReturnsFalseForMalformedJson()
         {
             var json = "{\"type\":";
 

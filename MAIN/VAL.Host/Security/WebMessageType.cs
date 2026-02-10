@@ -3,9 +3,9 @@ using System.Text.Json;
 
 namespace VAL.Host.Security
 {
-    internal static class WebMessageType
+    public static class WebMessageType
     {
-        internal static bool TryGetType(string json, out string type)
+        public static bool TryGetType(string json, out string type)
         {
             type = string.Empty;
 

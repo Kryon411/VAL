@@ -4,11 +4,11 @@ using System.Runtime.CompilerServices;
 
 namespace VAL.Host
 {
-    internal sealed class ModuleRegistrationTracker
+    public sealed class ModuleRegistrationTracker
     {
         private readonly ConditionalWeakTable<object, HashSet<string>> _seenByCore = new();
 
-        internal bool TryMarkRegistered(object coreKey, string moduleKey)
+        public bool TryMarkRegistered(object coreKey, string moduleKey)
         {
             if (coreKey == null || string.IsNullOrWhiteSpace(moduleKey))
                 return false;

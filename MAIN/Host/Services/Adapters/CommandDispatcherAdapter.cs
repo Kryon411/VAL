@@ -8,9 +8,16 @@ namespace VAL.Host.Services.Adapters
 {
     public sealed class CommandDispatcherAdapter : ICommandDispatcher
     {
+        private readonly HostCommandRouter _router;
+
+        public CommandDispatcherAdapter(HostCommandRouter router)
+        {
+            _router = router;
+        }
+
         public void HandleWebMessageJson(WebMessageEnvelope envelope)
         {
-            HostCommandRouter.HandleWebMessage(envelope);
+            _router.HandleWebMessage(envelope);
         }
 
         public MessageEnvelope? CreateContinuumInjectEnvelope(EssenceInjectController.InjectSeed seed)
