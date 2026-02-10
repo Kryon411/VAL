@@ -72,6 +72,10 @@ namespace VAL.Host.Security
             WebCommandNames.ToolsOpenTruthHealth,
             WebCommandNames.ToolsOpenDiagnostics,
 
+            // ---- Navigation (deprecated, host-fenced) ----
+            WebCommandNames.NavCommandGoChat,
+            WebCommandNames.NavCommandGoBack,
+
             // ---- Dock ----
             WebCommandNames.DockCommandRequestModel,
         };

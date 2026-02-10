@@ -6,6 +6,8 @@ namespace VAL.Host.Commands
         string Type,
         string Module,
         string[] RequiredFields,
-        Action<HostCommand> Handler
+        Action<HostCommand> Handler,
+        bool IsDeprecated = false,
+        string? DeprecationReason = null
     );
 }

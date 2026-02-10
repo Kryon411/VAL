@@ -42,7 +42,7 @@ namespace VAL.Host.Commands
 
             if (!WebCommandRegistry.IsAllowed(messageType))
             {
-                LogBlockedType(messageType, webMessage.SourceUri);
+                LogBlockedType(messageType, webMessage.SourceUri, "message-type-allowlist");
                 return;
             }
 
@@ -61,7 +61,7 @@ namespace VAL.Host.Commands
 
             if (!WebCommandRegistry.IsAllowed(commandName))
             {
-                LogBlockedType(commandName, webMessage.SourceUri);
+                LogBlockedType(commandName, webMessage.SourceUri, "command-allowlist");
                 return;
             }
 
@@ -83,28 +83,36 @@ namespace VAL.Host.Commands
 
         private void Dispatch(HostCommand cmd)
         {
-            if (_commandRegistry.TryDispatch(cmd, out var error))
+            var result = _commandRegistry.Dispatch(cmd);
+            if (result.IsAccepted)
                 return;
-
-            if (error != null)
-            {
-                if (IsDiagnosticsCommand(cmd))
-                {
-                    _diagnosticsReporter?.ReportDiagnosticsFailure(cmd, error, "exception");
-                    return;
-                }
-
-                ValLog.Warn(nameof(HostCommandRouter), $"Handler error for '{cmd.Type}': {error.GetType().Name}.");
-                return;
-            }
 
             if (IsDiagnosticsCommand(cmd))
             {
-                _diagnosticsReporter?.ReportDiagnosticsFailure(cmd, null, "unhandled");
+                _diagnosticsReporter?.ReportDiagnosticsFailure(cmd, result.Exception, result.Status.ToString());
                 return;
             }
 
-            ValLog.Warn(nameof(HostCommandRouter), $"Unknown command '{cmd.Type}'.");
+            switch (result.Status)
+            {
+                case CommandDispatchStatus.RejectedHandlerException:
+                    ValLog.Warn(nameof(HostCommandRouter),
+                        $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: handler-exception, detail: {result.Detail}, exception: {result.Exception?.GetType().Name}).");
+                    return;
+
+                case CommandDispatchStatus.RejectedMissingRequiredField:
+                case CommandDispatchStatus.RejectedUnknownType:
+                case CommandDispatchStatus.RejectedDeprecated:
+                case CommandDispatchStatus.RejectedEmptyType:
+                    ValLog.Warn(nameof(HostCommandRouter),
+                        $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: {result.Status}, detail: {result.Detail}).");
+                    return;
+
+                default:
+                    ValLog.Warn(nameof(HostCommandRouter),
+                        $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: unknown-rejection).");
+                    return;
+            }
         }
 
         private static bool IsDiagnosticsCommand(HostCommand cmd)
@@ -112,7 +120,7 @@ namespace VAL.Host.Commands
             return string.Equals(cmd.Type, WebCommandNames.ToolsOpenDiagnostics, StringComparison.Ordinal);
         }
 
-        private static void LogBlockedType(string type, Uri? sourceUri)
+        private static void LogBlockedType(string type, Uri? sourceUri, string reason)
         {
             var nowTicks = DateTimeOffset.UtcNow.Ticks;
             var lastTicks = Interlocked.Read(ref _lastBlockedTypeLogTicks);
@@ -123,7 +131,7 @@ namespace VAL.Host.Commands
                 return;
 
             var sourceHost = sourceUri?.Host ?? "<unknown>";
-            ValLog.Warn(nameof(HostCommandRouter), $"Blocked unknown web message type: {type} (source: {sourceHost})");
+            ValLog.Warn(nameof(HostCommandRouter), $"Blocked web message type: {type} (source: {sourceHost}, reason: {reason})");
         }
     }
 }
