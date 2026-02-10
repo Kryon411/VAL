@@ -8,7 +8,7 @@ namespace VAL.Tests.Truth
     public sealed class TruthFileRepairTests
     {
         [Fact]
-        public void TryRepairTruncatedTail_NoRepairNeeded_ReturnsFalse()
+        public void TryRepairTruncatedTailNoRepairNeededReturnsFalse()
         {
             var (path, cleanup) = CreateTempFile();
             try
@@ -29,7 +29,7 @@ namespace VAL.Tests.Truth
         }
 
         [Fact]
-        public void TryRepairTruncatedTail_RemovesPartialLine()
+        public void TryRepairTruncatedTailRemovesPartialLine()
         {
             var (path, cleanup) = CreateTempFile();
             try
@@ -50,7 +50,7 @@ namespace VAL.Tests.Truth
         }
 
         [Fact]
-        public void TryRepairTruncatedTail_NoNewline_TruncatesAll()
+        public void TryRepairTruncatedTailNoNewlineTruncatesAll()
         {
             var (path, cleanup) = CreateTempFile();
             try
@@ -71,7 +71,7 @@ namespace VAL.Tests.Truth
         }
 
         [Fact]
-        public void TryRepairTruncatedTail_IsIdempotent()
+        public void TryRepairTruncatedTailIsIdempotent()
         {
             var (path, cleanup) = CreateTempFile();
             try

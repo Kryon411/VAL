@@ -9,7 +9,7 @@ namespace VAL.Tests.Truth
     public sealed class TruthReaderTests
     {
         [Fact]
-        public void Read_SkipsMalformedLines_AndMaintainsLineNumbers()
+        public void ReadSkipsMalformedLinesAndMaintainsLineNumbers()
         {
             var (path, cleanup) = CreateTempFile();
             try

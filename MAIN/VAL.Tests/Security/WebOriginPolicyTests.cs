@@ -9,7 +9,7 @@ namespace VAL.Tests.Security
         [Theory]
         [InlineData("https://chatgpt.com/")]
         [InlineData("https://chat.openai.com/c/uuid")]
-        public void TryIsBridgeAllowed_AllowsChatGptHosts(string source)
+        public void TryIsBridgeAllowedAllowsChatGptHosts(string source)
         {
             var result = WebOriginPolicy.TryIsBridgeAllowed(source, out var uri);
 
@@ -24,7 +24,7 @@ namespace VAL.Tests.Security
         [InlineData("https://accounts.google.com/")]
         [InlineData("http://chatgpt.com/")]
         [InlineData("file:///C:/x")]
-        public void TryIsBridgeAllowed_RejectsNonChatGptHosts(string source)
+        public void TryIsBridgeAllowedRejectsNonChatGptHosts(string source)
         {
             var result = WebOriginPolicy.TryIsBridgeAllowed(source, out var uri);
 
@@ -36,7 +36,7 @@ namespace VAL.Tests.Security
         [InlineData("https://chatgpt.com/")]
         [InlineData("https://auth.openai.com/")]
         [InlineData("https://accounts.google.com/")]
-        public void TryIsNavigationAllowed_AllowsLoginHosts(string source)
+        public void TryIsNavigationAllowedAllowsLoginHosts(string source)
         {
             var result = WebOriginPolicy.TryIsNavigationAllowed(source, out var uri);
 
@@ -50,7 +50,7 @@ namespace VAL.Tests.Security
         [InlineData("edge://settings")]
         [InlineData("about:blank")]
         [InlineData("not a uri")]
-        public void TryIsNavigationAllowed_RejectsUnsafeUris(string source)
+        public void TryIsNavigationAllowedRejectsUnsafeUris(string source)
         {
             var result = WebOriginPolicy.TryIsNavigationAllowed(source, out var uri);
 

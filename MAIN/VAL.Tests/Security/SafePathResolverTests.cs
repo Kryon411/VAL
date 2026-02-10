@@ -9,7 +9,7 @@ namespace VAL.Tests.Security
     public sealed class SafePathResolverTests
     {
         [Fact]
-        public void TryResolveChatTruthPath_AllowsValidGuid()
+        public void TryResolveChatTruthPathAllowsValidGuid()
         {
             var productRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"));
             var chatId = Guid.NewGuid().ToString();
@@ -25,7 +25,7 @@ namespace VAL.Tests.Security
         [Theory]
         [InlineData("")]
         [InlineData("not-a-guid")]
-        public void TryResolveChatTruthPath_RejectsInvalidChatId(string chatId)
+        public void TryResolveChatTruthPathRejectsInvalidChatId(string chatId)
         {
             var productRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"));
 
@@ -37,7 +37,7 @@ namespace VAL.Tests.Security
         [Theory]
         [InlineData("..\\..\\Windows")]
         [InlineData("../etc/passwd")]
-        public void TryResolveChatTruthPath_RejectsTraversal(string chatId)
+        public void TryResolveChatTruthPathRejectsTraversal(string chatId)
         {
             var productRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"));
 
@@ -47,7 +47,7 @@ namespace VAL.Tests.Security
         }
 
         [Fact]
-        public void TryResolveChatTruthPath_EnforcesContainment()
+        public void TryResolveChatTruthPathEnforcesContainment()
         {
             var productRoot = Path.Combine(Path.GetTempPath(), "VAL", "Product", "..", "Product");
             var chatId = Guid.NewGuid().ToString();
