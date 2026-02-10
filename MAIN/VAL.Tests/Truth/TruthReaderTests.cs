@@ -8,21 +8,23 @@ namespace VAL.Tests.Truth
 {
     public sealed class TruthReaderTests
     {
+        private static readonly string[] MixedTruthLines =
+        {
+            "A|ok\r\n",
+            "BAD LINE\r\n",
+            "U|two\r\n",
+            "X|nope\r\n",
+            "\r\n",
+            "   \r\n"
+        };
+
         [Fact]
         public void ReadSkipsMalformedLinesAndMaintainsLineNumbers()
         {
             var (path, cleanup) = CreateTempFile();
             try
             {
-                File.WriteAllText(path, string.Join(string.Empty, new[]
-                {
-                    "A|ok\r\n",
-                    "BAD LINE\r\n",
-                    "U|two\r\n",
-                    "X|nope\r\n",
-                    "\r\n",
-                    "   \r\n"
-                }));
+                File.WriteAllText(path, string.Join(string.Empty, MixedTruthLines));
 
                 var ex = Record.Exception(() => TruthReader.Read(path, repairTailFirst: true).ToList());
                 Assert.Null(ex);

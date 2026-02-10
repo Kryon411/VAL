@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Text.Json;
 using VAL.Host.Commands;
 using Xunit;
@@ -7,6 +8,9 @@ namespace VAL.Tests.Commands
 {
     public sealed class CommandRegistryTests
     {
+        private static readonly Uri TestSourceUri = new("https://chatgpt.com");
+        private static readonly string[] RequiredEnabled = { "enabled" };
+
         [Fact]
         public void RegisterThrowsWhenCommandTypeIsDuplicated()
         {
@@ -32,7 +36,7 @@ namespace VAL.Tests.Commands
                 DeprecationReason: "Deprecated for safety."));
 
             using var doc = JsonDocument.Parse("{}");
-            var cmd = new HostCommand("cmd.deprecated", "{}", null, new Uri("https://chatgpt.com"), doc.RootElement);
+            var cmd = CreateHostCommand("cmd.deprecated", doc.RootElement);
 
             var result = registry.Dispatch(cmd);
 
@@ -45,16 +49,28 @@ namespace VAL.Tests.Commands
         public void DispatchReturnsMissingRequiredFieldStatus()
         {
             var registry = new CommandRegistry();
-            registry.Register(new CommandSpec("cmd.required", "Test", new[] { "enabled" }, _ => { }));
+            registry.Register(new CommandSpec("cmd.required", "Test", RequiredEnabled, _ => { }));
 
             using var doc = JsonDocument.Parse("{}");
-            var cmd = new HostCommand("cmd.required", "{}", null, new Uri("https://chatgpt.com"), doc.RootElement);
+            var cmd = CreateHostCommand("cmd.required", doc.RootElement);
 
             var result = registry.Dispatch(cmd);
 
             Assert.Equal(CommandDispatchStatus.RejectedMissingRequiredField, result.Status);
             Assert.Contains("enabled", result.Detail, StringComparison.OrdinalIgnoreCase);
             Assert.False(result.IsAccepted);
+        }
+
+        private static HostCommand CreateHostCommand(string type, JsonElement root)
+        {
+            var created = Activator.CreateInstance(
+                typeof(HostCommand),
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[] { type, "{}", null, TestSourceUri, root },
+                culture: null);
+
+            return Assert.IsType<HostCommand>(created);
         }
     }
 }
