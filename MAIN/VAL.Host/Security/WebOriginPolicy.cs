@@ -2,7 +2,7 @@ using System;
 
 namespace VAL.Host.Security
 {
-    internal static class WebOriginPolicy
+    public static class WebOriginPolicy
     {
         private static readonly string[] BridgeAllowedHosts =
         {
@@ -21,12 +21,12 @@ namespace VAL.Host.Security
             "login.microsoftonline.com"
         };
 
-        internal static bool TryIsBridgeAllowed(string? uri, out Uri? parsed)
+        public static bool TryIsBridgeAllowed(string? uri, out Uri? parsed)
         {
             return TryIsAllowed(uri, BridgeAllowedHosts, out parsed);
         }
 
-        internal static bool TryIsNavigationAllowed(string? uri, out Uri? parsed)
+        public static bool TryIsNavigationAllowed(string? uri, out Uri? parsed)
         {
             return TryIsAllowed(uri, NavigationAllowedHosts, out parsed);
         }

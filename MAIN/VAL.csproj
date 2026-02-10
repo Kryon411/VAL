@@ -143,6 +143,34 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Page Remove="VAL.App\**\*.xaml" />
+    <Page Remove="VAL.Host\**\*.xaml" />
+    <Page Remove="VAL.Contracts\**\*.xaml" />
+    <Page Remove="VAL.Tests\**\*.xaml" />
+    <Page Remove="VAL.Tools\**\*.xaml" />
+    <Resource Remove="VAL.App\**\*.xaml" />
+    <Resource Remove="VAL.Host\**\*.xaml" />
+    <Resource Remove="VAL.Contracts\**\*.xaml" />
+    <Resource Remove="VAL.Tests\**\*.xaml" />
+    <Resource Remove="VAL.Tools\**\*.xaml" />
+    <EmbeddedResource Remove="VAL.App\**\*.xaml" />
+    <EmbeddedResource Remove="VAL.Host\**\*.xaml" />
+    <EmbeddedResource Remove="VAL.Contracts\**\*.xaml" />
+    <EmbeddedResource Remove="VAL.Tests\**\*.xaml" />
+    <EmbeddedResource Remove="VAL.Tools\**\*.xaml" />
+    <Content Remove="VAL.App\**\*.xaml" />
+    <Content Remove="VAL.Host\**\*.xaml" />
+    <Content Remove="VAL.Contracts\**\*.xaml" />
+    <Content Remove="VAL.Tests\**\*.xaml" />
+    <Content Remove="VAL.Tools\**\*.xaml" />
+    <None Remove="VAL.App\**\*.xaml" />
+    <None Remove="VAL.Host\**\*.xaml" />
+    <None Remove="VAL.Contracts\**\*.xaml" />
+    <None Remove="VAL.Tests\**\*.xaml" />
+    <None Remove="VAL.Tools\**\*.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Remove="Tools\**\*" />
     <Content Remove="VAL.Tests\**\*" />
     <Content Remove="VAL.App\**\*" />

@@ -4,7 +4,7 @@ using VAL.Contracts;
 
 namespace VAL.Host.Security
 {
-    internal static class WebCommandRegistry
+    public static class WebCommandRegistry
     {
         internal static readonly HashSet<string> AllowedTypes = new(StringComparer.Ordinal)
         {
@@ -76,7 +76,7 @@ namespace VAL.Host.Security
             WebCommandNames.DockCommandRequestModel,
         };
 
-        internal static bool IsAllowed(string type)
+        public static bool IsAllowed(string type)
         {
             if (string.IsNullOrWhiteSpace(type))
                 return false;

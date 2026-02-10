@@ -2,7 +2,7 @@ using System;
 
 namespace VAL.Host.Logging
 {
-    internal sealed class LogEvent
+    public sealed class LogEvent
     {
         public LogEvent(DateTimeOffset timestamp, LogLevel level, string category, string message, string formattedLine)
         {

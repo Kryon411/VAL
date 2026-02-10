@@ -2,7 +2,6 @@ using System;
 using System.Text.Json;
 using System.Threading;
 using VAL.Contracts;
-using VAL.Host;
 using VAL.Host.Security;
 using VAL.Host.WebMessaging;
 
@@ -18,12 +17,21 @@ namespace VAL.Host.Commands
     ///
     /// This keeps MainWindow free of command-specific logic.
     /// </summary>
-    public static class HostCommandRouter
+    public sealed class HostCommandRouter
     {
         private static readonly long BlockedTypeLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
         private static long _lastBlockedTypeLogTicks;
 
-        public static void HandleWebMessage(WebMessageEnvelope webMessage)
+        private readonly CommandRegistry _commandRegistry;
+        private readonly ICommandDiagnosticsReporter? _diagnosticsReporter;
+
+        public HostCommandRouter(CommandRegistry commandRegistry, ICommandDiagnosticsReporter? diagnosticsReporter = null)
+        {
+            _commandRegistry = commandRegistry ?? throw new ArgumentNullException(nameof(commandRegistry));
+            _diagnosticsReporter = diagnosticsReporter;
+        }
+
+        public void HandleWebMessage(WebMessageEnvelope webMessage)
         {
             var json = webMessage.Json;
             if (string.IsNullOrWhiteSpace(json))
@@ -73,16 +81,16 @@ namespace VAL.Host.Commands
             Dispatch(fallbackCmd);
         }
 
-        private static void Dispatch(HostCommand cmd)
+        private void Dispatch(HostCommand cmd)
         {
-            if (CommandRegistry.TryDispatch(cmd, out var error))
+            if (_commandRegistry.TryDispatch(cmd, out var error))
                 return;
 
             if (error != null)
             {
                 if (IsDiagnosticsCommand(cmd))
                 {
-                    ToolsCommandHandlers.ReportDiagnosticsFailure(cmd, error, "exception");
+                    _diagnosticsReporter?.ReportDiagnosticsFailure(cmd, error, "exception");
                     return;
                 }
 
@@ -92,7 +100,7 @@ namespace VAL.Host.Commands
 
             if (IsDiagnosticsCommand(cmd))
             {
-                ToolsCommandHandlers.ReportDiagnosticsFailure(cmd, null, "unhandled");
+                _diagnosticsReporter?.ReportDiagnosticsFailure(cmd, null, "unhandled");
                 return;
             }
 

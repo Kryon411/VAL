@@ -2,7 +2,7 @@ using System;
 
 namespace VAL.Host.Commands
 {
-    internal sealed record CommandSpec(
+    public sealed record CommandSpec(
         string Type,
         string Module,
         string[] RequiredFields,
