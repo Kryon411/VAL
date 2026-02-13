@@ -78,6 +78,8 @@ namespace VAL.Host.Security
 
             // ---- Dock ----
             WebCommandNames.DockCommandRequestModel,
+            WebCommandNames.DockUiStateGet,
+            WebCommandNames.DockUiStateSet,
         };
 
         public static bool IsAllowed(string type)

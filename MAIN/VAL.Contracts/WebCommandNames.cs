@@ -81,6 +81,8 @@ namespace VAL.Contracts
 
         // ---- Dock ----
         public const string DockCommandRequestModel = "dock.command.request_model";
+        public const string DockUiStateGet = "dock.ui_state.get";
+        public const string DockUiStateSet = "dock.ui_state.set";
         public const string DockModel = "val.dock.model";
 
         private static readonly IReadOnlyDictionary<string, string> AllCommands = BuildAllCommands();

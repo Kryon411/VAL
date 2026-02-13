@@ -57,6 +57,8 @@ namespace VAL.Tests.Commands
                 handleNavigationGoChat: noop,
                 handleNavigationGoBack: noop,
                 handleDockRequestModel: noop,
+                handleDockUiStateGet: noop,
+                handleDockUiStateSet: noop,
                 handleAbyssOpenQueryUi: noop,
                 handleAbyssSearch: noop,
                 handleAbyssRetryLast: noop,
