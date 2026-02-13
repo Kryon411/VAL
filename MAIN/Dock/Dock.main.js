@@ -251,6 +251,9 @@ function suppressPreludeNudge(ms){
   let isBootstrapping = true;
   let hostReady = false;
   let hostStateReceived = false;
+  let bootTimedOut = false;
+  let userInteractedSinceBootstrap = false;
+  let suppressHostDockPersist = false;
 
   let pendingDockUiStateResolve = null;
 
@@ -259,7 +262,7 @@ function suppressPreludeNudge(ms){
   }
 
   function canPersistHostDockUiState(){
-    return !isBootstrapping && hostReady;
+    return !isBootstrapping && hostReady && !suppressHostDockPersist;
   }
 
   function persistHostDockUiState(){
@@ -618,7 +621,8 @@ function suppressPreludeNudge(ms){
     const hasHostState =
       Object.prototype.hasOwnProperty.call(payload, "isOpen") ||
       Object.prototype.hasOwnProperty.call(payload, "x") ||
-      Object.prototype.hasOwnProperty.call(payload, "y");
+      Object.prototype.hasOwnProperty.call(payload, "y") ||
+      Object.prototype.hasOwnProperty.call(payload, "mode");
 
     if (!hasHostState) return false;
 
@@ -644,6 +648,7 @@ function suppressPreludeNudge(ms){
         post({ type: getCommandName("DockUiStateGet"), chatId: getChatId() });
       } catch(_) {
         pendingDockUiStateResolve = null;
+        bootTimedOut = true;
         resolve({ received: false, applied: false });
         return;
       }
@@ -651,6 +656,7 @@ function suppressPreludeNudge(ms){
       setTimeout(()=>{
         if (!pendingDockUiStateResolve) return;
         pendingDockUiStateResolve = null;
+        bootTimedOut = true;
         resolve({ received: false, applied: false });
       }, 600);
     });
@@ -661,9 +667,18 @@ function suppressPreludeNudge(ms){
     isBootstrapping = false;
   }
 
+  function markUserInteraction(){
+    userInteractedSinceBootstrap = true;
+  }
+
   function applyDockUiStateAfterBootstrap(){
-    applyPos();
-    if (state.collapsed) collapse(true); else collapse(false);
+    suppressHostDockPersist = true;
+    try {
+      applyPos();
+      if (state.collapsed) collapse(true); else collapse(false);
+    } finally {
+      suppressHostDockPersist = false;
+    }
   }
 
   function applyFallbackDockUiStateAndPersist(){
@@ -951,6 +966,7 @@ function suppressPreludeNudge(ms){
 
   function onMove(e){
     if (!isDragging) return;
+    markUserInteraction();
     dragHasMoved = true;
     state.x = e.clientX - dragOffset[0];
     state.y = e.clientY - dragOffset[1];
@@ -967,6 +983,7 @@ function suppressPreludeNudge(ms){
     document.removeEventListener("mouseup", onUp, true);
 
     if (dragFromPill && !dragHasMoved) {
+      markUserInteraction();
       collapse(false);
     }
 
@@ -1046,7 +1063,7 @@ function suppressPreludeNudge(ms){
     panel.setAttribute("aria-labelledby", "valdock-title");
     const close  = el("button","valdock-close","×");
     portalBadge = el("div", "valdock-portal-badge", "Portal");
-    close.addEventListener("click",(e)=>{ e.preventDefault(); collapse(true); }, true);
+    close.addEventListener("click",(e)=>{ e.preventDefault(); markUserInteraction(); collapse(true); }, true);
     header.append(title, portalBadge, close);
 
     const body = el("div","valdock-body");
@@ -1089,11 +1106,20 @@ function suppressPreludeNudge(ms){
             const msgType = (unwrapped && unwrapped.type) ? unwrapped.type : msg.type;
             if (msgType === DOCK_UI_STATE_GET) {
               hostStateReceived = true;
+              const isLateReply = !pendingDockUiStateResolve && bootTimedOut;
+              if (isLateReply && userInteractedSinceBootstrap) {
+                return;
+              }
+
               const applied = applyDockUiStateFromHost(unwrapped);
               if (pendingDockUiStateResolve) {
                 const resolve = pendingDockUiStateResolve;
                 pendingDockUiStateResolve = null;
                 resolve({ received: true, applied });
+              } else if (isLateReply && applied) {
+                clampDockStatePosition();
+                saveState();
+                applyDockUiStateAfterBootstrap();
               }
               return;
             }
@@ -1110,13 +1136,14 @@ function suppressPreludeNudge(ms){
     } catch(_) {}
 
     // Clicking minimized pill expands
-    pill.addEventListener("click",(e)=>{ e.preventDefault(); collapse(false); }, true);
+    pill.addEventListener("click",(e)=>{ e.preventDefault(); markUserInteraction(); collapse(false); }, true);
 
     // Keyboard support: ESC closes, Tab wraps within open dock
     dock.addEventListener("keydown", (e)=>{
       if (state.collapsed) return;
       if (e.key === "Escape") {
         e.preventDefault();
+        markUserInteraction();
         collapse(true);
         return;
       }
@@ -1141,6 +1168,7 @@ function suppressPreludeNudge(ms){
       if (state.collapsed) return;
       if (e.key === "Escape") {
         e.preventDefault();
+        markUserInteraction();
         collapse(true);
       }
     }, true);
@@ -1179,6 +1207,7 @@ function suppressPreludeNudge(ms){
 
     window.addEventListener("resize", ()=>{
       if (state.x == null || state.y == null) return;
+      markUserInteraction();
       clampDockStatePosition();
       applyPos();
       saveState();
