@@ -57,6 +57,9 @@
 
   const COMMAND_NAME_BOOTSTRAP_TYPE = "val.contracts.bootstrap";
   const DOCK_MODEL_EVENT = "val.dock.model";
+  const DOCK_UI_STATE_GET = "dock.ui_state.get";
+  const DOCK_UI_STATE_SET = "dock.ui_state.set";
+  const DOCK_VIEWPORT_MARGIN = 8;
   const DEFAULT_COMMAND_NAMES = Object.freeze({
     VoidCommandSetEnabled: "void.command.set_enabled",
     ContinuumCommandPulse: "continuum.command.pulse",
@@ -75,7 +78,9 @@
     ToolsOpenDiagnostics: "tools.open_diagnostics",
     NavCommandGoChat: "nav.command.go_chat",
     NavCommandGoBack: "nav.command.go_back",
-    DockCommandRequestModel: "dock.command.request_model"
+    DockCommandRequestModel: "dock.command.request_model",
+    DockUiStateGet: DOCK_UI_STATE_GET,
+    DockUiStateSet: DOCK_UI_STATE_SET
   });
 
   let commandNames = { ...DEFAULT_COMMAND_NAMES };
@@ -208,6 +213,23 @@ function suppressPreludeNudge(ms){
   const CHAT_ID = getChatId();
   const LS_KEY  = "VAL_Dock_"+CHAT_ID;
 
+  function loadLocalDockState(){
+    const fallback = { x: null, y: null, collapsed: true };
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return fallback;
+      return {
+        x: Number.isFinite(parsed.x) ? Math.round(parsed.x) : null,
+        y: Number.isFinite(parsed.y) ? Math.round(parsed.y) : null,
+        collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : true
+      };
+    } catch(_) {
+      return fallback;
+    }
+  }
+
   let dock, pill, panel;
   let dockBody;
   let portalBadge, portalPillIndicator;
@@ -225,14 +247,24 @@ function suppressPreludeNudge(ms){
   let dragFromPill = false;
   let dragHasMoved = false;
 
-  let state = { x: null, y: null, collapsed: true };
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) state = Object.assign(state, JSON.parse(raw));
-  } catch(e) {}
+  let state = loadLocalDockState();
+
+  let pendingDockUiStateResolve = null;
 
   function saveState(){
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e) {}
+  }
+
+  function persistHostDockUiState(){
+    try {
+      post({
+        type: getCommandName("DockUiStateSet"),
+        isOpen: !state.collapsed,
+        x: Number.isFinite(state.x) ? Math.round(state.x) : null,
+        y: Number.isFinite(state.y) ? Math.round(state.y) : null,
+        mode: "floating"
+      });
+    } catch(_) {}
   }
 
   function el(tag, cls, text){
@@ -572,6 +604,43 @@ function suppressPreludeNudge(ms){
     } catch(_) {}
   }
 
+  function applyDockUiStateFromHost(payload){
+    if (!payload || typeof payload !== "object") return false;
+
+    if (Object.prototype.hasOwnProperty.call(payload, "isOpen")) {
+      state.collapsed = !payload.isOpen;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "x")) {
+      state.x = Number.isFinite(payload.x) ? Math.round(payload.x) : null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "y")) {
+      state.y = Number.isFinite(payload.y) ? Math.round(payload.y) : null;
+    }
+
+    return true;
+  }
+
+  function requestDockUiState(){
+    return new Promise((resolve)=>{
+      try {
+        pendingDockUiStateResolve = resolve;
+        post({ type: getCommandName("DockUiStateGet"), chatId: getChatId() });
+      } catch(_) {
+        pendingDockUiStateResolve = null;
+        resolve(false);
+        return;
+      }
+
+      setTimeout(()=>{
+        if (!pendingDockUiStateResolve) return;
+        pendingDockUiStateResolve = null;
+        resolve(false);
+      }, 600);
+    });
+  }
+
   function sendCommand(commandName, payload, requiresChatId, reason){
     if (!commandName) return;
     const msg = { type: commandName };
@@ -800,8 +869,22 @@ function suppressPreludeNudge(ms){
   function rectW(){ return dock.getBoundingClientRect().width; }
   function rectH(){ return dock.getBoundingClientRect().height; }
 
+  function clampDockStatePosition(){
+    if (!dock) return;
+    if (state.x == null || state.y == null) return;
+
+    const width = Math.max(0, rectW());
+    const height = Math.max(0, rectH());
+    const maxX = Math.max(DOCK_VIEWPORT_MARGIN, window.innerWidth - DOCK_VIEWPORT_MARGIN - width);
+    const maxY = Math.max(DOCK_VIEWPORT_MARGIN, window.innerHeight - DOCK_VIEWPORT_MARGIN - height);
+
+    state.x = Math.max(DOCK_VIEWPORT_MARGIN, Math.min(maxX, state.x));
+    state.y = Math.max(DOCK_VIEWPORT_MARGIN, Math.min(maxY, state.y));
+  }
+
   function applyPos(){
     if (!dock) return;
+    clampDockStatePosition();
     if (state.x == null || state.y == null){
       dock.style.top   = "14px";
       dock.style.right = "14px";
@@ -833,8 +916,9 @@ function suppressPreludeNudge(ms){
   function onMove(e){
     if (!isDragging) return;
     dragHasMoved = true;
-    state.x = Math.max(8, Math.min(window.innerWidth-8-rectW(), e.clientX - dragOffset[0]));
-    state.y = Math.max(8, Math.min(window.innerHeight-8-rectH(), e.clientY - dragOffset[1]));
+    state.x = e.clientX - dragOffset[0];
+    state.y = e.clientY - dragOffset[1];
+    clampDockStatePosition();
     applyPos();
 
     // Keep Void behavior in sync with its current enabled flag at startup.
@@ -853,6 +937,7 @@ function suppressPreludeNudge(ms){
     dragFromPill = false;
     isDragging   = false;
     saveState();
+    persistHostDockUiState();
   }
 
   function getDockFocusableElements(){
@@ -890,6 +975,7 @@ function suppressPreludeNudge(ms){
     panel.style.display = state.collapsed ? "none"  : "flex";
     pill.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
     saveState();
+    persistHostDockUiState();
 
     if (state.collapsed) {
       if (lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
@@ -965,6 +1051,20 @@ function suppressPreludeNudge(ms){
 
             const unwrapped = unwrapEnvelope(msg);
             const msgType = (unwrapped && unwrapped.type) ? unwrapped.type : msg.type;
+            if (msgType === DOCK_UI_STATE_GET) {
+              const applied = applyDockUiStateFromHost(unwrapped);
+              if (pendingDockUiStateResolve) {
+                const resolve = pendingDockUiStateResolve;
+                pendingDockUiStateResolve = null;
+                resolve(applied);
+              }
+              if (applied) {
+                saveState();
+                applyPos();
+                if (state.collapsed) collapse(true); else collapse(false);
+              }
+              return;
+            }
             if (msgType === DOCK_MODEL_EVENT) {
               renderDockModel(unwrapped);
               return;
@@ -1013,9 +1113,22 @@ function suppressPreludeNudge(ms){
       }
     }, true);
 
-    // Initial state
+    // Initial state (host state is authoritative when available).
     if (state.collapsed) collapse(true); else collapse(false);
     applyPos();
+    requestDockUiState().then((hostApplied)=>{
+      if (!hostApplied) return;
+      applyPos();
+      if (state.collapsed) collapse(true); else collapse(false);
+    });
+
+    window.addEventListener("resize", ()=>{
+      if (state.x == null || state.y == null) return;
+      clampDockStatePosition();
+      applyPos();
+      saveState();
+      persistHostDockUiState();
+    }, { passive: true });
 
     // Keep Void behavior in sync with its current enabled flag at startup.
     try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}

@@ -36,6 +36,8 @@ namespace VAL.Host
                     NavigationCommandHandlers.HandleGoChat,
                     NavigationCommandHandlers.HandleGoBack,
                     DockCommandHandlers.HandleRequestModel,
+                    DockCommandHandlers.HandleUiStateGet,
+                    DockCommandHandlers.HandleUiStateSet,
                     AbyssCommandHandlers.HandleOpenQueryUi,
                     AbyssCommandHandlers.HandleSearch,
                     AbyssCommandHandlers.HandleRetryLast,
@@ -64,6 +66,7 @@ namespace VAL.Host
                 builder.Services.AddSingleton<ITruthHealthReportService, TruthHealthReportService>();
                 builder.Services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();
                 builder.Services.AddSingleton<IDockModelService, DockModelService>();
+                builder.Services.AddSingleton<IDockUiStateStore, DockUiStateStore>();
                 builder.Services.AddSingleton<IPortalRuntimeStateManager, PortalRuntimeStateManager>();
                 builder.Services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
                 builder.Services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();

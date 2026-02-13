@@ -58,6 +58,8 @@ namespace VAL.Host
             Action<HostCommand> handleNavigationGoChat,
             Action<HostCommand> handleNavigationGoBack,
             Action<HostCommand> handleDockRequestModel,
+            Action<HostCommand> handleDockUiStateGet,
+            Action<HostCommand> handleDockUiStateSet,
             Action<HostCommand> handleAbyssOpenQueryUi,
             Action<HostCommand> handleAbyssSearch,
             Action<HostCommand> handleAbyssRetryLast,
@@ -292,6 +294,20 @@ namespace VAL.Host
                 "Dock",
                 Array.Empty<string>(),
                 handleDockRequestModel
+            ));
+
+            registry.Register(new CommandSpec(
+                WebCommandNames.DockUiStateGet,
+                "Dock",
+                Array.Empty<string>(),
+                handleDockUiStateGet
+            ));
+
+            registry.Register(new CommandSpec(
+                WebCommandNames.DockUiStateSet,
+                "Dock",
+                Array.Empty<string>(),
+                handleDockUiStateSet
             ));
         }
     }
