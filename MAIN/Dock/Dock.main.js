@@ -248,6 +248,9 @@ function suppressPreludeNudge(ms){
   let dragHasMoved = false;
 
   let state = loadLocalDockState();
+  let isBootstrapping = true;
+  let hostReady = false;
+  let hostStateReceived = false;
 
   let pendingDockUiStateResolve = null;
 
@@ -255,7 +258,12 @@ function suppressPreludeNudge(ms){
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e) {}
   }
 
+  function canPersistHostDockUiState(){
+    return !isBootstrapping && hostReady;
+  }
+
   function persistHostDockUiState(){
+    if (!canPersistHostDockUiState()) return;
     try {
       post({
         type: getCommandName("DockUiStateSet"),
@@ -607,6 +615,13 @@ function suppressPreludeNudge(ms){
   function applyDockUiStateFromHost(payload){
     if (!payload || typeof payload !== "object") return false;
 
+    const hasHostState =
+      Object.prototype.hasOwnProperty.call(payload, "isOpen") ||
+      Object.prototype.hasOwnProperty.call(payload, "x") ||
+      Object.prototype.hasOwnProperty.call(payload, "y");
+
+    if (!hasHostState) return false;
+
     if (Object.prototype.hasOwnProperty.call(payload, "isOpen")) {
       state.collapsed = !payload.isOpen;
     }
@@ -629,16 +644,37 @@ function suppressPreludeNudge(ms){
         post({ type: getCommandName("DockUiStateGet"), chatId: getChatId() });
       } catch(_) {
         pendingDockUiStateResolve = null;
-        resolve(false);
+        resolve({ received: false, applied: false });
         return;
       }
 
       setTimeout(()=>{
         if (!pendingDockUiStateResolve) return;
         pendingDockUiStateResolve = null;
-        resolve(false);
+        resolve({ received: false, applied: false });
       }, 600);
     });
+  }
+
+  function finishDockBootstrap(){
+    hostReady = true;
+    isBootstrapping = false;
+  }
+
+  function applyDockUiStateAfterBootstrap(){
+    applyPos();
+    if (state.collapsed) collapse(true); else collapse(false);
+  }
+
+  function applyFallbackDockUiStateAndPersist(){
+    const fallbackState = loadLocalDockState();
+    state.x = fallbackState.x;
+    state.y = fallbackState.y;
+    state.collapsed = fallbackState.collapsed;
+    clampDockStatePosition();
+    saveState();
+    applyDockUiStateAfterBootstrap();
+    persistHostDockUiState();
   }
 
   function sendCommand(commandName, payload, requiresChatId, reason){
@@ -1052,16 +1088,12 @@ function suppressPreludeNudge(ms){
             const unwrapped = unwrapEnvelope(msg);
             const msgType = (unwrapped && unwrapped.type) ? unwrapped.type : msg.type;
             if (msgType === DOCK_UI_STATE_GET) {
+              hostStateReceived = true;
               const applied = applyDockUiStateFromHost(unwrapped);
               if (pendingDockUiStateResolve) {
                 const resolve = pendingDockUiStateResolve;
                 pendingDockUiStateResolve = null;
-                resolve(applied);
-              }
-              if (applied) {
-                saveState();
-                applyPos();
-                if (state.collapsed) collapse(true); else collapse(false);
+                resolve({ received: true, applied });
               }
               return;
             }
@@ -1116,10 +1148,33 @@ function suppressPreludeNudge(ms){
     // Initial state (host state is authoritative when available).
     if (state.collapsed) collapse(true); else collapse(false);
     applyPos();
-    requestDockUiState().then((hostApplied)=>{
-      if (!hostApplied) return;
-      applyPos();
-      if (state.collapsed) collapse(true); else collapse(false);
+
+    requestDockUiState().then((result)=>{
+      const hasHostState = !!(result && result.received && result.applied);
+
+      if (hasHostState) {
+        clampDockStatePosition();
+        saveState();
+        finishDockBootstrap();
+        applyDockUiStateAfterBootstrap();
+        return;
+      }
+
+      if (hostStateReceived || (result && result.received)) {
+        finishDockBootstrap();
+        applyFallbackDockUiStateAndPersist();
+        return;
+      }
+
+      // If host does not respond, keep local fallback without writing host state.
+      const fallbackState = loadLocalDockState();
+      state.x = fallbackState.x;
+      state.y = fallbackState.y;
+      state.collapsed = fallbackState.collapsed;
+      clampDockStatePosition();
+      saveState();
+      finishDockBootstrap();
+      applyDockUiStateAfterBootstrap();
     });
 
     window.addEventListener("resize", ()=>{
