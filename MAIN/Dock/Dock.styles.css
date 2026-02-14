@@ -3,45 +3,39 @@
 .valdock{
   position: fixed;
   z-index: 9998;
+  inset: 0;
+  pointer-events: none;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial;
   color: rgba(245,251,255,0.75);
 }
 
 /* Controls pill */
 .valdock-pill{
-  position: relative;
-  top: -8px;
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   appearance: none;
   border: 1px solid rgba(120, 180, 240, 0.16);
-
-  /* Match the expanded Control Centre panel's SoftGlass scaffold */
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
   background-color: rgba(2, 10, 20, 0.86);
-  color: rgba(245,251,255,0.75);
-  padding: 10px 26px;
+  color: rgba(245,251,255,0.85);
+  padding: 10px 22px;
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: none;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  opacity: 0.75;
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease,
-    opacity 0.35s ease;
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  transition: transform 0.12s ease, border-color 0.15s ease, opacity 0.35s ease;
 }
 
 .valdock-pill:hover{
   border-color: rgba(120, 180, 240, 0.28);
-  box-shadow: none;
-  transform: translateY(-1px);
+  transform: translateX(-50%) translateY(-1px);
   opacity: 1;
 }
 
@@ -52,7 +46,7 @@
 }
 
 .valdock-pill:active{
-  transform: translateY(1px) scale(0.99);
+  transform: translateX(-50%) translateY(1px) scale(0.99);
 }
 
 .valdock-pill-indicator{
@@ -71,66 +65,62 @@
 /* Expanded Control Centre panel */
 .valdock-panel{
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--val-composer-offset, 120px) + 10px);
+  transform: translateX(-50%) translateY(8px);
+  opacity: 0;
+  pointer-events: none;
   display: none;
   flex-direction: column;
-  gap: 0;
-  width: 380px;
-  min-width: 360px;
-  max-width: min(92vw, 400px);
-  max-height: min(72vh, 660px);
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-  background-color: rgba(2,10,20,0.96);
+  width: min(980px, calc(100vw - 40px));
+  max-height: min(60vh, 520px);
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  background-color: rgba(2,10,20,0.94);
   border: 1px solid rgba(120, 180, 240, 0.16);
-  border-radius: 18px;
+  border-radius: 20px;
   padding: 0;
-  box-shadow: none;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   overflow: hidden;
+  transition: opacity 0.15s ease, transform 0.18s ease;
+}
+
+html.val-dock-open .valdock-panel{
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
 }
 
 .valdock-header{
-  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  font-weight: 600;
-  font-size: 15px;
-  padding: 10px 12px;
-  cursor: move;
-  user-select: none;
-  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-  border-bottom: 1px solid rgba(120, 180, 240, 0.16);
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  gap: 10px;
+  padding: 8px 14px 6px;
+  border-bottom: 1px solid rgba(120, 180, 240, 0.1);
 }
 
 .valdock-title{
-  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
-  grid-column: 2;
   justify-self: center;
   text-align: center;
-  font-size: 16px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  opacity: 0.92;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  opacity: 0.86;
 }
 
 .valdock-portal-badge{
-  grid-column: 3;
-  justify-self: center;
+  justify-self: end;
   display: none;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 999px;
   background: rgba(160, 60, 80, 0.24);
   border: 1px solid rgba(255, 140, 160, 0.3);
   color: rgba(255, 220, 230, 0.92);
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: 10px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   font-weight: 600;
   white-space: nowrap;
@@ -140,22 +130,8 @@
   display: inline-flex;
 }
 
-.valdock-close{
-  grid-column: 4;
-  justify-self: end;
-  appearance: none;
-  border: none;
-  background: rgba(8,24,40,0.9);
-  color: rgba(208,232,255,0.75);
-  padding: 4px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-  box-shadow: none;
-}
-
-.valdock-close:focus-visible{
-  outline: 2px solid rgba(120, 180, 240, 0.75);
-  outline-offset: 2px;
+html.val-dock-open body{
+  padding-bottom: var(--val-dock-open-height, 0px);
 }
 
 .valdock-row{
