@@ -62,6 +62,9 @@
   const DOCK_VIEWPORT_MARGIN = 8;
   const DOCK_DEFAULT_MODE = "shelf";
   const DOCK_FALLBACK_COMPOSER_OFFSET = 120;
+  const DOCK_MIN_COMPOSER_OFFSET = 100;
+  const DOCK_MAX_COMPOSER_OFFSET = 420;
+  const DOCK_TOP_SAFE = 64;
   const DEFAULT_COMMAND_NAMES = Object.freeze({
     VoidCommandSetEnabled: "void.command.set_enabled",
     ContinuumCommandPulse: "continuum.command.pulse",
@@ -257,6 +260,8 @@ function suppressPreludeNudge(ms){
   let bootTimedOut = false;
   let userInteractedSinceBootstrap = false;
   let suppressHostDockPersist = false;
+  let composerOffsetObserver = null;
+  let composerOffsetTarget = null;
 
   let pendingDockUiStateResolve = null;
 
@@ -1044,6 +1049,11 @@ function suppressPreludeNudge(ms){
     }
   }
 
+  function clampComposerOffset(offset){
+    if (!Number.isFinite(offset)) return DOCK_FALLBACK_COMPOSER_OFFSET;
+    return Math.max(DOCK_MIN_COMPOSER_OFFSET, Math.min(DOCK_MAX_COMPOSER_OFFSET, Math.round(offset)));
+  }
+
   function updateComposerOffset(){
     const doc = document.documentElement;
     if (!doc) return;
@@ -1053,12 +1063,72 @@ function suppressPreludeNudge(ms){
       const composer = getComposerElement();
       if (composer) {
         const rect = composer.getBoundingClientRect();
-        const measured = Math.max(rect.height + Math.max(0, window.innerHeight - rect.bottom), rect.height + 28);
-        if (Number.isFinite(measured) && measured > 0) offset = Math.round(measured);
+        const measured = window.innerHeight - rect.top;
+        if (Number.isFinite(measured) && measured > 0) offset = clampComposerOffset(measured);
       }
     } catch(_) {}
 
-    doc.style.setProperty("--val-composer-offset", `${offset}px`);
+    doc.style.setProperty("--val-composer-offset", `${clampComposerOffset(offset)}px`);
+    doc.style.setProperty("--val-top-safe", `${DOCK_TOP_SAFE}px`);
+  }
+
+  function setOpen(isOpen, reason){
+    const nextCollapsed = !isOpen;
+    const wasCollapsed = state.collapsed;
+    state.collapsed = nextCollapsed;
+    if (!pill || !panel) return;
+
+    try { hideTooltip(); } catch(_) {}
+    panel.style.display = state.collapsed ? "none" : "flex";
+    pill.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
+    pill.classList.toggle("active", !state.collapsed);
+    updateDockOpenRootClass();
+    saveState();
+    persistHostDockUiState();
+
+    if (state.collapsed) {
+      if (lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
+        try { pill.focus({ preventScroll: true }); } catch(_) { try { pill.focus(); } catch(__) {} }
+      }
+      return;
+    }
+
+    if (wasCollapsed) {
+      lastFocusedElement = document.activeElement;
+    }
+    focusFirstDockControl();
+    updateComposerOffset();
+    requestDockModel();
+    if (reason !== "safety_offscreen") {
+      requestAnimationFrame(()=>{ ensureShelfViewportSafety(); });
+    }
+  }
+
+  function ensureShelfViewportSafety(){
+    if (state.collapsed || !panel) return;
+    const rect = panel.getBoundingClientRect();
+    if (!rect || rect.height <= 0) return;
+
+    const doc = document.documentElement;
+    const styles = getComputedStyle(doc);
+    const topSafe = Number.parseFloat(styles.getPropertyValue("--val-top-safe")) || DOCK_TOP_SAFE;
+    const currentOffset = Number.parseFloat(styles.getPropertyValue("--val-composer-offset")) || DOCK_FALLBACK_COMPOSER_OFFSET;
+
+    if (rect.top >= topSafe && rect.bottom <= (window.innerHeight - DOCK_VIEWPORT_MARGIN)) return;
+
+    if (rect.top < topSafe) {
+      const requiredDrop = Math.ceil(topSafe - rect.top + 8);
+      const adjustedOffset = clampComposerOffset(currentOffset - requiredDrop);
+      doc.style.setProperty("--val-composer-offset", `${adjustedOffset}px`);
+    }
+
+    requestAnimationFrame(()=>{
+      if (state.collapsed || !panel) return;
+      const retryRect = panel.getBoundingClientRect();
+      if (retryRect.top < topSafe || retryRect.bottom > (window.innerHeight - DOCK_VIEWPORT_MARGIN)) {
+        setOpen(false, "safety_offscreen");
+      }
+    });
   }
 
   function updateDockOpenRootClass(){
@@ -1084,26 +1154,7 @@ function suppressPreludeNudge(ms){
   }
 
   function collapse(toCollapsed){
-    state.collapsed = !!toCollapsed;
-    if (!pill || !panel) return;
-    try { hideTooltip(); } catch(_) {}
-    pill.style.display  = "block";
-    panel.style.display = state.collapsed ? "none"  : "flex";
-    pill.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
-    updateDockOpenRootClass();
-    saveState();
-    persistHostDockUiState();
-
-    if (state.collapsed) {
-      if (lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
-        try { pill.focus({ preventScroll: true }); } catch(_) { try { pill.focus(); } catch(__) {} }
-      }
-    } else {
-      lastFocusedElement = document.activeElement;
-      focusFirstDockControl();
-      updateComposerOffset();
-      requestDockModel();
-    }
+    setOpen(!toCollapsed, "collapse_wrapper");
   }
 
   function buildDock(){
@@ -1113,7 +1164,7 @@ function suppressPreludeNudge(ms){
     pill.append(portalPillIndicator);
     pill.setAttribute("aria-controls", "valdock-panel");
     pill.setAttribute("aria-expanded", "false");
-    panel = el("div","valdock-panel");
+    panel = el("div","valdock-panel valdock-shelf");
     panel.id = "valdock-panel";
     panel.setAttribute("role", "dialog");
     panel.setAttribute("aria-label", "Control Centre");
@@ -1202,7 +1253,7 @@ function suppressPreludeNudge(ms){
     pill.addEventListener("click",(e)=>{
       e.preventDefault();
       markUserInteraction();
-      collapse(!state.collapsed);
+      setOpen(state.collapsed, "pill_toggle");
     }, true);
 
     // Keyboard support: ESC closes, Tab wraps within open dock
@@ -1211,7 +1262,7 @@ function suppressPreludeNudge(ms){
       if (e.key === "Escape") {
         e.preventDefault();
         markUserInteraction();
-        collapse(true);
+        setOpen(false, "escape_dock");
         return;
       }
       if (e.key === "Tab") {
@@ -1236,8 +1287,17 @@ function suppressPreludeNudge(ms){
       if (e.key === "Escape") {
         e.preventDefault();
         markUserInteraction();
-        collapse(true);
+        setOpen(false, "escape_document");
       }
+    }, true);
+
+    document.addEventListener("click", (e)=>{
+      if (state.collapsed || !pill || !panel) return;
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (pill.contains(target) || panel.contains(target)) return;
+      markUserInteraction();
+      setOpen(false, "click_outside");
     }, true);
 
     // Initial state (host state is authoritative when available).
@@ -1295,9 +1355,25 @@ function suppressPreludeNudge(ms){
       }, 120);
     }
 
+    function observeComposerForOffset(){
+      const composer = getComposerElement();
+      const target = composer && composer.parentElement ? composer.parentElement : composer;
+      if (!target || target === composerOffsetTarget) return;
+      composerOffsetTarget = target;
+      if (!composerOffsetObserver) {
+        composerOffsetObserver = new MutationObserver(()=>{ scheduleComposerOffsetUpdate(); });
+      }
+      try { composerOffsetObserver.disconnect(); } catch(_) {}
+      try { composerOffsetObserver.observe(target, { attributes: true, childList: true, subtree: true }); } catch(_) {}
+    }
+
     try {
-      const composerOffsetObserver = new MutationObserver(()=>{ scheduleComposerOffsetUpdate(); });
-      composerOffsetObserver.observe(document.body, { childList: true, subtree: true });
+      const bodyObserver = new MutationObserver(()=>{
+        observeComposerForOffset();
+        scheduleComposerOffsetUpdate();
+      });
+      bodyObserver.observe(document.body, { childList: true, subtree: true });
+      observeComposerForOffset();
     } catch(_) {}
 
     // Keep Void behavior in sync with its current enabled flag at startup.
