@@ -2,7 +2,7 @@
 
 .valdock{
   position: fixed;
-  z-index: 9998;
+  z-index: 2147483644;
   inset: 0;
   pointer-events: none;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial;
@@ -12,6 +12,7 @@
 /* Controls pill */
 .valdock-pill{
   position: fixed;
+  z-index: 2147483646;
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
@@ -31,6 +32,11 @@
   font-weight: 550;
   letter-spacing: 0.02em;
   transition: transform 0.12s ease, border-color 0.15s ease, opacity 0.35s ease;
+}
+
+.valdock-pill.active{
+  border-color: rgba(120, 180, 240, 0.4);
+  box-shadow: 0 0 0 1px rgba(120, 180, 240, 0.15);
 }
 
 .valdock-pill:hover{
@@ -63,18 +69,20 @@
 }
 
 /* Expanded Control Centre panel */
-.valdock-panel{
+.valdock-panel,
+.valdock-shelf{
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   position: fixed;
+  z-index: 2147483645;
   left: 50%;
-  bottom: calc(var(--val-composer-offset, 120px) + 10px);
+  bottom: calc(var(--val-composer-offset, 140px) + 12px);
   transform: translateX(-50%) translateY(8px);
   opacity: 0;
   pointer-events: none;
   display: none;
   flex-direction: column;
-  width: min(980px, calc(100vw - 40px));
-  max-height: min(60vh, 520px);
+  width: min(980px, 86vw);
+  max-height: calc(100vh - var(--val-top-safe, 64px) - var(--val-composer-offset, 140px) - 24px);
   background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
   background-color: rgba(2,10,20,0.94);
   border: 1px solid rgba(120, 180, 240, 0.16);
@@ -82,7 +90,7 @@
   padding: 0;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  overflow: hidden;
+  overflow: auto;
   transition: opacity 0.15s ease, transform 0.18s ease;
 }
 
