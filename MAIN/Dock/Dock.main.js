@@ -60,6 +60,8 @@
   const DOCK_UI_STATE_GET = "dock.ui_state.get";
   const DOCK_UI_STATE_SET = "dock.ui_state.set";
   const DOCK_VIEWPORT_MARGIN = 8;
+  const DOCK_DEFAULT_MODE = "shelf";
+  const DOCK_FALLBACK_COMPOSER_OFFSET = 120;
   const DEFAULT_COMMAND_NAMES = Object.freeze({
     VoidCommandSetEnabled: "void.command.set_enabled",
     ContinuumCommandPulse: "continuum.command.pulse",
@@ -214,7 +216,7 @@ function suppressPreludeNudge(ms){
   const LS_KEY  = "VAL_Dock_"+CHAT_ID;
 
   function loadLocalDockState(){
-    const fallback = { x: null, y: null, collapsed: true };
+    const fallback = { x: null, y: null, collapsed: true, mode: DOCK_DEFAULT_MODE };
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return fallback;
@@ -223,7 +225,8 @@ function suppressPreludeNudge(ms){
       return {
         x: Number.isFinite(parsed.x) ? Math.round(parsed.x) : null,
         y: Number.isFinite(parsed.y) ? Math.round(parsed.y) : null,
-        collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : true
+        collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : true,
+        mode: parsed.mode === "floating" ? "floating" : DOCK_DEFAULT_MODE
       };
     } catch(_) {
       return fallback;
@@ -257,6 +260,10 @@ function suppressPreludeNudge(ms){
 
   let pendingDockUiStateResolve = null;
 
+  function isShelfMode(){
+    return state.mode !== "floating";
+  }
+
   function saveState(){
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e) {}
   }
@@ -273,7 +280,7 @@ function suppressPreludeNudge(ms){
         isOpen: !state.collapsed,
         x: Number.isFinite(state.x) ? Math.round(state.x) : null,
         y: Number.isFinite(state.y) ? Math.round(state.y) : null,
-        mode: "floating"
+        mode: isShelfMode() ? "shelf" : "floating"
       });
     } catch(_) {}
   }
@@ -638,6 +645,10 @@ function suppressPreludeNudge(ms){
       state.y = Number.isFinite(payload.y) ? Math.round(payload.y) : null;
     }
 
+    if (Object.prototype.hasOwnProperty.call(payload, "mode")) {
+      state.mode = payload.mode === "floating" ? "floating" : "shelf";
+    }
+
     return true;
   }
 
@@ -674,6 +685,7 @@ function suppressPreludeNudge(ms){
   function applyDockUiStateAfterBootstrap(){
     suppressHostDockPersist = true;
     try {
+      state.mode = state.mode === "floating" ? "floating" : "shelf";
       applyPos();
       if (state.collapsed) collapse(true); else collapse(false);
     } finally {
@@ -686,6 +698,7 @@ function suppressPreludeNudge(ms){
     state.x = fallbackState.x;
     state.y = fallbackState.y;
     state.collapsed = fallbackState.collapsed;
+    state.mode = fallbackState.mode === "floating" ? "floating" : "shelf";
     clampDockStatePosition();
     saveState();
     applyDockUiStateAfterBootstrap();
@@ -922,6 +935,7 @@ function suppressPreludeNudge(ms){
 
   function clampDockStatePosition(){
     if (!dock) return;
+    if (isShelfMode()) return;
     if (state.x == null || state.y == null) return;
 
     const width = Math.max(0, rectW());
@@ -935,6 +949,13 @@ function suppressPreludeNudge(ms){
 
   function applyPos(){
     if (!dock) return;
+    if (isShelfMode()) {
+      dock.style.top = "0";
+      dock.style.left = "0";
+      dock.style.right = "auto";
+      dock.style.transform = "";
+      return;
+    }
     clampDockStatePosition();
     if (state.x == null || state.y == null){
       dock.style.top   = "14px";
@@ -950,6 +971,7 @@ function suppressPreludeNudge(ms){
   }
 
   function onDown(e){
+    if (isShelfMode()) return;
     const headerHit = e.target.closest(".valdock-header");
     const pillHit   = e.target.closest(".valdock-pill");
     if (!headerHit && !pillHit) return;
@@ -984,13 +1006,15 @@ function suppressPreludeNudge(ms){
 
     if (dragFromPill && !dragHasMoved) {
       markUserInteraction();
-      collapse(false);
+      collapse(!state.collapsed);
     }
 
     dragFromPill = false;
     isDragging   = false;
-    saveState();
-    persistHostDockUiState();
+    if (!isShelfMode()) {
+      saveState();
+      persistHostDockUiState();
+    }
   }
 
   function getDockFocusableElements(){
@@ -1020,13 +1044,53 @@ function suppressPreludeNudge(ms){
     }
   }
 
+  function updateComposerOffset(){
+    const doc = document.documentElement;
+    if (!doc) return;
+
+    let offset = DOCK_FALLBACK_COMPOSER_OFFSET;
+    try {
+      const composer = getComposerElement();
+      if (composer) {
+        const rect = composer.getBoundingClientRect();
+        const measured = Math.max(rect.height + Math.max(0, window.innerHeight - rect.bottom), rect.height + 28);
+        if (Number.isFinite(measured) && measured > 0) offset = Math.round(measured);
+      }
+    } catch(_) {}
+
+    doc.style.setProperty("--val-composer-offset", `${offset}px`);
+  }
+
+  function updateDockOpenRootClass(){
+    const root = document.documentElement;
+    if (!root) return;
+    const isOpen = !state.collapsed;
+    root.classList.toggle("val-dock-open", isOpen);
+    if (!isOpen) {
+      root.style.setProperty("--val-dock-open-height", "0px");
+      return;
+    }
+
+    updateComposerOffset();
+    try {
+      const panelHeight = panel ? panel.getBoundingClientRect().height : 0;
+      const composerOffset = Number.parseFloat((getComputedStyle(root).getPropertyValue("--val-composer-offset") || "").replace("px", ""));
+      const safeComposerOffset = Number.isFinite(composerOffset) ? composerOffset : DOCK_FALLBACK_COMPOSER_OFFSET;
+      const reserve = Math.round(panelHeight + safeComposerOffset + 22);
+      root.style.setProperty("--val-dock-open-height", `${Math.max(0, reserve)}px`);
+    } catch(_) {
+      root.style.setProperty("--val-dock-open-height", `${DOCK_FALLBACK_COMPOSER_OFFSET + 260}px`);
+    }
+  }
+
   function collapse(toCollapsed){
     state.collapsed = !!toCollapsed;
     if (!pill || !panel) return;
     try { hideTooltip(); } catch(_) {}
-    pill.style.display  = state.collapsed ? "block" : "none";
+    pill.style.display  = "block";
     panel.style.display = state.collapsed ? "none"  : "flex";
     pill.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
+    updateDockOpenRootClass();
     saveState();
     persistHostDockUiState();
 
@@ -1037,6 +1101,7 @@ function suppressPreludeNudge(ms){
     } else {
       lastFocusedElement = document.activeElement;
       focusFirstDockControl();
+      updateComposerOffset();
       requestDockModel();
     }
   }
@@ -1058,13 +1123,11 @@ function suppressPreludeNudge(ms){
 
     // Header
     const header = el("div","valdock-header");
-    const title  = el("div","valdock-title","CONTROL CENTRE");
+    const title  = el("div","valdock-title","Control Centre");
     title.id = "valdock-title";
     panel.setAttribute("aria-labelledby", "valdock-title");
-    const close  = el("button","valdock-close","×");
     portalBadge = el("div", "valdock-portal-badge", "Portal");
-    close.addEventListener("click",(e)=>{ e.preventDefault(); markUserInteraction(); collapse(true); }, true);
-    header.append(title, portalBadge, close);
+    header.append(title, portalBadge);
 
     const body = el("div","valdock-body");
     dockBody = body;
@@ -1136,7 +1199,11 @@ function suppressPreludeNudge(ms){
     } catch(_) {}
 
     // Clicking minimized pill expands
-    pill.addEventListener("click",(e)=>{ e.preventDefault(); markUserInteraction(); collapse(false); }, true);
+    pill.addEventListener("click",(e)=>{
+      e.preventDefault();
+      markUserInteraction();
+      collapse(!state.collapsed);
+    }, true);
 
     // Keyboard support: ESC closes, Tab wraps within open dock
     dock.addEventListener("keydown", (e)=>{
@@ -1199,6 +1266,7 @@ function suppressPreludeNudge(ms){
       state.x = fallbackState.x;
       state.y = fallbackState.y;
       state.collapsed = fallbackState.collapsed;
+      state.mode = fallbackState.mode === "floating" ? "floating" : "shelf";
       clampDockStatePosition();
       saveState();
       finishDockBootstrap();
@@ -1206,6 +1274,9 @@ function suppressPreludeNudge(ms){
     });
 
     window.addEventListener("resize", ()=>{
+      updateComposerOffset();
+      updateDockOpenRootClass();
+      if (isShelfMode()) return;
       if (state.x == null || state.y == null) return;
       markUserInteraction();
       clampDockStatePosition();
@@ -1213,6 +1284,21 @@ function suppressPreludeNudge(ms){
       saveState();
       persistHostDockUiState();
     }, { passive: true });
+
+    let composerOffsetTimer = null;
+    function scheduleComposerOffsetUpdate(){
+      if (composerOffsetTimer) return;
+      composerOffsetTimer = setTimeout(()=>{
+        composerOffsetTimer = null;
+        updateComposerOffset();
+        if (!state.collapsed) updateDockOpenRootClass();
+      }, 120);
+    }
+
+    try {
+      const composerOffsetObserver = new MutationObserver(()=>{ scheduleComposerOffsetUpdate(); });
+      composerOffsetObserver.observe(document.body, { childList: true, subtree: true });
+    } catch(_) {}
 
     // Keep Void behavior in sync with its current enabled flag at startup.
     try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}
