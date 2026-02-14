@@ -65,6 +65,8 @@
   const DOCK_MIN_COMPOSER_OFFSET = 100;
   const DOCK_MAX_COMPOSER_OFFSET = 420;
   const DOCK_TOP_SAFE = 64;
+  const DOCK_SHELF_GAP = 12;
+  const DOCK_SHELF_BOTTOM_MARGIN = 24;
   const DEFAULT_COMMAND_NAMES = Object.freeze({
     VoidCommandSetEnabled: "void.command.set_enabled",
     ContinuumCommandPulse: "continuum.command.pulse",
@@ -1072,6 +1074,21 @@ function suppressPreludeNudge(ms){
     doc.style.setProperty("--val-top-safe", `${DOCK_TOP_SAFE}px`);
   }
 
+  function updatePillMetrics(){
+    if (!pill) return;
+    const doc = document.documentElement;
+    if (!doc) return;
+    try {
+      const rect = pill.getBoundingClientRect();
+      if (!rect || rect.height <= 0) return;
+      doc.style.setProperty("--val-pill-top", `${Math.round(rect.top)}px`);
+      doc.style.setProperty("--val-pill-bottom", `${Math.round(rect.bottom)}px`);
+      doc.style.setProperty("--val-pill-height", `${Math.round(rect.height)}px`);
+      doc.style.setProperty("--val-shelf-gap", `${DOCK_SHELF_GAP}px`);
+      doc.style.setProperty("--val-shelf-bottom-margin", `${DOCK_SHELF_BOTTOM_MARGIN}px`);
+    } catch(_) {}
+  }
+
   function setOpen(isOpen, reason){
     const nextCollapsed = !isOpen;
     const wasCollapsed = state.collapsed;
@@ -1096,39 +1113,33 @@ function suppressPreludeNudge(ms){
     if (wasCollapsed) {
       lastFocusedElement = document.activeElement;
     }
+    updatePillMetrics();
     focusFirstDockControl();
     updateComposerOffset();
     requestDockModel();
-    if (reason !== "safety_offscreen") {
-      requestAnimationFrame(()=>{ ensureShelfViewportSafety(); });
-    }
+    requestAnimationFrame(()=>{ ensureShelfViewportSafety(); });
   }
 
   function ensureShelfViewportSafety(){
     if (state.collapsed || !panel) return;
+    if (!isShelfMode()) return;
+
+    updatePillMetrics();
     const rect = panel.getBoundingClientRect();
     if (!rect || rect.height <= 0) return;
 
     const doc = document.documentElement;
-    const styles = getComputedStyle(doc);
-    const topSafe = Number.parseFloat(styles.getPropertyValue("--val-top-safe")) || DOCK_TOP_SAFE;
-    const currentOffset = Number.parseFloat(styles.getPropertyValue("--val-composer-offset")) || DOCK_FALLBACK_COMPOSER_OFFSET;
+    const topSafe = DOCK_TOP_SAFE;
+    const topAdjustment = rect.top < topSafe ? Math.ceil(topSafe - rect.top) : 0;
+    doc.style.setProperty("--val-shelf-top-adjust", `${topAdjustment}px`);
 
-    if (rect.top >= topSafe && rect.bottom <= (window.innerHeight - DOCK_VIEWPORT_MARGIN)) return;
-
-    if (rect.top < topSafe) {
-      const requiredDrop = Math.ceil(topSafe - rect.top + 8);
-      const adjustedOffset = clampComposerOffset(currentOffset - requiredDrop);
-      doc.style.setProperty("--val-composer-offset", `${adjustedOffset}px`);
-    }
-
-    requestAnimationFrame(()=>{
-      if (state.collapsed || !panel) return;
-      const retryRect = panel.getBoundingClientRect();
-      if (retryRect.top < topSafe || retryRect.bottom > (window.innerHeight - DOCK_VIEWPORT_MARGIN)) {
-        setOpen(false, "safety_offscreen");
-      }
-    });
+    const pillBottom = Number.parseFloat(getComputedStyle(doc).getPropertyValue("--val-pill-bottom")) || 70;
+    const topGap = DOCK_SHELF_GAP + topAdjustment;
+    const availableHeight = Math.max(
+      140,
+      Math.floor(window.innerHeight - (pillBottom + topGap) - DOCK_SHELF_BOTTOM_MARGIN)
+    );
+    doc.style.setProperty("--val-shelf-max-height", `${availableHeight}px`);
   }
 
   function updateDockOpenRootClass(){
@@ -1178,7 +1189,15 @@ function suppressPreludeNudge(ms){
     title.id = "valdock-title";
     panel.setAttribute("aria-labelledby", "valdock-title");
     portalBadge = el("div", "valdock-portal-badge", "Portal");
-    header.append(title, portalBadge);
+    const closeBtn = el("button", "valdock-close", "✕");
+    closeBtn.setAttribute("type", "button");
+    closeBtn.setAttribute("aria-label", "Close Control Centre");
+    closeBtn.addEventListener("click", (e)=>{
+      e.preventDefault();
+      markUserInteraction();
+      setOpen(false, "close_button");
+    }, true);
+    header.append(title, portalBadge, closeBtn);
 
     const body = el("div","valdock-body");
     dockBody = body;
@@ -1186,6 +1205,7 @@ function suppressPreludeNudge(ms){
     dock.append(pill, panel);
 
     document.body.appendChild(dock);
+    updatePillMetrics();
     requestDockModel();
 
     // Best-effort: reflect Chronicle run state in the button label.
@@ -1334,7 +1354,9 @@ function suppressPreludeNudge(ms){
     });
 
     window.addEventListener("resize", ()=>{
+      updatePillMetrics();
       updateComposerOffset();
+      ensureShelfViewportSafety();
       updateDockOpenRootClass();
       if (isShelfMode()) return;
       if (state.x == null || state.y == null) return;
