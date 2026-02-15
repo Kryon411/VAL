@@ -1,5 +1,9 @@
 /* ModuleDock.styles.css — VAL SoftGlass Dock */
 
+:root {
+  --valdock-style-version: "dock-shelf-vNext";
+}
+
 .valdock{
   position: fixed;
   z-index: 2147483644;
@@ -9,118 +13,106 @@
   color: rgba(245,251,255,0.75);
 }
 
-/* Controls pill */
-.valdock-pill{
-  position: fixed;
-  z-index: 2147483646;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+.valdock-launcher{
   pointer-events: auto;
-  font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
-  appearance: none;
-  border: 1px solid rgba(120, 180, 240, 0.16);
-  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-  background-color: rgba(2, 10, 20, 0.86);
-  color: rgba(245,251,255,0.85);
-  padding: 10px 22px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
+  border: 1px solid rgba(120, 180, 240, 0.32);
+  background: radial-gradient(circle at 30% 30%, rgba(70, 170, 255, 0.45), rgba(8, 20, 38, 0.95) 72%);
+  box-shadow: 0 0 0 1px rgba(120, 180, 240, 0.1), 0 0 18px rgba(34, 152, 255, 0.22);
   cursor: pointer;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  font-size: 14px;
-  font-weight: 550;
-  letter-spacing: 0.02em;
-  transition: transform 0.12s ease, border-color 0.15s ease, opacity 0.35s ease;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.18s ease;
 }
 
-.valdock-pill.active{
-  border-color: rgba(120, 180, 240, 0.4);
-  box-shadow: 0 0 0 1px rgba(120, 180, 240, 0.15);
+.valdock-launcher-icon{
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(125, 205, 255, 0.95);
+  box-shadow: inset 0 0 6px rgba(20, 125, 255, 0.55), 0 0 8px rgba(40, 155, 255, 0.45);
+  background: radial-gradient(circle at 40% 38%, rgba(210, 243, 255, 0.95), rgba(66, 162, 255, 0.32) 55%, rgba(20, 38, 72, 0.2) 100%);
 }
 
-.valdock-pill:hover{
-  border-color: rgba(120, 180, 240, 0.28);
-  transform: translateX(-50%) translateY(-1px);
-  opacity: 1;
+.valdock-launcher:hover{
+  transform: translateY(-1px);
+  border-color: rgba(125, 205, 255, 0.58);
 }
 
-.valdock-pill:focus-visible{
+.valdock-launcher:focus-visible{
   outline: 2px solid rgba(120, 180, 240, 0.75);
-  outline-offset: 3px;
-  opacity: 1;
+  outline-offset: 2px;
 }
 
-.valdock-pill:active{
-  transform: translateX(-50%) translateY(1px) scale(0.99);
+.valdock-launcher.active{
+  border-color: rgba(125, 205, 255, 0.66);
+  box-shadow: 0 0 0 1px rgba(120, 180, 240, 0.18), 0 0 22px rgba(34, 152, 255, 0.35);
 }
 
-.valdock-pill-indicator{
-  margin-left: 8px;
-  font-size: 12px;
-  line-height: 1;
-  color: rgba(255, 96, 96, 0.92);
-  text-shadow: 0 0 6px rgba(255, 64, 64, 0.4);
+.valdock-launcher.is-fallback{
+  position: fixed;
+  top: 12px;
+  right: 72px;
+  z-index: 2147483646;
+}
+
+.valdock-launcher-indicator{
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 70, 70, 0.95);
+  box-shadow: 0 0 8px rgba(255, 70, 70, 0.55);
   display: none;
 }
 
-.valdock-pill-indicator.active{
-  display: inline-block;
+.valdock-launcher-indicator.active{
+  display: block;
 }
 
-/* Expanded Control Centre panel */
 .valdock-panel,
 .valdock-shelf{
   font-family: "Inter", "Söhne", "Helvetica Neue", Arial, system-ui, -apple-system, "Segoe UI", sans-serif;
   position: fixed;
   z-index: 2147483645;
-  left: 50%;
-  top: calc(var(--val-pill-bottom, 70px) + var(--val-shelf-gap, 12px) + var(--val-shelf-top-adjust, 0px));
-  bottom: auto;
-  transform: translateX(-50%) translateY(8px);
+  right: 16px;
+  top: 56px;
+  left: auto;
   opacity: 0;
   pointer-events: none;
   display: none;
   flex-direction: column;
-  width: min(980px, 86vw);
-  max-height: var(--val-shelf-max-height, calc(100vh - (var(--val-pill-bottom, 70px) + var(--val-shelf-gap, 12px)) - var(--val-shelf-bottom-margin, 24px)));
+  width: min(560px, calc(100vw - 32px));
+  min-width: min(420px, calc(100vw - 32px));
+  max-width: 560px;
+  max-height: 72vh;
   background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-  background-color: rgba(2,10,20,0.94);
-  border: 1px solid rgba(120, 180, 240, 0.16);
-  border-radius: 20px;
-  padding: 0;
+  background-color: rgba(2,10,20,0.95);
+  border: 1px solid rgba(120, 180, 240, 0.18);
+  border-radius: 16px;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   transition: opacity 0.15s ease, transform 0.18s ease;
+  transform: translateY(8px);
 }
 
 html.val-dock-open .valdock-panel{
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
   pointer-events: auto;
 }
 
-.valdock-header{
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px 6px;
-  border-bottom: 1px solid rgba(120, 180, 240, 0.1);
-}
-
-.valdock-title{
-  justify-self: center;
-  text-align: center;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  opacity: 0.86;
-}
-
 .valdock-portal-badge{
-  justify-self: end;
+  position: absolute;
+  top: 10px;
+  left: 12px;
   display: none;
   align-items: center;
   gap: 6px;
@@ -134,6 +126,7 @@ html.val-dock-open .valdock-panel{
   text-transform: uppercase;
   font-weight: 600;
   white-space: nowrap;
+  z-index: 2;
 }
 
 .valdock-portal-badge.active{
@@ -141,9 +134,12 @@ html.val-dock-open .valdock-panel{
 }
 
 .valdock-close{
-  justify-self: end;
-  width: 30px;
-  height: 30px;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   border: 1px solid rgba(120, 180, 240, 0.2);
   background: rgba(4,18,32,0.78);
@@ -161,10 +157,6 @@ html.val-dock-open .valdock-panel{
 .valdock-close:focus-visible{
   outline: 2px solid rgba(120, 180, 240, 0.75);
   outline-offset: 2px;
-}
-
-html.val-dock-open body{
-  padding-bottom: var(--val-dock-open-height, 0px);
 }
 
 .valdock-row{
@@ -379,7 +371,7 @@ html.val-dock-open body{
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px 12px;
+  padding: 42px 12px 12px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
