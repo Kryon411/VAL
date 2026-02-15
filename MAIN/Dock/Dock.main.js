@@ -1,11 +1,6 @@
 // Dock.main.js — Working Beta Dock (Continuum + Void)
 // Self-contained dock UI injected into chatgpt.com via ModuleLoader.
 // Provides:
-//  - Minimized "Control Centre" pill (top-center by default)
-//  - Expandable "Control Centre" panel
-//  - Continuum toggle (best-effort) + Pulse + Open Folder buttons
-//  - Void toggle (best-effort) for hide-code/screenshots modules
-//  - Per-session position + collapsed state via localStorage
 
 (function () {
   if (window.__VAL_DOCK_BOOTED__) return;
@@ -59,14 +54,9 @@
   const DOCK_MODEL_EVENT = "val.dock.model";
   const DOCK_UI_STATE_GET = "dock.ui_state.get";
   const DOCK_UI_STATE_SET = "dock.ui_state.set";
-  const DOCK_VIEWPORT_MARGIN = 8;
   const DOCK_DEFAULT_MODE = "shelf";
-  const DOCK_FALLBACK_COMPOSER_OFFSET = 120;
-  const DOCK_MIN_COMPOSER_OFFSET = 100;
-  const DOCK_MAX_COMPOSER_OFFSET = 420;
-  const DOCK_TOP_SAFE = 64;
-  const DOCK_SHELF_GAP = 12;
-  const DOCK_SHELF_BOTTOM_MARGIN = 24;
+  const DOCK_PANEL_TOP_GAP = 12;
+  const DOCK_PANEL_SCREEN_MARGIN = 16;
   const DEFAULT_COMMAND_NAMES = Object.freeze({
     VoidCommandSetEnabled: "void.command.set_enabled",
     ContinuumCommandPulse: "continuum.command.pulse",
@@ -221,26 +211,26 @@ function suppressPreludeNudge(ms){
   const LS_KEY  = "VAL_Dock_"+CHAT_ID;
 
   function loadLocalDockState(){
-    const fallback = { x: null, y: null, collapsed: true, mode: DOCK_DEFAULT_MODE };
+    const fallback = { collapsed: true, mode: DOCK_DEFAULT_MODE };
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return fallback;
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return fallback;
       return {
-        x: Number.isFinite(parsed.x) ? Math.round(parsed.x) : null,
-        y: Number.isFinite(parsed.y) ? Math.round(parsed.y) : null,
-        collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : true,
-        mode: parsed.mode === "floating" ? "floating" : DOCK_DEFAULT_MODE
+        collapsed: typeof parsed.collapsed === "boolean"
+          ? parsed.collapsed
+          : (typeof parsed.isOpen === "boolean" ? !parsed.isOpen : true),
+        mode: DOCK_DEFAULT_MODE
       };
     } catch(_) {
       return fallback;
     }
   }
 
-  let dock, pill, panel;
+  let dock, launcher, panel;
   let dockBody;
-  let portalBadge, portalPillIndicator;
+  let portalBadge, portalLauncherIndicator;
   let pulseStatusHint;
   let pulseBtn;
   let chronicleBtn;
@@ -250,11 +240,6 @@ function suppressPreludeNudge(ms){
   let refreshLocked = false;
   let refreshTimer = null;
   let lastFocusedElement = null;
-  let isDragging = false;
-  let dragOffset = [0,0];
-  let dragFromPill = false;
-  let dragHasMoved = false;
-
   let state = loadLocalDockState();
   let isBootstrapping = true;
   let hostReady = false;
@@ -262,17 +247,20 @@ function suppressPreludeNudge(ms){
   let bootTimedOut = false;
   let userInteractedSinceBootstrap = false;
   let suppressHostDockPersist = false;
-  let composerOffsetObserver = null;
-  let composerOffsetTarget = null;
+  let headerMutationObserver = null;
 
   let pendingDockUiStateResolve = null;
 
-  function isShelfMode(){
-    return state.mode !== "floating";
-  }
+  function isShelfMode(){ return true; }
 
   function saveState(){
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e) {}
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        isOpen: !state.collapsed,
+        collapsed: state.collapsed,
+        mode: DOCK_DEFAULT_MODE
+      }));
+    } catch(e) {}
   }
 
   function canPersistHostDockUiState(){
@@ -285,9 +273,7 @@ function suppressPreludeNudge(ms){
       post({
         type: getCommandName("DockUiStateSet"),
         isOpen: !state.collapsed,
-        x: Number.isFinite(state.x) ? Math.round(state.x) : null,
-        y: Number.isFinite(state.y) ? Math.round(state.y) : null,
-        mode: isShelfMode() ? "shelf" : "floating"
+        mode: DOCK_DEFAULT_MODE
       });
     } catch(_) {}
   }
@@ -585,7 +571,7 @@ function suppressPreludeNudge(ms){
     const active = !!badge.active;
     try {
       if (portalBadge) portalBadge.classList.toggle("active", active);
-      if (portalPillIndicator) portalPillIndicator.classList.toggle("active", active);
+      if (portalLauncherIndicator) portalLauncherIndicator.classList.toggle("active", active);
     } catch(_) {}
   }
 
@@ -643,18 +629,7 @@ function suppressPreludeNudge(ms){
     if (Object.prototype.hasOwnProperty.call(payload, "isOpen")) {
       state.collapsed = !payload.isOpen;
     }
-
-    if (Object.prototype.hasOwnProperty.call(payload, "x")) {
-      state.x = Number.isFinite(payload.x) ? Math.round(payload.x) : null;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(payload, "y")) {
-      state.y = Number.isFinite(payload.y) ? Math.round(payload.y) : null;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(payload, "mode")) {
-      state.mode = payload.mode === "floating" ? "floating" : "shelf";
-    }
+    state.mode = DOCK_DEFAULT_MODE;
 
     return true;
   }
@@ -692,8 +667,7 @@ function suppressPreludeNudge(ms){
   function applyDockUiStateAfterBootstrap(){
     suppressHostDockPersist = true;
     try {
-      state.mode = state.mode === "floating" ? "floating" : "shelf";
-      applyPos();
+      state.mode = DOCK_DEFAULT_MODE;
       if (state.collapsed) collapse(true); else collapse(false);
     } finally {
       suppressHostDockPersist = false;
@@ -702,11 +676,8 @@ function suppressPreludeNudge(ms){
 
   function applyFallbackDockUiStateAndPersist(){
     const fallbackState = loadLocalDockState();
-    state.x = fallbackState.x;
-    state.y = fallbackState.y;
     state.collapsed = fallbackState.collapsed;
-    state.mode = fallbackState.mode === "floating" ? "floating" : "shelf";
-    clampDockStatePosition();
+    state.mode = DOCK_DEFAULT_MODE;
     saveState();
     applyDockUiStateAfterBootstrap();
     persistHostDockUiState();
@@ -937,93 +908,6 @@ function suppressPreludeNudge(ms){
 
 
 
-  function rectW(){ return dock.getBoundingClientRect().width; }
-  function rectH(){ return dock.getBoundingClientRect().height; }
-
-  function clampDockStatePosition(){
-    if (!dock) return;
-    if (isShelfMode()) return;
-    if (state.x == null || state.y == null) return;
-
-    const width = Math.max(0, rectW());
-    const height = Math.max(0, rectH());
-    const maxX = Math.max(DOCK_VIEWPORT_MARGIN, window.innerWidth - DOCK_VIEWPORT_MARGIN - width);
-    const maxY = Math.max(DOCK_VIEWPORT_MARGIN, window.innerHeight - DOCK_VIEWPORT_MARGIN - height);
-
-    state.x = Math.max(DOCK_VIEWPORT_MARGIN, Math.min(maxX, state.x));
-    state.y = Math.max(DOCK_VIEWPORT_MARGIN, Math.min(maxY, state.y));
-  }
-
-  function applyPos(){
-    if (!dock) return;
-    if (isShelfMode()) {
-      dock.style.top = "0";
-      dock.style.left = "0";
-      dock.style.right = "auto";
-      dock.style.transform = "";
-      return;
-    }
-    clampDockStatePosition();
-    if (state.x == null || state.y == null){
-      dock.style.top   = "14px";
-      dock.style.right = "14px";
-      dock.style.left  = "auto";
-      dock.style.transform = "";
-    } else {
-      dock.style.left  = state.x+"px";
-      dock.style.top   = state.y+"px";
-      dock.style.right = "auto";
-      dock.style.transform = "";
-    }
-  }
-
-  function onDown(e){
-    if (isShelfMode()) return;
-    const headerHit = e.target.closest(".valdock-header");
-    const pillHit   = e.target.closest(".valdock-pill");
-    if (!headerHit && !pillHit) return;
-
-    const rect = dock.getBoundingClientRect();
-    isDragging   = true;
-    dragFromPill = !!pillHit;
-    dragHasMoved = false;
-    dragOffset   = [e.clientX-rect.left, e.clientY-rect.top];
-
-    document.addEventListener("mousemove", onMove, true);
-    document.addEventListener("mouseup", onUp, true);
-  }
-
-  function onMove(e){
-    if (!isDragging) return;
-    markUserInteraction();
-    dragHasMoved = true;
-    state.x = e.clientX - dragOffset[0];
-    state.y = e.clientY - dragOffset[1];
-    clampDockStatePosition();
-    applyPos();
-
-    // Keep Void behavior in sync with its current enabled flag at startup.
-    try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}
-
-  }
-
-  function onUp(){
-    document.removeEventListener("mousemove", onMove, true);
-    document.removeEventListener("mouseup", onUp, true);
-
-    if (dragFromPill && !dragHasMoved) {
-      markUserInteraction();
-      collapse(!state.collapsed);
-    }
-
-    dragFromPill = false;
-    isDragging   = false;
-    if (!isShelfMode()) {
-      saveState();
-      persistHostDockUiState();
-    }
-  }
-
   function getDockFocusableElements(){
     if (!dock) return [];
     const selectors = [
@@ -1051,143 +935,149 @@ function suppressPreludeNudge(ms){
     }
   }
 
-  function clampComposerOffset(offset){
-    if (!Number.isFinite(offset)) return DOCK_FALLBACK_COMPOSER_OFFSET;
-    return Math.max(DOCK_MIN_COMPOSER_OFFSET, Math.min(DOCK_MAX_COMPOSER_OFFSET, Math.round(offset)));
+  function isVisibleNode(node){
+    if (!(node instanceof HTMLElement)) return false;
+    const style = window.getComputedStyle(node);
+    if (style.visibility === "hidden" || style.display === "none" || style.pointerEvents === "none") return false;
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 18 || rect.height < 18) return false;
+    if (rect.top < -2 || rect.top > 96) return false;
+    if ((window.innerWidth - rect.right) > 240) return false;
+    return rect.bottom > 0 && rect.left < window.innerWidth;
   }
 
-  function updateComposerOffset(){
-    const doc = document.documentElement;
-    if (!doc) return;
-
-    let offset = DOCK_FALLBACK_COMPOSER_OFFSET;
-    try {
-      const composer = getComposerElement();
-      if (composer) {
-        const rect = composer.getBoundingClientRect();
-        const measured = window.innerHeight - rect.top;
-        if (Number.isFinite(measured) && measured > 0) offset = clampComposerOffset(measured);
+  function closestFlexContainer(node){
+    let current = node;
+    while (current && current !== document.body) {
+      if (!(current instanceof HTMLElement)) {
+        current = current.parentElement;
+        continue;
       }
-    } catch(_) {}
-
-    doc.style.setProperty("--val-composer-offset", `${clampComposerOffset(offset)}px`);
-    doc.style.setProperty("--val-top-safe", `${DOCK_TOP_SAFE}px`);
+      const display = window.getComputedStyle(current).display;
+      if (display.includes("flex") || display.includes("grid")) return current;
+      current = current.parentElement;
+    }
+    return node && node.parentElement ? node.parentElement : null;
   }
 
-  function updatePillMetrics(){
-    if (!pill) return;
-    const doc = document.documentElement;
-    if (!doc) return;
-    try {
-      const rect = pill.getBoundingClientRect();
-      if (!rect || rect.height <= 0) return;
-      doc.style.setProperty("--val-pill-top", `${Math.round(rect.top)}px`);
-      doc.style.setProperty("--val-pill-bottom", `${Math.round(rect.bottom)}px`);
-      doc.style.setProperty("--val-pill-height", `${Math.round(rect.height)}px`);
-      doc.style.setProperty("--val-shelf-gap", `${DOCK_SHELF_GAP}px`);
-      doc.style.setProperty("--val-shelf-bottom-margin", `${DOCK_SHELF_BOTTOM_MARGIN}px`);
-    } catch(_) {}
+  function findHeaderAnchorCandidate(){
+    const candidates = Array.from(document.querySelectorAll("button, a, [role='button']"))
+      .filter(isVisibleNode)
+      .map((node) => ({ node, rect: node.getBoundingClientRect() }));
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => {
+      if (Math.abs(b.rect.right - a.rect.right) > 1) return b.rect.right - a.rect.right;
+      return a.rect.top - b.rect.top;
+    });
+    return candidates[0].node;
   }
 
-  function setOpen(isOpen, reason){
+  function ensureLauncherInserted(){
+    if (!launcher) return;
+
+    const anchor = findHeaderAnchorCandidate();
+    if (!anchor) {
+      launcher.classList.add("is-fallback");
+      if (!launcher.parentElement) document.body.appendChild(launcher);
+      return;
+    }
+
+    const container = closestFlexContainer(anchor);
+    if (!(container instanceof HTMLElement)) {
+      launcher.classList.add("is-fallback");
+      if (!launcher.parentElement) document.body.appendChild(launcher);
+      return;
+    }
+
+    launcher.classList.remove("is-fallback");
+    if (launcher.parentElement !== container) {
+      container.insertBefore(launcher, anchor);
+      return;
+    }
+
+    if (launcher.nextSibling !== anchor) {
+      container.insertBefore(launcher, anchor);
+    }
+  }
+
+  function positionPanel(){
+    if (!panel || !launcher) return;
+    const rect = launcher.getBoundingClientRect();
+    const hasRect = rect && rect.width > 0 && rect.height > 0;
+
+    const top = hasRect
+      ? Math.max(DOCK_PANEL_SCREEN_MARGIN, Math.round(rect.bottom + DOCK_PANEL_TOP_GAP))
+      : 56;
+    const right = hasRect
+      ? Math.max(DOCK_PANEL_SCREEN_MARGIN, Math.round(window.innerWidth - rect.right))
+      : 72;
+
+    const maxHeight = Math.max(
+      180,
+      Math.min(Math.floor(window.innerHeight * 0.72), Math.floor(window.innerHeight - top - 24))
+    );
+
+    panel.style.top = `${top}px`;
+    panel.style.right = `${right}px`;
+    panel.style.left = "auto";
+    panel.style.maxHeight = `${maxHeight}px`;
+  }
+
+  function setOpen(isOpen){
     const nextCollapsed = !isOpen;
     const wasCollapsed = state.collapsed;
     state.collapsed = nextCollapsed;
-    if (!pill || !panel) return;
+    if (!launcher || !panel) return;
 
     try { hideTooltip(); } catch(_) {}
     panel.style.display = state.collapsed ? "none" : "flex";
-    pill.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
-    pill.classList.toggle("active", !state.collapsed);
+    launcher.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
+    launcher.classList.toggle("active", !state.collapsed);
     updateDockOpenRootClass();
     saveState();
     persistHostDockUiState();
 
     if (state.collapsed) {
       if (lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
-        try { pill.focus({ preventScroll: true }); } catch(_) { try { pill.focus(); } catch(__) {} }
+        try { launcher.focus({ preventScroll: true }); } catch(_) { try { launcher.focus(); } catch(__) {} }
       }
       return;
     }
 
-    if (wasCollapsed) {
-      lastFocusedElement = document.activeElement;
-    }
-    updatePillMetrics();
+    if (wasCollapsed) lastFocusedElement = document.activeElement;
+    positionPanel();
     focusFirstDockControl();
-    updateComposerOffset();
     requestDockModel();
-    requestAnimationFrame(()=>{ ensureShelfViewportSafety(); });
-  }
-
-  function ensureShelfViewportSafety(){
-    if (state.collapsed || !panel) return;
-    if (!isShelfMode()) return;
-
-    updatePillMetrics();
-    const rect = panel.getBoundingClientRect();
-    if (!rect || rect.height <= 0) return;
-
-    const doc = document.documentElement;
-    const topSafe = DOCK_TOP_SAFE;
-    const topAdjustment = rect.top < topSafe ? Math.ceil(topSafe - rect.top) : 0;
-    doc.style.setProperty("--val-shelf-top-adjust", `${topAdjustment}px`);
-
-    const pillBottom = Number.parseFloat(getComputedStyle(doc).getPropertyValue("--val-pill-bottom")) || 70;
-    const topGap = DOCK_SHELF_GAP + topAdjustment;
-    const availableHeight = Math.max(
-      140,
-      Math.floor(window.innerHeight - (pillBottom + topGap) - DOCK_SHELF_BOTTOM_MARGIN)
-    );
-    doc.style.setProperty("--val-shelf-max-height", `${availableHeight}px`);
   }
 
   function updateDockOpenRootClass(){
     const root = document.documentElement;
     if (!root) return;
-    const isOpen = !state.collapsed;
-    root.classList.toggle("val-dock-open", isOpen);
-    if (!isOpen) {
-      root.style.setProperty("--val-dock-open-height", "0px");
-      return;
-    }
-
-    updateComposerOffset();
-    try {
-      const panelHeight = panel ? panel.getBoundingClientRect().height : 0;
-      const composerOffset = Number.parseFloat((getComputedStyle(root).getPropertyValue("--val-composer-offset") || "").replace("px", ""));
-      const safeComposerOffset = Number.isFinite(composerOffset) ? composerOffset : DOCK_FALLBACK_COMPOSER_OFFSET;
-      const reserve = Math.round(panelHeight + safeComposerOffset + 22);
-      root.style.setProperty("--val-dock-open-height", `${Math.max(0, reserve)}px`);
-    } catch(_) {
-      root.style.setProperty("--val-dock-open-height", `${DOCK_FALLBACK_COMPOSER_OFFSET + 260}px`);
-    }
+    root.classList.toggle("val-dock-open", !state.collapsed);
   }
 
   function collapse(toCollapsed){
-    setOpen(!toCollapsed, "collapse_wrapper");
+    setOpen(!toCollapsed);
   }
 
   function buildDock(){
     dock  = el("div","valdock");
-    pill  = el("button","valdock-pill","Control Centre");
-    portalPillIndicator = el("span","valdock-pill-indicator","●");
-    pill.append(portalPillIndicator);
-    pill.setAttribute("aria-controls", "valdock-panel");
-    pill.setAttribute("aria-expanded", "false");
+    launcher = el("button","valdock-launcher");
+    launcher.setAttribute("type", "button");
+    launcher.setAttribute("title", "Control Centre");
+    launcher.setAttribute("aria-label", "Control Centre");
+    launcher.setAttribute("aria-controls", "valdock-panel");
+    launcher.setAttribute("aria-expanded", "false");
+    launcher.setAttribute("data-val-tooltip", "Control Centre");
+    launcher.innerHTML = '<span class="valdock-launcher-icon" aria-hidden="true"></span>';
+    portalLauncherIndicator = el("span","valdock-launcher-indicator");
+    launcher.append(portalLauncherIndicator);
+
     panel = el("div","valdock-panel valdock-shelf");
     panel.id = "valdock-panel";
     panel.setAttribute("role", "dialog");
     panel.setAttribute("aria-label", "Control Centre");
 
-    // Drag handlers
-    dock.addEventListener("mousedown", onDown, true);
-
-    // Header
-    const header = el("div","valdock-header");
-    const title  = el("div","valdock-title","Control Centre");
-    title.id = "valdock-title";
-    panel.setAttribute("aria-labelledby", "valdock-title");
     portalBadge = el("div", "valdock-portal-badge", "Portal");
     const closeBtn = el("button", "valdock-close", "✕");
     closeBtn.setAttribute("type", "button");
@@ -1195,20 +1085,24 @@ function suppressPreludeNudge(ms){
     closeBtn.addEventListener("click", (e)=>{
       e.preventDefault();
       markUserInteraction();
-      setOpen(false, "close_button");
+      setOpen(false);
     }, true);
-    header.append(title, portalBadge, closeBtn);
 
     const body = el("div","valdock-body");
     dockBody = body;
-    panel.append(header, body);
-    dock.append(pill, panel);
+    panel.append(portalBadge, closeBtn, body);
+    dock.append(panel);
 
     document.body.appendChild(dock);
-    updatePillMetrics();
+    ensureLauncherInserted();
     requestDockModel();
 
-    // Best-effort: reflect Chronicle run state in the button label.
+    try {
+      const cssVersion = getComputedStyle(document.documentElement).getPropertyValue("--valdock-style-version").trim() || "unknown";
+      console.log("Dock init: launcher mode");
+      console.log(`Dock CSS version: ${cssVersion}`);
+    } catch(_) {}
+
     syncChronicleBusyFromDom();
     try {
       const mo = new MutationObserver(()=>{ syncChronicleBusyFromDom(); });
@@ -1251,7 +1145,6 @@ function suppressPreludeNudge(ms){
                 pendingDockUiStateResolve = null;
                 resolve({ received: true, applied });
               } else if (isLateReply && applied) {
-                clampDockStatePosition();
                 saveState();
                 applyDockUiStateAfterBootstrap();
               }
@@ -1269,20 +1162,18 @@ function suppressPreludeNudge(ms){
       }
     } catch(_) {}
 
-    // Clicking minimized pill expands
-    pill.addEventListener("click",(e)=>{
+    launcher.addEventListener("click", (e)=>{
       e.preventDefault();
       markUserInteraction();
-      setOpen(state.collapsed, "pill_toggle");
+      setOpen(state.collapsed);
     }, true);
 
-    // Keyboard support: ESC closes, Tab wraps within open dock
     dock.addEventListener("keydown", (e)=>{
       if (state.collapsed) return;
       if (e.key === "Escape") {
         e.preventDefault();
         markUserInteraction();
-        setOpen(false, "escape_dock");
+        setOpen(false);
         return;
       }
       if (e.key === "Tab") {
@@ -1307,28 +1198,25 @@ function suppressPreludeNudge(ms){
       if (e.key === "Escape") {
         e.preventDefault();
         markUserInteraction();
-        setOpen(false, "escape_document");
+        setOpen(false);
       }
     }, true);
 
     document.addEventListener("click", (e)=>{
-      if (state.collapsed || !pill || !panel) return;
+      if (state.collapsed || !launcher || !panel) return;
       const target = e.target;
       if (!(target instanceof Node)) return;
-      if (pill.contains(target) || panel.contains(target)) return;
+      if (launcher.contains(target) || panel.contains(target)) return;
       markUserInteraction();
-      setOpen(false, "click_outside");
+      setOpen(false);
     }, true);
 
-    // Initial state (host state is authoritative when available).
     if (state.collapsed) collapse(true); else collapse(false);
-    applyPos();
 
     requestDockUiState().then((result)=>{
       const hasHostState = !!(result && result.received && result.applied);
 
       if (hasHostState) {
-        clampDockStatePosition();
         saveState();
         finishDockBootstrap();
         applyDockUiStateAfterBootstrap();
@@ -1341,71 +1229,31 @@ function suppressPreludeNudge(ms){
         return;
       }
 
-      // If host does not respond, keep local fallback without writing host state.
       const fallbackState = loadLocalDockState();
-      state.x = fallbackState.x;
-      state.y = fallbackState.y;
       state.collapsed = fallbackState.collapsed;
-      state.mode = fallbackState.mode === "floating" ? "floating" : "shelf";
-      clampDockStatePosition();
+      state.mode = DOCK_DEFAULT_MODE;
       saveState();
       finishDockBootstrap();
       applyDockUiStateAfterBootstrap();
     });
 
     window.addEventListener("resize", ()=>{
-      updatePillMetrics();
-      updateComposerOffset();
-      ensureShelfViewportSafety();
-      updateDockOpenRootClass();
-      if (isShelfMode()) return;
-      if (state.x == null || state.y == null) return;
-      markUserInteraction();
-      clampDockStatePosition();
-      applyPos();
-      saveState();
-      persistHostDockUiState();
+      ensureLauncherInserted();
+      if (!state.collapsed) positionPanel();
     }, { passive: true });
 
-    let composerOffsetTimer = null;
-    function scheduleComposerOffsetUpdate(){
-      if (composerOffsetTimer) return;
-      composerOffsetTimer = setTimeout(()=>{
-        composerOffsetTimer = null;
-        updateComposerOffset();
-        if (!state.collapsed) updateDockOpenRootClass();
-      }, 120);
-    }
-
-    function observeComposerForOffset(){
-      const composer = getComposerElement();
-      const target = composer && composer.parentElement ? composer.parentElement : composer;
-      if (!target || target === composerOffsetTarget) return;
-      composerOffsetTarget = target;
-      if (!composerOffsetObserver) {
-        composerOffsetObserver = new MutationObserver(()=>{ scheduleComposerOffsetUpdate(); });
-      }
-      try { composerOffsetObserver.disconnect(); } catch(_) {}
-      try { composerOffsetObserver.observe(target, { attributes: true, childList: true, subtree: true }); } catch(_) {}
-    }
-
     try {
-      const bodyObserver = new MutationObserver(()=>{
-        observeComposerForOffset();
-        scheduleComposerOffsetUpdate();
+      headerMutationObserver = new MutationObserver(()=>{
+        ensureLauncherInserted();
+        if (!state.collapsed) positionPanel();
       });
-      bodyObserver.observe(document.body, { childList: true, subtree: true });
-      observeComposerForOffset();
+      headerMutationObserver.observe(document.body, { childList: true, subtree: true });
     } catch(_) {}
 
-    // Keep Void behavior in sync with its current enabled flag at startup.
     try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}
-
-
-
-    // Emit console signal
     try { console.log("[VAL Dock] Loaded for", CHAT_ID); } catch(_) {}
   }
+
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", buildDock, { once: true });
