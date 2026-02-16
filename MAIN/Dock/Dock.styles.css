@@ -38,6 +38,21 @@
   background: radial-gradient(circle at 40% 38%, rgba(210, 243, 255, 0.95), rgba(66, 162, 255, 0.32) 55%, rgba(20, 38, 72, 0.2) 100%);
 }
 
+
+.valdock-launcher-fallback{
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(230,245,255,0.9);
+}
+
+.valdock-launcher:not(.is-unstyled) .valdock-launcher-fallback{
+  display: none;
+}
+
+.valdock-launcher.is-unstyled .valdock-launcher-fallback{
+  display: inline;
+}
 .valdock-launcher:hover{
   transform: translateY(-1px);
   border-color: rgba(125, 205, 255, 0.58);
