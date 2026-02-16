@@ -972,6 +972,60 @@ function suppressPreludeNudge(ms){
     return candidates[0].node;
   }
 
+  function applyLauncherFailSafeStyles(launcherBtn){
+    if (!(launcherBtn instanceof HTMLElement)) return;
+    launcherBtn.style.position = "fixed";
+    launcherBtn.style.top = "12px";
+    launcherBtn.style.right = "72px";
+    launcherBtn.style.width = "40px";
+    launcherBtn.style.height = "40px";
+    launcherBtn.style.borderRadius = "999px";
+    launcherBtn.style.display = "flex";
+    launcherBtn.style.alignItems = "center";
+    launcherBtn.style.justifyContent = "center";
+    launcherBtn.style.background = "rgba(10,16,24,0.72)";
+    launcherBtn.style.border = "1px solid rgba(120,160,200,0.25)";
+    launcherBtn.style.backdropFilter = "blur(10px)";
+    launcherBtn.style.zIndex = "2147483000";
+    launcherBtn.style.cursor = "pointer";
+
+    const icon = launcherBtn.querySelector(".valdock-launcher-icon");
+    if (icon instanceof HTMLElement) {
+      icon.style.width = "18px";
+      icon.style.height = "18px";
+      icon.style.borderRadius = "999px";
+      icon.style.background = "radial-gradient(circle at 35% 35%, rgba(160,210,255,0.95) 0%, rgba(65,135,255,0.85) 28%, rgba(10,40,95,0.95) 58%, rgba(0,0,0,0.0) 72%)";
+      icon.style.boxShadow = "0 0 10px rgba(80,160,255,0.25)";
+    }
+  }
+
+  function clearLauncherFailSafeStyles(launcherBtn){
+    if (!(launcherBtn instanceof HTMLElement)) return;
+    [
+      "position", "top", "right", "width", "height", "borderRadius", "display", "alignItems",
+      "justifyContent", "background", "border", "backdropFilter", "zIndex", "cursor"
+    ].forEach((prop)=> launcherBtn.style.removeProperty(prop));
+
+    const icon = launcherBtn.querySelector(".valdock-launcher-icon");
+    if (icon instanceof HTMLElement) {
+      ["width", "height", "borderRadius", "background", "boxShadow"].forEach((prop)=> icon.style.removeProperty(prop));
+    }
+  }
+
+  function syncLauncherStyleState(){
+    if (!launcher) return;
+    const rect = launcher.getBoundingClientRect();
+    const isUnstyled = rect.width < 20 || rect.height < 20;
+    if (isUnstyled) {
+      applyLauncherFailSafeStyles(launcher);
+      launcher.classList.add("is-unstyled");
+      console.info("[VAL Dock] launcher fail-safe active");
+      return;
+    }
+    launcher.classList.remove("is-unstyled");
+    clearLauncherFailSafeStyles(launcher);
+  }
+
   function ensureLauncherInserted(){
     if (!launcher) return;
 
@@ -979,6 +1033,7 @@ function suppressPreludeNudge(ms){
     if (!anchor) {
       launcher.classList.add("is-fallback");
       if (!launcher.parentElement) document.body.appendChild(launcher);
+      syncLauncherStyleState();
       return;
     }
 
@@ -986,18 +1041,22 @@ function suppressPreludeNudge(ms){
     if (!(container instanceof HTMLElement)) {
       launcher.classList.add("is-fallback");
       if (!launcher.parentElement) document.body.appendChild(launcher);
+      syncLauncherStyleState();
       return;
     }
 
     launcher.classList.remove("is-fallback");
     if (launcher.parentElement !== container) {
       container.insertBefore(launcher, anchor);
+      syncLauncherStyleState();
       return;
     }
 
     if (launcher.nextSibling !== anchor) {
       container.insertBefore(launcher, anchor);
     }
+
+    syncLauncherStyleState();
   }
 
   function positionPanel(){
@@ -1069,7 +1128,7 @@ function suppressPreludeNudge(ms){
     launcher.setAttribute("aria-controls", "valdock-panel");
     launcher.setAttribute("aria-expanded", "false");
     launcher.setAttribute("data-val-tooltip", "Control Centre");
-    launcher.innerHTML = '<span class="valdock-launcher-icon" aria-hidden="true"></span>';
+    launcher.innerHTML = '<span class="valdock-launcher-icon" aria-hidden="true"></span><span class="valdock-launcher-fallback" aria-hidden="true">CC</span>';
     portalLauncherIndicator = el("span","valdock-launcher-indicator");
     launcher.append(portalLauncherIndicator);
 
@@ -1095,6 +1154,7 @@ function suppressPreludeNudge(ms){
 
     document.body.appendChild(dock);
     ensureLauncherInserted();
+    syncLauncherStyleState();
     requestDockModel();
 
     try {
