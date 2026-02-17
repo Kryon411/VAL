@@ -306,11 +306,20 @@ namespace VAL
             const double topInset = 56;
 
             var overlayWidth = _ccOverlay.ActualWidth > 0 ? _ccOverlay.ActualWidth : _ccOverlay.Width;
-            var left = originDip.X + ActualWidth - overlayWidth - rightInset;
-            var top = originDip.Y + topInset;
+            var overlayHeight = _ccOverlay.ActualHeight > 0 ? _ccOverlay.ActualHeight : _ccOverlay.Height;
+            var targetLeft = originDip.X + ActualWidth - overlayWidth - rightInset;
+            var targetTop = originDip.Y + topInset;
 
-            _ccOverlay.Left = Math.Max(0, left);
-            _ccOverlay.Top = Math.Max(0, top);
+            var vsLeft = SystemParameters.VirtualScreenLeft;
+            var vsTop = SystemParameters.VirtualScreenTop;
+            var vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
+            var vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
+
+            targetLeft = Math.Min(Math.Max(targetLeft, vsLeft), vsRight - overlayWidth);
+            targetTop = Math.Min(Math.Max(targetTop, vsTop), vsBottom - overlayHeight);
+
+            _ccOverlay.Left = targetLeft;
+            _ccOverlay.Top = targetTop;
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
