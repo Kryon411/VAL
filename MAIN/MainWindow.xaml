@@ -52,8 +52,8 @@
                         Margin="0,0,6,0"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button x:Name="ControlCentreButton"
-                        Width="30"
-                        Height="30"
+                        Width="28"
+                        Height="28"
                         Margin="0,0,8,0"
                         VerticalAlignment="Center"
                         ToolTip="Control Centre"
@@ -61,8 +61,9 @@
                         AutomationProperties.Name="Control Centre"
                         Cursor="Hand"
                         BorderThickness="1"
-                        BorderBrush="#4A74A4D2"
-                        Background="#4025446C"
+                        BorderBrush="#2A4A66"
+                        Background="Transparent"
+                        Padding="0"
                         Foreground="#E8F4FF"
                         FocusVisualStyle="{x:Null}">
                 <Button.Style>
@@ -71,7 +72,7 @@
                             <Setter.Value>
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="LensBorder"
-                                            CornerRadius="15"
+                                            CornerRadius="14"
                                             BorderThickness="{TemplateBinding BorderThickness}"
                                             BorderBrush="{TemplateBinding BorderBrush}"
                                             Background="{TemplateBinding Background}">
@@ -93,20 +94,20 @@
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="LensBorder" Property="BorderBrush" Value="#88A5D4FF" />
-                                            <Setter TargetName="LensBorder" Property="Background" Value="#5A315D8F" />
+                                            <Setter TargetName="LensBorder" Property="BorderBrush" Value="#5D7AA0" />
+                                            <Setter TargetName="LensBorder" Property="Background" Value="#1F2A3F" />
                                             <Setter TargetName="LensBorder" Property="Effect">
                                                 <Setter.Value>
                                                     <DropShadowEffect BlurRadius="14"
                                                                       ShadowDepth="0"
-                                                                      Color="#6A4AB8FF"
-                                                                      Opacity="0.9" />
+                                                                      Color="#4A8FD0"
+                                                                      Opacity="0.45" />
                                                 </Setter.Value>
                                             </Setter>
                                         </Trigger>
                                         <Trigger Property="IsKeyboardFocused" Value="True">
-                                            <Setter TargetName="LensBorder" Property="BorderBrush" Value="#99B8DCFF" />
-                                            <Setter TargetName="LensBorder" Property="Background" Value="#5A315D8F" />
+                                            <Setter TargetName="LensBorder" Property="BorderBrush" Value="#7899C4" />
+                                            <Setter TargetName="LensBorder" Property="Background" Value="#1F2A3F" />
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -118,6 +119,7 @@
 
             <Button Width="40"
                     Height="28"
+                    Padding="0"
                     Content="—"
                     Click="WindowMinimize_Click"
                     Background="Transparent"
@@ -126,6 +128,7 @@
 
             <Button Width="40"
                     Height="28"
+                    Padding="0"
                     Content="□"
                     Click="WindowMaxRestore_Click"
                     Background="Transparent"
@@ -134,6 +137,7 @@
 
             <Button Width="40"
                     Height="28"
+                    Padding="0"
                     Content="✕"
                     Click="WindowClose_Click"
                     Background="Transparent"
