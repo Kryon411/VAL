@@ -1,18 +1,16 @@
 using System;
 using System.ComponentModel;
-using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Interop;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Options;
 using VAL.Host;
-using VAL.Host.Services;
 using VAL.Host.Options;
+using VAL.Host.Services;
 using VAL.Host.Startup;
+using VAL.Host.WebMessaging;
 using VAL.ViewModels;
 
 namespace VAL
@@ -25,12 +23,14 @@ namespace VAL
         private readonly WebViewOptions _webViewOptions;
         private readonly StartupOptions _startupOptions;
         private readonly StartupCrashGuard _startupCrashGuard;
-        private bool _loggedWebViewUnavailable;
         private ControlCentreOverlay? _ccOverlay;
         private bool _ccLoggedNotReady;
+        private bool _isDockOpen;
 
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-        private const string DockToggleMessage = "{\"type\":\"dock.toggle\",\"source\":\"host\"}";
+        private const string DockOpenMessage = "{\"type\":\"dock.open\",\"source\":\"host\"}";
+        private const string DockCloseMessage = "{\"type\":\"dock.close\",\"source\":\"host\"}";
+        private const string DockUiStateSetType = "dock.ui_state.set";
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
@@ -51,7 +51,6 @@ namespace VAL
             _startupCrashGuard = startupCrashGuard;
 
             InitializeComponent();
-            InitializeControlCentreButtonIcon();
             Title = _startupOptions.SafeMode ? "VAL (SAFE MODE)" : "VAL";
             DataContext = _viewModel;
             Loaded += MainWindow_Loaded;
@@ -65,6 +64,7 @@ namespace VAL
             SizeChanged += MainWindow_SizeChanged;
 
             _webViewRuntime.WebMessageJsonReceived += _viewModel.HandleWebMessageJson;
+            _webViewRuntime.WebMessageJsonReceived += HandleWebMessageForDockState;
         }
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -84,7 +84,6 @@ namespace VAL
             }
             catch
             {
-                // Never block close due to a guardrail failure.
                 ValLog.Warn("MainWindow", "Close guard failed.");
             }
         }
@@ -105,6 +104,7 @@ namespace VAL
         private void MainWindow_Closed(object? sender, EventArgs e)
         {
             _webViewRuntime.WebMessageJsonReceived -= _viewModel.HandleWebMessageJson;
+            _webViewRuntime.WebMessageJsonReceived -= HandleWebMessageForDockState;
 
             try
             {
@@ -123,10 +123,7 @@ namespace VAL
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // Always launch maximized
             WindowState = WindowState.Maximized;
-
-            // ToastHub centralizes toast policy/gating, ToastManager remains the renderer.
             _toastService.Initialize(this);
 
             var hwnd = new WindowInteropHelper(this).Handle;
@@ -181,7 +178,6 @@ namespace VAL
                 WebView.Source = startUri;
             }
 
-            ControlCentreButton.Visibility = Visibility.Collapsed;
             EnsureControlCentreOverlay();
             ShowControlCentreOverlayIfNeeded();
             UpdateControlCentreOverlayPosition();
@@ -189,17 +185,12 @@ namespace VAL
             _startupCrashGuard.MarkSuccess();
         }
 
-        private void ControlCentreButton_Click(object sender, RoutedEventArgs e)
-        {
-            PostDockToggleMessage(_loggedWebViewUnavailable, value => _loggedWebViewUnavailable = value);
-        }
-
         private void ControlCentreOverlay_ToggleRequested(object? sender, EventArgs e)
         {
-            PostDockToggleMessage(_ccLoggedNotReady, value => _ccLoggedNotReady = value);
+            PostDockStateMessage(_ccLoggedNotReady, value => _ccLoggedNotReady = value);
         }
 
-        private void PostDockToggleMessage(bool loggedFlag, Action<bool> setLoggedFlag)
+        private void PostDockStateMessage(bool loggedFlag, Action<bool> setLoggedFlag)
         {
             try
             {
@@ -215,12 +206,97 @@ namespace VAL
                     return;
                 }
 
-                WebView.CoreWebView2.PostWebMessageAsString(DockToggleMessage);
+                _isDockOpen = !_isDockOpen;
+                var payload = _isDockOpen ? DockOpenMessage : DockCloseMessage;
+                WebView.CoreWebView2.PostWebMessageAsString(payload);
             }
             catch (Exception ex)
             {
-                ValLog.Warn("MainWindow", $"Failed to post Control Centre toggle message: {ex.Message}");
+                ValLog.Warn("MainWindow", $"Failed to post Control Centre state message: {ex.Message}");
             }
+        }
+
+        private void HandleWebMessageForDockState(WebMessageEnvelope envelope)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(envelope.Json);
+                var root = document.RootElement;
+
+                if (!TryReadType(root, out var type) || !string.Equals(type, DockUiStateSetType, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                if (TryReadIsOpen(root, out var isOpen))
+                {
+                    _isDockOpen = isOpen;
+                }
+            }
+            catch
+            {
+                // Ignore malformed messages from web modules.
+            }
+        }
+
+        private static bool TryReadType(JsonElement root, out string? type)
+        {
+            type = null;
+
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (root.TryGetProperty("type", out var directType) && directType.ValueKind == JsonValueKind.String)
+            {
+                type = directType.GetString();
+                return !string.IsNullOrWhiteSpace(type);
+            }
+
+            if (root.TryGetProperty("name", out var nameType) && nameType.ValueKind == JsonValueKind.String)
+            {
+                type = nameType.GetString();
+                return !string.IsNullOrWhiteSpace(type);
+            }
+
+            return false;
+        }
+
+        private static bool TryReadIsOpen(JsonElement root, out bool isOpen)
+        {
+            isOpen = false;
+
+            if (root.TryGetProperty("isOpen", out var direct) && TryReadBoolean(direct, out isOpen))
+            {
+                return true;
+            }
+
+            if (!root.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            return payload.TryGetProperty("isOpen", out var payloadIsOpen) && TryReadBoolean(payloadIsOpen, out isOpen);
+        }
+
+        private static bool TryReadBoolean(JsonElement value, out bool result)
+        {
+            result = false;
+
+            if (value.ValueKind == JsonValueKind.True)
+            {
+                result = true;
+                return true;
+            }
+
+            if (value.ValueKind == JsonValueKind.False)
+            {
+                result = false;
+                return true;
+            }
+
+            return false;
         }
 
         private void MainWindow_Activated(object? sender, EventArgs e)
@@ -294,121 +370,24 @@ namespace VAL
 
         private void UpdateControlCentreOverlayPosition()
         {
-            if (_ccOverlay == null || !_ccOverlay.IsVisible || WindowState == WindowState.Minimized)
+            if (_ccOverlay == null || !_ccOverlay.IsVisible || WindowState == WindowState.Minimized || WebView.ActualWidth <= 0 || WebView.ActualHeight <= 0)
             {
                 return;
             }
 
             var dpi = VisualTreeHelper.GetDpi(this);
-            var originPx = PointToScreen(new Point(0, 0));
-            var originDip = new Point(originPx.X / dpi.DpiScaleX, originPx.Y / dpi.DpiScaleY);
+            var webViewOriginPx = WebView.PointToScreen(new Point(0, 0));
+            var webViewOriginDip = new Point(webViewOriginPx.X / dpi.DpiScaleX, webViewOriginPx.Y / dpi.DpiScaleY);
+
             const double rightInset = 16;
-            const double topInset = 56;
+            const double topInset = 12;
 
             var overlayWidth = _ccOverlay.ActualWidth > 0 ? _ccOverlay.ActualWidth : _ccOverlay.Width;
-            var overlayHeight = _ccOverlay.ActualHeight > 0 ? _ccOverlay.ActualHeight : _ccOverlay.Height;
-            var targetLeft = originDip.X + ActualWidth - overlayWidth - rightInset;
-            var targetTop = originDip.Y + topInset;
-
-            var vsLeft = SystemParameters.VirtualScreenLeft;
-            var vsTop = SystemParameters.VirtualScreenTop;
-            var vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
-            var vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
-
-            targetLeft = Math.Min(Math.Max(targetLeft, vsLeft), vsRight - overlayWidth);
-            targetTop = Math.Min(Math.Max(targetTop, vsTop), vsBottom - overlayHeight);
+            var targetLeft = webViewOriginDip.X + WebView.ActualWidth - overlayWidth - rightInset;
+            var targetTop = webViewOriginDip.Y + topInset;
 
             _ccOverlay.Left = targetLeft;
             _ccOverlay.Top = targetTop;
-        }
-
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ClickCount == 2)
-            {
-                ToggleMaxRestore();
-                return;
-            }
-
-            DragMove();
-        }
-
-        private void WindowMinimize_Click(object sender, RoutedEventArgs e)
-        {
-            WindowState = WindowState.Minimized;
-        }
-
-        private void WindowMaxRestore_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleMaxRestore();
-        }
-
-        private void WindowClose_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
-
-        private void ToggleMaxRestore()
-        {
-            WindowState = WindowState == WindowState.Maximized
-                ? WindowState.Normal
-                : WindowState.Maximized;
-        }
-
-        private void InitializeControlCentreButtonIcon()
-        {
-            var iconPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico");
-            var imageSource = TryLoadIcon(iconPath);
-
-            ControlCentreButton.ApplyTemplate();
-            var buttonImage = ControlCentreButton.Template.FindName("ControlCentreButtonImage", ControlCentreButton) as Image;
-            var fallbackText = ControlCentreButton.Template.FindName("ControlCentreFallbackText", ControlCentreButton) as TextBlock;
-
-            if (imageSource != null)
-            {
-                if (buttonImage != null)
-                {
-                    buttonImage.Source = imageSource;
-                    buttonImage.Visibility = Visibility.Visible;
-                }
-
-                if (fallbackText != null)
-                {
-                    fallbackText.Visibility = Visibility.Collapsed;
-                }
-
-                return;
-            }
-
-            if (buttonImage != null)
-            {
-                buttonImage.Visibility = Visibility.Collapsed;
-            }
-
-            if (fallbackText != null)
-            {
-                fallbackText.Visibility = Visibility.Visible;
-            }
-        }
-
-        private static BitmapFrame? TryLoadIcon(string iconPath)
-        {
-            try
-            {
-                if (!File.Exists(iconPath))
-                {
-                    return null;
-                }
-
-                var uri = new Uri(iconPath, UriKind.Absolute);
-                var bitmap = BitmapFrame.Create(uri, BitmapCreateOptions.DelayCreation, BitmapCacheOption.OnLoad);
-                bitmap.Freeze();
-                return bitmap;
-            }
-            catch
-            {
-                return null;
-            }
         }
     }
 }

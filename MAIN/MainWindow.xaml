@@ -1,153 +1,18 @@
 <Window x:Class="VAL.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="VAL" Height="720" Width="1280"
         WindowStartupLocation="CenterScreen"
-        WindowStyle="None"
+        WindowStyle="SingleBorderWindow"
         AllowsTransparency="False"
         Style="{DynamicResource VALWindowTheme}">
-    <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="36"
-                            CornerRadius="0"
-                            GlassFrameThickness="0"
-                            ResizeBorderThickness="6"
-                            UseAeroCaptionButtons="False" />
-    </shell:WindowChrome.WindowChrome>
     <Window.InputBindings>
         <KeyBinding Key="D"
                     Modifiers="Control+Alt"
                     Command="{Binding OpenDiagnosticsCommand}" />
     </Window.InputBindings>
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="36" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <Grid Grid.Row="0"
-              x:Name="TitleBar"
-              Height="36"
-              Background="#0D0F14"
-              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Orientation="Horizontal"
-                        Margin="10,0,0,0"
-                        VerticalAlignment="Center"
-                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                <TextBlock Text="VAL"
-                           Foreground="#CFE6FF"
-                           FontWeight="SemiBold" />
-            </StackPanel>
-
-            <StackPanel Grid.Column="2"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        Margin="0,0,6,0"
-                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                <Button x:Name="ControlCentreButton"
-                        Width="28"
-                        Height="28"
-                        Margin="0,0,8,0"
-                        VerticalAlignment="Center"
-                        ToolTip="Control Centre"
-                        Click="ControlCentreButton_Click"
-                        AutomationProperties.Name="Control Centre"
-                        Cursor="Hand"
-                        BorderThickness="1"
-                        BorderBrush="#2A4A66"
-                        Background="Transparent"
-                        Padding="0"
-                        Foreground="#E8F4FF"
-                        FocusVisualStyle="{x:Null}">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="LensBorder"
-                                            CornerRadius="14"
-                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            Background="{TemplateBinding Background}">
-                                        <Grid>
-                                            <Image x:Name="ControlCentreButtonImage"
-                                                   Width="18"
-                                                   Height="18"
-                                                   Stretch="Uniform"
-                                                   SnapsToDevicePixels="True"
-                                                   RenderOptions.BitmapScalingMode="HighQuality" />
-                                            <TextBlock x:Name="ControlCentreFallbackText"
-                                                       Text="CC"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       Visibility="Collapsed"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center" />
-                                        </Grid>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="LensBorder" Property="BorderBrush" Value="#5D7AA0" />
-                                            <Setter TargetName="LensBorder" Property="Background" Value="#1F2A3F" />
-                                            <Setter TargetName="LensBorder" Property="Effect">
-                                                <Setter.Value>
-                                                    <DropShadowEffect BlurRadius="14"
-                                                                      ShadowDepth="0"
-                                                                      Color="#4A8FD0"
-                                                                      Opacity="0.45" />
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Trigger>
-                                        <Trigger Property="IsKeyboardFocused" Value="True">
-                                            <Setter TargetName="LensBorder" Property="BorderBrush" Value="#7899C4" />
-                                            <Setter TargetName="LensBorder" Property="Background" Value="#1F2A3F" />
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Button.Style>
-                </Button>
-
-            <Button Width="40"
-                    Height="28"
-                    Padding="0"
-                    Content="—"
-                    Click="WindowMinimize_Click"
-                    Background="Transparent"
-                    Foreground="#CFE6FF"
-                    BorderThickness="0" />
-
-            <Button Width="40"
-                    Height="28"
-                    Padding="0"
-                    Content="□"
-                    Click="WindowMaxRestore_Click"
-                    Background="Transparent"
-                    Foreground="#CFE6FF"
-                    BorderThickness="0" />
-
-            <Button Width="40"
-                    Height="28"
-                    Padding="0"
-                    Content="✕"
-                    Click="WindowClose_Click"
-                    Background="Transparent"
-                    Foreground="#CFE6FF"
-                    BorderThickness="0" />
-            </StackPanel>
-
-        </Grid>
-
-        <wv2:WebView2 x:Name="WebView"
-                      Grid.Row="1" />
+        <wv2:WebView2 x:Name="WebView" />
     </Grid>
 </Window>
