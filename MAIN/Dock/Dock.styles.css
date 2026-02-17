@@ -97,16 +97,16 @@
   position: fixed;
   z-index: 2147483645;
   right: 16px;
-  top: 56px;
+  top: 44px;
   left: auto;
   opacity: 0;
   pointer-events: none;
   display: none;
   flex-direction: column;
-  width: min(560px, calc(100vw - 32px));
-  min-width: min(420px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - 80px));
+  min-width: min(400px, calc(100vw - 80px));
   max-width: 560px;
-  max-height: 72vh;
+  max-height: calc(100vh - 120px);
   background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
   background-color: rgba(2,10,20,0.95);
   border: 1px solid rgba(120, 180, 240, 0.18);
@@ -385,8 +385,8 @@ html.val-dock-open .valdock-panel{
 .valdock-body{
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 42px 12px 12px;
+  gap: 6px;
+  padding: 38px 10px 10px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -395,8 +395,8 @@ html.val-dock-open .valdock-panel{
 .valdock-section{
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 9px 10px;
   border-radius: 14px;
   border: 1px solid rgba(120, 180, 240, 0.14);
   background:
@@ -439,7 +439,7 @@ html.val-dock-open .valdock-panel{
 .valdock-section-body{
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .valdock-section-hint{
