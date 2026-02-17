@@ -12,15 +12,19 @@
                     Command="{Binding OpenDiagnosticsCommand}" />
     </Window.InputBindings>
     <Grid>
-        <wv2:WebView2 x:Name="WebView" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="44" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <Button x:Name="ControlCentreButton"
-                Panel.ZIndex="9999"
+        <Grid Grid.Row="0"
+              Background="Transparent">
+            <Button x:Name="ControlCentreButton"
                 Width="30"
                 Height="30"
-                Margin="0,8,12,0"
+                Margin="0,7,12,7"
                 HorizontalAlignment="Right"
-                VerticalAlignment="Top"
+                VerticalAlignment="Center"
                 ToolTip="Control Centre"
                 Click="ControlCentreButton_Click"
                 AutomationProperties.Name="Control Centre"
@@ -80,5 +84,10 @@
                     </Style>
                 </Button.Style>
             </Button>
+
+        </Grid>
+
+        <wv2:WebView2 x:Name="WebView"
+                      Grid.Row="1" />
     </Grid>
 </Window>
