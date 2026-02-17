@@ -14,74 +14,71 @@
     <Grid>
         <wv2:WebView2 x:Name="WebView" />
 
-        <Grid Panel.ZIndex="20"
-              IsHitTestVisible="False">
-            <Button x:Name="ControlCentreButton"
-                    Width="30"
-                    Height="30"
-                    Margin="0,10,14,0"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    ToolTip="Control Centre"
-                    Click="ControlCentreButton_Click"
-                    IsHitTestVisible="True"
-                    AutomationProperties.Name="Control Centre"
-                    Cursor="Hand"
-                    BorderThickness="1"
-                    BorderBrush="#4A74A4D2"
-                    Background="#4025446C"
-                    Foreground="#E8F4FF"
-                    FocusVisualStyle="{x:Null}">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="LensBorder"
-                                            CornerRadius="15"
-                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            Background="{TemplateBinding Background}">
-                                        <Grid>
-                                            <Image x:Name="ControlCentreButtonImage"
-                                                   Width="18"
-                                                   Height="18"
-                                                   Stretch="Uniform"
-                                                   SnapsToDevicePixels="True"
-                                                   RenderOptions.BitmapScalingMode="HighQuality" />
-                                            <TextBlock x:Name="ControlCentreFallbackText"
-                                                       Text="CC"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       Visibility="Collapsed"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center" />
-                                        </Grid>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="LensBorder" Property="BorderBrush" Value="#88A5D4FF" />
-                                            <Setter TargetName="LensBorder" Property="Background" Value="#5A315D8F" />
-                                            <Setter TargetName="LensBorder" Property="Effect">
-                                                <Setter.Value>
-                                                    <DropShadowEffect BlurRadius="14"
-                                                                      ShadowDepth="0"
-                                                                      Color="#6A4AB8FF"
-                                                                      Opacity="0.9" />
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Trigger>
-                                        <Trigger Property="IsKeyboardFocused" Value="True">
-                                            <Setter TargetName="LensBorder" Property="BorderBrush" Value="#99B8DCFF" />
-                                            <Setter TargetName="LensBorder" Property="Background" Value="#5A315D8F" />
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Button.Style>
-            </Button>
-        </Grid>
+        <Button x:Name="ControlCentreButton"
+                Panel.ZIndex="9999"
+                Width="30"
+                Height="30"
+                Margin="0,8,12,0"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                ToolTip="Control Centre"
+                Click="ControlCentreButton_Click"
+                AutomationProperties.Name="Control Centre"
+                Cursor="Hand"
+                BorderThickness="1"
+                BorderBrush="#4A74A4D2"
+                Background="#4025446C"
+                Foreground="#E8F4FF"
+                FocusVisualStyle="{x:Null}">
+            <Button.Style>
+                <Style TargetType="Button">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="LensBorder"
+                                        CornerRadius="15"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        Background="{TemplateBinding Background}">
+                                    <Grid>
+                                        <Image x:Name="ControlCentreButtonImage"
+                                               Width="18"
+                                               Height="18"
+                                               Stretch="Uniform"
+                                               SnapsToDevicePixels="True"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                        <TextBlock x:Name="ControlCentreFallbackText"
+                                                   Text="CC"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Visibility="Collapsed"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="LensBorder" Property="BorderBrush" Value="#88A5D4FF" />
+                                        <Setter TargetName="LensBorder" Property="Background" Value="#5A315D8F" />
+                                        <Setter TargetName="LensBorder" Property="Effect">
+                                            <Setter.Value>
+                                                <DropShadowEffect BlurRadius="14"
+                                                                  ShadowDepth="0"
+                                                                  Color="#6A4AB8FF"
+                                                                  Opacity="0.9" />
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                    <Trigger Property="IsKeyboardFocused" Value="True">
+                                        <Setter TargetName="LensBorder" Property="BorderBrush" Value="#99B8DCFF" />
+                                        <Setter TargetName="LensBorder" Property="Background" Value="#5A315D8F" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Button.Style>
+        </Button>
     </Grid>
 </Window>
