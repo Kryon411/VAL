@@ -55,6 +55,7 @@
   const DOCK_UI_STATE_GET = "dock.ui_state.get";
   const DOCK_UI_STATE_SET = "dock.ui_state.set";
   const DOCK_DEFAULT_MODE = "shelf";
+  const HOST_LAUNCHER = true;
   const DOCK_PANEL_TOP_GAP = 12;
   const DOCK_PANEL_SCREEN_MARGIN = 16;
   const DEFAULT_COMMAND_NAMES = Object.freeze({
@@ -250,6 +251,7 @@ function suppressPreludeNudge(ms){
   let headerMutationObserver = null;
 
   let pendingDockUiStateResolve = null;
+  let dockBuilt = false;
 
   function isShelfMode(){ return true; }
 
@@ -1060,16 +1062,22 @@ function suppressPreludeNudge(ms){
   }
 
   function positionPanel(){
-    if (!panel || !launcher) return;
-    const rect = launcher.getBoundingClientRect();
-    const hasRect = rect && rect.width > 0 && rect.height > 0;
+    if (!panel) return;
 
-    const top = hasRect
-      ? Math.max(DOCK_PANEL_SCREEN_MARGIN, Math.round(rect.bottom + DOCK_PANEL_TOP_GAP))
-      : 56;
-    const right = hasRect
-      ? Math.max(DOCK_PANEL_SCREEN_MARGIN, Math.round(window.innerWidth - rect.right))
-      : 72;
+    let hasRect = false;
+    let top = 56;
+    let right = 16;
+
+    if (launcher) {
+      const rect = launcher.getBoundingClientRect();
+      hasRect = !!(rect && rect.width > 0 && rect.height > 0);
+      top = hasRect
+        ? Math.max(DOCK_PANEL_SCREEN_MARGIN, Math.round(rect.bottom + DOCK_PANEL_TOP_GAP))
+        : 56;
+      right = hasRect
+        ? Math.max(DOCK_PANEL_SCREEN_MARGIN, Math.round(window.innerWidth - rect.right))
+        : 72;
+    }
 
     const maxHeight = Math.max(
       180,
@@ -1086,18 +1094,20 @@ function suppressPreludeNudge(ms){
     const nextCollapsed = !isOpen;
     const wasCollapsed = state.collapsed;
     state.collapsed = nextCollapsed;
-    if (!launcher || !panel) return;
+    if (!panel) return;
 
     try { hideTooltip(); } catch(_) {}
     panel.style.display = state.collapsed ? "none" : "flex";
-    launcher.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
-    launcher.classList.toggle("active", !state.collapsed);
+    if (launcher) {
+      launcher.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
+      launcher.classList.toggle("active", !state.collapsed);
+    }
     updateDockOpenRootClass();
     saveState();
     persistHostDockUiState();
 
     if (state.collapsed) {
-      if (lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
+      if (launcher && lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
         try { launcher.focus({ preventScroll: true }); } catch(_) { try { launcher.focus(); } catch(__) {} }
       }
       return;
@@ -1120,17 +1130,24 @@ function suppressPreludeNudge(ms){
   }
 
   function buildDock(){
+    if (dockBuilt) return;
+    dockBuilt = true;
+
     dock  = el("div","valdock");
-    launcher = el("button","valdock-launcher");
-    launcher.setAttribute("type", "button");
-    launcher.setAttribute("title", "Control Centre");
-    launcher.setAttribute("aria-label", "Control Centre");
-    launcher.setAttribute("aria-controls", "valdock-panel");
-    launcher.setAttribute("aria-expanded", "false");
-    launcher.setAttribute("data-val-tooltip", "Control Centre");
-    launcher.innerHTML = '<span class="valdock-launcher-icon" aria-hidden="true"></span><span class="valdock-launcher-fallback" aria-hidden="true">CC</span>';
-    portalLauncherIndicator = el("span","valdock-launcher-indicator");
-    launcher.append(portalLauncherIndicator);
+    launcher = null;
+    portalLauncherIndicator = null;
+    if (!HOST_LAUNCHER) {
+      launcher = el("button","valdock-launcher");
+      launcher.setAttribute("type", "button");
+      launcher.setAttribute("title", "Control Centre");
+      launcher.setAttribute("aria-label", "Control Centre");
+      launcher.setAttribute("aria-controls", "valdock-panel");
+      launcher.setAttribute("aria-expanded", "false");
+      launcher.setAttribute("data-val-tooltip", "Control Centre");
+      launcher.innerHTML = '<span class="valdock-launcher-icon" aria-hidden="true"></span><span class="valdock-launcher-fallback" aria-hidden="true">CC</span>';
+      portalLauncherIndicator = el("span","valdock-launcher-indicator");
+      launcher.append(portalLauncherIndicator);
+    }
 
     panel = el("div","valdock-panel valdock-shelf");
     panel.id = "valdock-panel";
@@ -1153,15 +1170,11 @@ function suppressPreludeNudge(ms){
     dock.append(panel);
 
     document.body.appendChild(dock);
-    ensureLauncherInserted();
-    syncLauncherStyleState();
+    if (!HOST_LAUNCHER) {
+      ensureLauncherInserted();
+      syncLauncherStyleState();
+    }
     requestDockModel();
-
-    try {
-      const cssVersion = getComputedStyle(document.documentElement).getPropertyValue("--valdock-style-version").trim() || "unknown";
-      console.log("Dock init: launcher mode");
-      console.log(`Dock CSS version: ${cssVersion}`);
-    } catch(_) {}
 
     syncChronicleBusyFromDom();
     try {
@@ -1169,64 +1182,13 @@ function suppressPreludeNudge(ms){
       mo.observe(document.body, { childList:true, subtree:true });
     } catch(_) {}
 
-    try {
-      if (window.chrome?.webview?.addEventListener) {
-        window.chrome.webview.addEventListener("message", (ev)=>{
-          try {
-            let msg = ev && ev.data;
-            if (!msg) return;
-            if (typeof msg === "string") {
-              try { msg = JSON.parse(msg); } catch(_) { return; }
-            }
-            if (!msg || typeof msg !== "object") return;
-
-            if ((msg.type || "") === COMMAND_NAME_BOOTSTRAP_TYPE) {
-              try {
-                const payload = (msg.payload && typeof msg.payload === "object" && !Array.isArray(msg.payload))
-                  ? msg.payload
-                  : (msg.commandNames && typeof msg.commandNames === "object" ? msg.commandNames : (msg.commands && typeof msg.commands === "object" ? msg.commands : null));
-                applyCommandNames(payload);
-              } catch(_) {}
-              return;
-            }
-
-            const unwrapped = unwrapEnvelope(msg);
-            const msgType = (unwrapped && unwrapped.type) ? unwrapped.type : msg.type;
-            if (msgType === DOCK_UI_STATE_GET) {
-              hostStateReceived = true;
-              const isLateReply = !pendingDockUiStateResolve && bootTimedOut;
-              if (isLateReply && userInteractedSinceBootstrap) {
-                return;
-              }
-
-              const applied = applyDockUiStateFromHost(unwrapped);
-              if (pendingDockUiStateResolve) {
-                const resolve = pendingDockUiStateResolve;
-                pendingDockUiStateResolve = null;
-                resolve({ received: true, applied });
-              } else if (isLateReply && applied) {
-                saveState();
-                applyDockUiStateAfterBootstrap();
-              }
-              return;
-            }
-            if (msgType === DOCK_MODEL_EVENT) {
-              renderDockModel(unwrapped);
-              return;
-            }
-            if (msgType === "continuum.chronicle.start") setChronicleBusy(true);
-            if (msgType === "continuum.chronicle.done" || msgType === "continuum.chronicle.cancel") setChronicleBusy(false);
-            if (msgType === "continuum.session.attached") requestDockModel();
-          } catch(_) {}
-        });
-      }
-    } catch(_) {}
-
-    launcher.addEventListener("click", (e)=>{
-      e.preventDefault();
-      markUserInteraction();
-      setOpen(state.collapsed);
-    }, true);
+    if (launcher) {
+      launcher.addEventListener("click", (e)=>{
+        e.preventDefault();
+        markUserInteraction();
+        setOpen(state.collapsed);
+      }, true);
+    }
 
     dock.addEventListener("keydown", (e)=>{
       if (state.collapsed) return;
@@ -1263,10 +1225,10 @@ function suppressPreludeNudge(ms){
     }, true);
 
     document.addEventListener("click", (e)=>{
-      if (state.collapsed || !launcher || !panel) return;
+      if (state.collapsed || !panel) return;
       const target = e.target;
       if (!(target instanceof Node)) return;
-      if (launcher.contains(target) || panel.contains(target)) return;
+      if ((launcher && launcher.contains(target)) || panel.contains(target)) return;
       markUserInteraction();
       setOpen(false);
     }, true);
@@ -1298,22 +1260,122 @@ function suppressPreludeNudge(ms){
     });
 
     window.addEventListener("resize", ()=>{
-      ensureLauncherInserted();
+      if (!HOST_LAUNCHER) ensureLauncherInserted();
       if (!state.collapsed) positionPanel();
     }, { passive: true });
 
-    try {
-      headerMutationObserver = new MutationObserver(()=>{
-        ensureLauncherInserted();
-        if (!state.collapsed) positionPanel();
-      });
-      headerMutationObserver.observe(document.body, { childList: true, subtree: true });
-    } catch(_) {}
+    if (!HOST_LAUNCHER) {
+      try {
+        headerMutationObserver = new MutationObserver(()=>{
+          ensureLauncherInserted();
+          if (!state.collapsed) positionPanel();
+        });
+        headerMutationObserver.observe(document.body, { childList: true, subtree: true });
+      } catch(_) {}
+    }
 
     try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}
     try { console.log("[VAL Dock] Loaded for", CHAT_ID); } catch(_) {}
   }
 
+  function ensureDockBuilt(){
+    if (!dockBuilt) buildDock();
+  }
+
+  function toggleDockFromHost(action){
+    ensureDockBuilt();
+    if (!panel) return;
+
+    if (action === "open") {
+      setOpen(true);
+      return;
+    }
+
+    if (action === "close") {
+      setOpen(false);
+      return;
+    }
+
+    console.log("[VAL Dock] host toggle");
+    setOpen(state.collapsed);
+  }
+
+  function handleHostWebMessage(ev){
+    try {
+      let msg = ev && ev.data;
+      if (!msg) return;
+      if (typeof msg === "string") {
+        try { msg = JSON.parse(msg); } catch(_) { return; }
+      }
+      if (!msg || typeof msg !== "object") return;
+
+      if ((msg.type || "") === COMMAND_NAME_BOOTSTRAP_TYPE) {
+        try {
+          const payload = (msg.payload && typeof msg.payload === "object" && !Array.isArray(msg.payload))
+            ? msg.payload
+            : (msg.commandNames && typeof msg.commandNames === "object" ? msg.commandNames : (msg.commands && typeof msg.commands === "object" ? msg.commands : null));
+          applyCommandNames(payload);
+        } catch(_) {}
+        return;
+      }
+
+      const unwrapped = unwrapEnvelope(msg);
+      const msgType = (unwrapped && unwrapped.type) ? unwrapped.type : msg.type;
+
+      if (msgType === "dock.toggle") {
+        toggleDockFromHost("toggle");
+        return;
+      }
+
+      if (msgType === "dock.open") {
+        toggleDockFromHost("open");
+        return;
+      }
+
+      if (msgType === "dock.close") {
+        toggleDockFromHost("close");
+        return;
+      }
+
+      if (msgType === DOCK_UI_STATE_GET) {
+        hostStateReceived = true;
+        const isLateReply = !pendingDockUiStateResolve && bootTimedOut;
+        if (isLateReply && userInteractedSinceBootstrap) {
+          return;
+        }
+
+        const applied = applyDockUiStateFromHost(unwrapped);
+        if (pendingDockUiStateResolve) {
+          const resolve = pendingDockUiStateResolve;
+          pendingDockUiStateResolve = null;
+          resolve({ received: true, applied });
+        } else if (isLateReply && applied) {
+          saveState();
+          applyDockUiStateAfterBootstrap();
+        }
+        return;
+      }
+      if (msgType === DOCK_MODEL_EVENT) {
+        renderDockModel(unwrapped);
+        return;
+      }
+      if (msgType === "continuum.chronicle.start") setChronicleBusy(true);
+      if (msgType === "continuum.chronicle.done" || msgType === "continuum.chronicle.cancel") setChronicleBusy(false);
+      if (msgType === "continuum.session.attached") requestDockModel();
+    } catch(_) {}
+  }
+
+  function attachHostMessageListener(){
+    try {
+      if (!window.chrome?.webview?.addEventListener) return;
+      window.chrome.webview.addEventListener("message", handleHostWebMessage);
+      console.log("[VAL Dock] host message listener attached");
+    } catch(_) {}
+  }
+
+
+
+  attachHostMessageListener();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", buildDock, { once: true });

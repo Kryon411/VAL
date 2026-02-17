@@ -1,8 +1,12 @@
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Options;
 using VAL.Host;
 using VAL.Host.Services;
@@ -20,8 +24,10 @@ namespace VAL
         private readonly WebViewOptions _webViewOptions;
         private readonly StartupOptions _startupOptions;
         private readonly StartupCrashGuard _startupCrashGuard;
+        private bool _loggedWebViewUnavailable;
 
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        private const string DockToggleMessage = "{\"type\":\"dock.toggle\",\"source\":\"host\"}";
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
@@ -42,6 +48,7 @@ namespace VAL
             _startupCrashGuard = startupCrashGuard;
 
             InitializeComponent();
+            InitializeControlCentreButtonIcon();
             Title = _startupOptions.SafeMode ? "VAL (SAFE MODE)" : "VAL";
             DataContext = _viewModel;
             Loaded += MainWindow_Loaded;
@@ -153,6 +160,86 @@ namespace VAL
             }
 
             _startupCrashGuard.MarkSuccess();
+        }
+
+        private void ControlCentreButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (WebView.CoreWebView2 == null)
+                {
+                    if (_loggedWebViewUnavailable)
+                    {
+                        return;
+                    }
+
+                    _loggedWebViewUnavailable = true;
+                    ValLog.Info("MainWindow", "Control Centre toggle ignored because WebView2 is not ready.");
+                    return;
+                }
+
+                WebView.CoreWebView2.PostWebMessageAsString(DockToggleMessage);
+            }
+            catch (Exception ex)
+            {
+                ValLog.Warn("MainWindow", $"Failed to post Control Centre toggle message: {ex.Message}");
+            }
+        }
+
+        private void InitializeControlCentreButtonIcon()
+        {
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico");
+            var imageSource = TryLoadIcon(iconPath);
+
+            ControlCentreButton.ApplyTemplate();
+            var buttonImage = ControlCentreButton.Template.FindName("ControlCentreButtonImage", ControlCentreButton) as Image;
+            var fallbackText = ControlCentreButton.Template.FindName("ControlCentreFallbackText", ControlCentreButton) as TextBlock;
+
+            if (imageSource != null)
+            {
+                if (buttonImage != null)
+                {
+                    buttonImage.Source = imageSource;
+                    buttonImage.Visibility = Visibility.Visible;
+                }
+
+                if (fallbackText != null)
+                {
+                    fallbackText.Visibility = Visibility.Collapsed;
+                }
+
+                return;
+            }
+
+            if (buttonImage != null)
+            {
+                buttonImage.Visibility = Visibility.Collapsed;
+            }
+
+            if (fallbackText != null)
+            {
+                fallbackText.Visibility = Visibility.Visible;
+            }
+        }
+
+        private static ImageSource? TryLoadIcon(string iconPath)
+        {
+            try
+            {
+                if (!File.Exists(iconPath))
+                {
+                    return null;
+                }
+
+                var uri = new Uri(iconPath, UriKind.Absolute);
+                var bitmap = BitmapFrame.Create(uri, BitmapCreateOptions.DelayCreation, BitmapCacheOption.OnLoad);
+                bitmap.Freeze();
+                return bitmap;
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
