@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Options;
 using VAL.Host;
@@ -25,6 +26,8 @@ namespace VAL
         private readonly StartupOptions _startupOptions;
         private readonly StartupCrashGuard _startupCrashGuard;
         private bool _loggedWebViewUnavailable;
+        private ControlCentreOverlay? _ccOverlay;
+        private bool _ccLoggedNotReady;
 
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
         private const string DockToggleMessage = "{\"type\":\"dock.toggle\",\"source\":\"host\"}";
@@ -55,6 +58,11 @@ namespace VAL
             Closing += MainWindow_Closing;
             Closed += MainWindow_Closed;
             SourceInitialized += MainWindow_SourceInitialized;
+            Activated += MainWindow_Activated;
+            Deactivated += MainWindow_Deactivated;
+            StateChanged += MainWindow_StateChanged;
+            LocationChanged += MainWindow_LocationChanged;
+            SizeChanged += MainWindow_SizeChanged;
 
             _webViewRuntime.WebMessageJsonReceived += _viewModel.HandleWebMessageJson;
         }
@@ -97,6 +105,20 @@ namespace VAL
         private void MainWindow_Closed(object? sender, EventArgs e)
         {
             _webViewRuntime.WebMessageJsonReceived -= _viewModel.HandleWebMessageJson;
+
+            try
+            {
+                if (_ccOverlay != null)
+                {
+                    _ccOverlay.ToggleRequested -= ControlCentreOverlay_ToggleRequested;
+                    _ccOverlay.Close();
+                    _ccOverlay = null;
+                }
+            }
+            catch
+            {
+                ValLog.Warn("MainWindow", "Failed to close Control Centre overlay window.");
+            }
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -159,21 +181,36 @@ namespace VAL
                 WebView.Source = startUri;
             }
 
+            ControlCentreButton.Visibility = Visibility.Collapsed;
+            EnsureControlCentreOverlay();
+            ShowControlCentreOverlayIfNeeded();
+            UpdateControlCentreOverlayPosition();
+
             _startupCrashGuard.MarkSuccess();
         }
 
         private void ControlCentreButton_Click(object sender, RoutedEventArgs e)
         {
+            PostDockToggleMessage(_loggedWebViewUnavailable, value => _loggedWebViewUnavailable = value);
+        }
+
+        private void ControlCentreOverlay_ToggleRequested(object? sender, EventArgs e)
+        {
+            PostDockToggleMessage(_ccLoggedNotReady, value => _ccLoggedNotReady = value);
+        }
+
+        private void PostDockToggleMessage(bool loggedFlag, Action<bool> setLoggedFlag)
+        {
             try
             {
                 if (WebView.CoreWebView2 == null)
                 {
-                    if (_loggedWebViewUnavailable)
+                    if (loggedFlag)
                     {
                         return;
                     }
 
-                    _loggedWebViewUnavailable = true;
+                    setLoggedFlag(true);
                     ValLog.Info("MainWindow", "Control Centre toggle ignored because WebView2 is not ready.");
                     return;
                 }
@@ -184,6 +221,105 @@ namespace VAL
             {
                 ValLog.Warn("MainWindow", $"Failed to post Control Centre toggle message: {ex.Message}");
             }
+        }
+
+        private void MainWindow_Activated(object? sender, EventArgs e)
+        {
+            if (_ccOverlay == null)
+            {
+                return;
+            }
+
+            _ccOverlay.Topmost = true;
+            _ccOverlay.Topmost = false;
+            UpdateControlCentreOverlayPosition();
+        }
+
+        private void MainWindow_Deactivated(object? sender, EventArgs e)
+        {
+            if (_ccOverlay != null)
+            {
+                _ccOverlay.Topmost = false;
+            }
+        }
+
+        private void MainWindow_StateChanged(object? sender, EventArgs e)
+        {
+            if (WindowState == WindowState.Minimized)
+            {
+                _ccOverlay?.Hide();
+                return;
+            }
+
+            ShowControlCentreOverlayIfNeeded();
+            UpdateControlCentreOverlayPosition();
+        }
+
+        private void MainWindow_LocationChanged(object? sender, EventArgs e)
+        {
+            UpdateControlCentreOverlayPosition();
+        }
+
+        private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateControlCentreOverlayPosition();
+        }
+
+        private void EnsureControlCentreOverlay()
+        {
+            if (_ccOverlay != null)
+            {
+                return;
+            }
+
+            _ccOverlay = new ControlCentreOverlay();
+            _ccOverlay.Owner = this;
+            _ccOverlay.ToggleRequested += ControlCentreOverlay_ToggleRequested;
+        }
+
+        private void ShowControlCentreOverlayIfNeeded()
+        {
+            if (_ccOverlay == null || WindowState == WindowState.Minimized)
+            {
+                return;
+            }
+
+            if (_ccOverlay.IsVisible)
+            {
+                return;
+            }
+
+            _ccOverlay.Show();
+        }
+
+        private void UpdateControlCentreOverlayPosition()
+        {
+            if (_ccOverlay == null || !_ccOverlay.IsVisible || WindowState == WindowState.Minimized)
+            {
+                return;
+            }
+
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var originPx = PointToScreen(new Point(0, 0));
+            var originDip = new Point(originPx.X / dpi.DpiScaleX, originPx.Y / dpi.DpiScaleY);
+            const double rightInset = 16;
+            const double topInset = 56;
+
+            var overlayWidth = _ccOverlay.ActualWidth > 0 ? _ccOverlay.ActualWidth : _ccOverlay.Width;
+            var overlayHeight = _ccOverlay.ActualHeight > 0 ? _ccOverlay.ActualHeight : _ccOverlay.Height;
+            var targetLeft = originDip.X + ActualWidth - overlayWidth - rightInset;
+            var targetTop = originDip.Y + topInset;
+
+            var vsLeft = SystemParameters.VirtualScreenLeft;
+            var vsTop = SystemParameters.VirtualScreenTop;
+            var vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
+            var vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
+
+            targetLeft = Math.Min(Math.Max(targetLeft, vsLeft), vsRight - overlayWidth);
+            targetTop = Math.Min(Math.Max(targetTop, vsTop), vsBottom - overlayHeight);
+
+            _ccOverlay.Left = targetLeft;
+            _ccOverlay.Top = targetTop;
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
