@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Options;
 using VAL.Host;
@@ -183,6 +184,39 @@ namespace VAL
             {
                 ValLog.Warn("MainWindow", $"Failed to post Control Centre toggle message: {ex.Message}");
             }
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+            {
+                ToggleMaxRestore();
+                return;
+            }
+
+            DragMove();
+        }
+
+        private void WindowMinimize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void WindowMaxRestore_Click(object sender, RoutedEventArgs e)
+        {
+            ToggleMaxRestore();
+        }
+
+        private void WindowClose_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private void ToggleMaxRestore()
+        {
+            WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
         }
 
         private void InitializeControlCentreButtonIcon()
