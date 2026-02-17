@@ -1,18 +1,16 @@
 using System;
 using System.ComponentModel;
-using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Interop;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Options;
 using VAL.Host;
 using VAL.Host.Services;
 using VAL.Host.Options;
 using VAL.Host.Startup;
+using VAL.Host.WebMessaging;
 using VAL.ViewModels;
 
 namespace VAL
@@ -28,9 +26,13 @@ namespace VAL
         private bool _loggedWebViewUnavailable;
         private ControlCentreOverlay? _ccOverlay;
         private bool _ccLoggedNotReady;
+        private bool _isDockOpen;
 
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-        private const string DockToggleMessage = "{\"type\":\"dock.toggle\",\"source\":\"host\"}";
+        private const string DockOpenMessage = "{\"type\":\"dock.open\",\"source\":\"host\"}";
+        private const string DockCloseMessage = "{\"type\":\"dock.close\",\"source\":\"host\"}";
+        private const string DockUiStateSetType = "dock.ui_state.set";
+        private const string DockUiStateGetType = "dock.ui_state.get";
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
@@ -51,7 +53,6 @@ namespace VAL
             _startupCrashGuard = startupCrashGuard;
 
             InitializeComponent();
-            InitializeControlCentreButtonIcon();
             Title = _startupOptions.SafeMode ? "VAL (SAFE MODE)" : "VAL";
             DataContext = _viewModel;
             Loaded += MainWindow_Loaded;
@@ -65,6 +66,7 @@ namespace VAL
             SizeChanged += MainWindow_SizeChanged;
 
             _webViewRuntime.WebMessageJsonReceived += _viewModel.HandleWebMessageJson;
+            _webViewRuntime.WebMessageJsonReceived += HandleDockStateWebMessage;
         }
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -105,6 +107,7 @@ namespace VAL
         private void MainWindow_Closed(object? sender, EventArgs e)
         {
             _webViewRuntime.WebMessageJsonReceived -= _viewModel.HandleWebMessageJson;
+            _webViewRuntime.WebMessageJsonReceived -= HandleDockStateWebMessage;
 
             try
             {
@@ -181,7 +184,6 @@ namespace VAL
                 WebView.Source = startUri;
             }
 
-            ControlCentreButton.Visibility = Visibility.Collapsed;
             EnsureControlCentreOverlay();
             ShowControlCentreOverlayIfNeeded();
             UpdateControlCentreOverlayPosition();
@@ -189,17 +191,12 @@ namespace VAL
             _startupCrashGuard.MarkSuccess();
         }
 
-        private void ControlCentreButton_Click(object sender, RoutedEventArgs e)
-        {
-            PostDockToggleMessage(_loggedWebViewUnavailable, value => _loggedWebViewUnavailable = value);
-        }
-
         private void ControlCentreOverlay_ToggleRequested(object? sender, EventArgs e)
         {
-            PostDockToggleMessage(_ccLoggedNotReady, value => _ccLoggedNotReady = value);
+            PostDockStateMessage(_ccLoggedNotReady, value => _ccLoggedNotReady = value);
         }
 
-        private void PostDockToggleMessage(bool loggedFlag, Action<bool> setLoggedFlag)
+        private void PostDockStateMessage(bool loggedFlag, Action<bool> setLoggedFlag)
         {
             try
             {
@@ -215,7 +212,8 @@ namespace VAL
                     return;
                 }
 
-                WebView.CoreWebView2.PostWebMessageAsString(DockToggleMessage);
+                WebView.CoreWebView2.PostWebMessageAsString(_isDockOpen ? DockCloseMessage : DockOpenMessage);
+                _isDockOpen = !_isDockOpen;
             }
             catch (Exception ex)
             {
@@ -300,115 +298,99 @@ namespace VAL
             }
 
             var dpi = VisualTreeHelper.GetDpi(this);
-            var originPx = PointToScreen(new Point(0, 0));
+            var originPx = PointToScreen(WebView.TranslatePoint(new Point(0, 0), this));
             var originDip = new Point(originPx.X / dpi.DpiScaleX, originPx.Y / dpi.DpiScaleY);
             const double rightInset = 16;
-            const double topInset = 56;
+            const double topInset = 12;
 
             var overlayWidth = _ccOverlay.ActualWidth > 0 ? _ccOverlay.ActualWidth : _ccOverlay.Width;
-            var overlayHeight = _ccOverlay.ActualHeight > 0 ? _ccOverlay.ActualHeight : _ccOverlay.Height;
-            var targetLeft = originDip.X + ActualWidth - overlayWidth - rightInset;
+            var targetLeft = originDip.X + WebView.ActualWidth - overlayWidth - rightInset;
             var targetTop = originDip.Y + topInset;
-
-            var vsLeft = SystemParameters.VirtualScreenLeft;
-            var vsTop = SystemParameters.VirtualScreenTop;
-            var vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
-            var vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
-
-            targetLeft = Math.Min(Math.Max(targetLeft, vsLeft), vsRight - overlayWidth);
-            targetTop = Math.Min(Math.Max(targetTop, vsTop), vsBottom - overlayHeight);
 
             _ccOverlay.Left = targetLeft;
             _ccOverlay.Top = targetTop;
         }
 
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ClickCount == 2)
-            {
-                ToggleMaxRestore();
-                return;
-            }
-
-            DragMove();
-        }
-
-        private void WindowMinimize_Click(object sender, RoutedEventArgs e)
-        {
-            WindowState = WindowState.Minimized;
-        }
-
-        private void WindowMaxRestore_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleMaxRestore();
-        }
-
-        private void WindowClose_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
-
-        private void ToggleMaxRestore()
-        {
-            WindowState = WindowState == WindowState.Maximized
-                ? WindowState.Normal
-                : WindowState.Maximized;
-        }
-
-        private void InitializeControlCentreButtonIcon()
-        {
-            var iconPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico");
-            var imageSource = TryLoadIcon(iconPath);
-
-            ControlCentreButton.ApplyTemplate();
-            var buttonImage = ControlCentreButton.Template.FindName("ControlCentreButtonImage", ControlCentreButton) as Image;
-            var fallbackText = ControlCentreButton.Template.FindName("ControlCentreFallbackText", ControlCentreButton) as TextBlock;
-
-            if (imageSource != null)
-            {
-                if (buttonImage != null)
-                {
-                    buttonImage.Source = imageSource;
-                    buttonImage.Visibility = Visibility.Visible;
-                }
-
-                if (fallbackText != null)
-                {
-                    fallbackText.Visibility = Visibility.Collapsed;
-                }
-
-                return;
-            }
-
-            if (buttonImage != null)
-            {
-                buttonImage.Visibility = Visibility.Collapsed;
-            }
-
-            if (fallbackText != null)
-            {
-                fallbackText.Visibility = Visibility.Visible;
-            }
-        }
-
-        private static BitmapFrame? TryLoadIcon(string iconPath)
+        private void HandleDockStateWebMessage(WebMessageEnvelope message)
         {
             try
             {
-                if (!File.Exists(iconPath))
+                using var document = JsonDocument.Parse(message.Json);
+                var root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object)
                 {
-                    return null;
+                    return;
                 }
 
-                var uri = new Uri(iconPath, UriKind.Absolute);
-                var bitmap = BitmapFrame.Create(uri, BitmapCreateOptions.DelayCreation, BitmapCacheOption.OnLoad);
-                bitmap.Freeze();
-                return bitmap;
+                var messageType = TryReadMessageType(root);
+                if (!string.Equals(messageType, DockUiStateSetType, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(messageType, DockUiStateGetType, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                var payload = root;
+                if (root.TryGetProperty("payload", out var payloadElement)
+                    && payloadElement.ValueKind == JsonValueKind.Object)
+                {
+                    payload = payloadElement;
+                }
+
+                if (TryReadDockOpenState(payload, out var isOpen))
+                {
+                    _isDockOpen = isOpen;
+                }
             }
             catch
             {
-                return null;
+                // Ignore malformed dock updates.
             }
+        }
+
+        private static string? TryReadMessageType(JsonElement element)
+        {
+            if (element.TryGetProperty("type", out var typeElement)
+                && typeElement.ValueKind == JsonValueKind.String)
+            {
+                var type = typeElement.GetString();
+                if (string.Equals(type, WebMessageTypes.Command, StringComparison.OrdinalIgnoreCase)
+                    && element.TryGetProperty("name", out var nameElement)
+                    && nameElement.ValueKind == JsonValueKind.String)
+                {
+                    return nameElement.GetString();
+                }
+
+                return type;
+            }
+
+            return null;
+        }
+
+        private static bool TryReadDockOpenState(JsonElement payload, out bool isOpen)
+        {
+            if (payload.TryGetProperty("isOpen", out var isOpenElement)
+                && isOpenElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                isOpen = isOpenElement.GetBoolean();
+                return true;
+            }
+
+            if (payload.TryGetProperty("open", out var openElement)
+                && openElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                isOpen = openElement.GetBoolean();
+                return true;
+            }
+
+            if (payload.TryGetProperty("collapsed", out var collapsedElement)
+                && collapsedElement.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                isOpen = !collapsedElement.GetBoolean();
+                return true;
+            }
+
+            isOpen = false;
+            return false;
         }
     }
 }
