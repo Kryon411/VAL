@@ -5,7 +5,6 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.Options;
 using VAL.Host;
@@ -222,7 +221,7 @@ namespace VAL
             }
         }
 
-        private static ImageSource? TryLoadIcon(string iconPath)
+        private static BitmapFrame? TryLoadIcon(string iconPath)
         {
             try
             {
