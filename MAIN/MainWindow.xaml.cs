@@ -92,6 +92,7 @@ namespace VAL
             _uiState = LoadUiState();
             _layoutMode = _uiState.LayoutMode;
             _isDockOpen = _uiState.Dock.IsOpen;
+            _overlayMovedByUser = _uiState.ControlCentre.HasPosition;
 
             Title = _startupOptions.SafeMode ? "VAL (SAFE MODE)" : "VAL";
             DataContext = _viewModel;
@@ -285,8 +286,12 @@ namespace VAL
                 }
 
                 PostDockUiStateData();
-                var payload = _isDockOpen ? DockCloseMessage : DockOpenMessage;
+                var nextIsOpen = !_isDockOpen;
+                _isDockOpen = nextIsOpen;
+                _uiState.Dock.IsOpen = nextIsOpen;
+                var payload = nextIsOpen ? DockOpenMessage : DockCloseMessage;
                 WebView.CoreWebView2.PostWebMessageAsString(payload);
+                QueueStateSave();
             }
             catch (Exception ex)
             {
@@ -346,15 +351,32 @@ namespace VAL
                 return false;
             }
 
+            string? directTypeValue = null;
             if (root.TryGetProperty("type", out var directType) && directType.ValueKind == JsonValueKind.String)
             {
-                type = directType.GetString();
-                return !string.IsNullOrWhiteSpace(type);
+                directTypeValue = directType.GetString();
             }
 
             if (root.TryGetProperty("name", out var nameType) && nameType.ValueKind == JsonValueKind.String)
             {
-                type = nameType.GetString();
+                var envelopeName = nameType.GetString();
+                if (!string.IsNullOrWhiteSpace(envelopeName)
+                    && string.Equals(directTypeValue, "command", StringComparison.OrdinalIgnoreCase))
+                {
+                    type = envelopeName;
+                    return true;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(directTypeValue))
+            {
+                type = directTypeValue;
+                return true;
+            }
+
+            if (root.TryGetProperty("name", out var fallbackName) && fallbackName.ValueKind == JsonValueKind.String)
+            {
+                type = fallbackName.GetString();
                 return !string.IsNullOrWhiteSpace(type);
             }
 
@@ -578,17 +600,29 @@ namespace VAL
                 return;
             }
 
-            var dockRect = ClampToVirtualScreen(_uiState.Dock.ToRect(defaultX: double.NaN, defaultY: double.NaN, defaultW: 560, defaultH: 460));
-            _uiState.Dock = Geometry.FromRect(dockRect, _uiState.Dock);
+            double? x = _uiState.Dock.X;
+            double? y = _uiState.Dock.Y;
+            var width = (_uiState.Dock.W.HasValue && _uiState.Dock.W.Value > 1) ? _uiState.Dock.W : 560d;
+            var height = (_uiState.Dock.H.HasValue && _uiState.Dock.H.Value > 1) ? _uiState.Dock.H : 460d;
+
+            if (_uiState.Dock.HasPosition)
+            {
+                var dockRect = ClampToVirtualScreen(_uiState.Dock.ToRect(defaultX: _uiState.Dock.X ?? double.NaN, defaultY: _uiState.Dock.Y ?? double.NaN, defaultW: width ?? 560d, defaultH: height ?? 460d));
+                _uiState.Dock = Geometry.FromRect(dockRect, _uiState.Dock);
+                x = _uiState.Dock.X;
+                y = _uiState.Dock.Y;
+                width = _uiState.Dock.W;
+                height = _uiState.Dock.H;
+            }
 
             var payload = JsonSerializer.Serialize(new
             {
                 type = DockUiStateDataType,
                 source = "host",
-                x = _uiState.Dock.X,
-                y = _uiState.Dock.Y,
-                w = _uiState.Dock.W,
-                h = _uiState.Dock.H,
+                x,
+                y,
+                w = width,
+                h = height,
                 isOpen = _uiState.Dock.IsOpen
             }, CachedJsonOptions);
 
