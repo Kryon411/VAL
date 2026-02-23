@@ -54,6 +54,7 @@
   const DOCK_MODEL_EVENT = "val.dock.model";
   const DOCK_UI_STATE_GET = "dock.ui_state.get";
   const DOCK_UI_STATE_SET = "dock.ui_state.set";
+  const DOCK_UI_STATE_DATA = "dock.ui_state.data";
   const DOCK_DEFAULT_MODE = "shelf";
   const HOST_LAUNCHER = true;
   const DOCK_PANEL_TOP_GAP = 12;
@@ -222,7 +223,11 @@ function suppressPreludeNudge(ms){
         collapsed: typeof parsed.collapsed === "boolean"
           ? parsed.collapsed
           : (typeof parsed.isOpen === "boolean" ? !parsed.isOpen : true),
-        mode: DOCK_DEFAULT_MODE
+        mode: DOCK_DEFAULT_MODE,
+        x: Math.round(dockGeometry.x),
+        y: Math.round(dockGeometry.y),
+        w: Math.round(dockGeometry.w),
+        h: Math.round(dockGeometry.h)
       };
     } catch(_) {
       return fallback;
@@ -242,6 +247,8 @@ function suppressPreludeNudge(ms){
   let refreshTimer = null;
   let lastFocusedElement = null;
   let state = loadLocalDockState();
+  let layoutMode = false;
+  let dockGeometry = { x: 72, y: 56, w: 560, h: 460 };
   let isBootstrapping = true;
   let hostReady = false;
   let hostStateReceived = false;
@@ -260,7 +267,11 @@ function suppressPreludeNudge(ms){
       localStorage.setItem(LS_KEY, JSON.stringify({
         isOpen: !state.collapsed,
         collapsed: state.collapsed,
-        mode: DOCK_DEFAULT_MODE
+        mode: DOCK_DEFAULT_MODE,
+        x: Math.round(dockGeometry.x),
+        y: Math.round(dockGeometry.y),
+        w: Math.round(dockGeometry.w),
+        h: Math.round(dockGeometry.h)
       }));
     } catch(e) {}
   }
@@ -275,7 +286,11 @@ function suppressPreludeNudge(ms){
       post({
         type: getCommandName("DockUiStateSet"),
         isOpen: !state.collapsed,
-        mode: DOCK_DEFAULT_MODE
+        mode: DOCK_DEFAULT_MODE,
+        x: Math.round(dockGeometry.x),
+        y: Math.round(dockGeometry.y),
+        w: Math.round(dockGeometry.w),
+        h: Math.round(dockGeometry.h)
       });
     } catch(_) {}
   }
@@ -624,6 +639,8 @@ function suppressPreludeNudge(ms){
       Object.prototype.hasOwnProperty.call(payload, "isOpen") ||
       Object.prototype.hasOwnProperty.call(payload, "x") ||
       Object.prototype.hasOwnProperty.call(payload, "y") ||
+      Object.prototype.hasOwnProperty.call(payload, "w") ||
+      Object.prototype.hasOwnProperty.call(payload, "h") ||
       Object.prototype.hasOwnProperty.call(payload, "mode");
 
     if (!hasHostState) return false;
@@ -631,6 +648,15 @@ function suppressPreludeNudge(ms){
     if (Object.prototype.hasOwnProperty.call(payload, "isOpen")) {
       state.collapsed = !payload.isOpen;
     }
+
+    const nx = Number(payload.x);
+    const ny = Number(payload.y);
+    const nw = Number(payload.w);
+    const nh = Number(payload.h);
+    if (Number.isFinite(nx)) dockGeometry.x = nx;
+    if (Number.isFinite(ny)) dockGeometry.y = ny;
+    if (Number.isFinite(nw)) dockGeometry.w = Math.max(360, nw);
+    if (Number.isFinite(nh)) dockGeometry.h = Math.max(180, nh);
     state.mode = DOCK_DEFAULT_MODE;
 
     return true;
@@ -683,6 +709,7 @@ function suppressPreludeNudge(ms){
     saveState();
     applyDockUiStateAfterBootstrap();
     persistHostDockUiState();
+    emitDockState();
   }
 
   function sendCommand(commandName, payload, requiresChatId, reason){
@@ -1064,30 +1091,31 @@ function suppressPreludeNudge(ms){
   function positionPanel(){
     if (!panel) return;
 
-    let hasRect = false;
-    let top = 56;
-    let right = 16;
+    const maxW = Math.max(360, Math.floor(window.innerWidth - 24));
+    const maxH = Math.max(180, Math.floor(window.innerHeight - 24));
+    dockGeometry.w = Math.min(Math.max(360, dockGeometry.w), maxW);
+    dockGeometry.h = Math.min(Math.max(180, dockGeometry.h), maxH);
+    dockGeometry.x = Math.min(Math.max(0, dockGeometry.x), Math.max(0, window.innerWidth - dockGeometry.w));
+    dockGeometry.y = Math.min(Math.max(0, dockGeometry.y), Math.max(0, window.innerHeight - dockGeometry.h));
 
-    if (launcher) {
-      const rect = launcher.getBoundingClientRect();
-      hasRect = !!(rect && rect.width > 0 && rect.height > 0);
-      top = hasRect
-        ? Math.max(DOCK_PANEL_SCREEN_MARGIN, Math.round(rect.bottom + DOCK_PANEL_TOP_GAP))
-        : 56;
-      right = hasRect
-        ? Math.max(DOCK_PANEL_SCREEN_MARGIN, Math.round(window.innerWidth - rect.right))
-        : 72;
-    }
+    panel.style.left = `${Math.round(dockGeometry.x)}px`;
+    panel.style.top = `${Math.round(dockGeometry.y)}px`;
+    panel.style.right = "auto";
+    panel.style.width = `${Math.round(dockGeometry.w)}px`;
+    panel.style.minWidth = `${Math.round(dockGeometry.w)}px`;
+    panel.style.maxWidth = `${Math.round(dockGeometry.w)}px`;
+    panel.style.maxHeight = `${Math.round(dockGeometry.h)}px`;
+    panel.style.height = `${Math.round(dockGeometry.h)}px`;
+  }
 
-    const maxHeight = Math.max(
-      180,
-      Math.min(Math.floor(window.innerHeight * 0.72), Math.floor(window.innerHeight - top - 24))
-    );
+  function setLayoutMode(next){
+    layoutMode = !!next;
+    if (!panel) return;
+    panel.classList.toggle("layout-mode", layoutMode);
+  }
 
-    panel.style.top = `${top}px`;
-    panel.style.right = `${right}px`;
-    panel.style.left = "auto";
-    panel.style.maxHeight = `${maxHeight}px`;
+  function emitDockState(){
+    try { post({ type: "dock.state", isOpen: !state.collapsed }); } catch(_) {}
   }
 
   function setOpen(isOpen){
@@ -1105,6 +1133,7 @@ function suppressPreludeNudge(ms){
     updateDockOpenRootClass();
     saveState();
     persistHostDockUiState();
+    emitDockState();
 
     if (state.collapsed) {
       if (launcher && lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
@@ -1150,6 +1179,8 @@ function suppressPreludeNudge(ms){
     }
 
     panel = el("div","valdock-panel valdock-shelf");
+    const moveBar = el("div", "valdock-layout-movebar", "Layout mode: drag");
+    const resizeHandle = el("div", "valdock-layout-resize", "");
     panel.id = "valdock-panel";
     panel.setAttribute("role", "dialog");
     panel.setAttribute("aria-label", "Control Centre");
@@ -1164,9 +1195,41 @@ function suppressPreludeNudge(ms){
       setOpen(false);
     }, true);
 
+
+    let dragStart = null;
+    moveBar.addEventListener("mousedown", (e)=>{
+      if (!layoutMode) return;
+      dragStart = { mx: e.clientX, my: e.clientY, x: dockGeometry.x, y: dockGeometry.y };
+      e.preventDefault();
+    }, true);
+
+    resizeHandle.addEventListener("mousedown", (e)=>{
+      if (!layoutMode) return;
+      dragStart = { mx: e.clientX, my: e.clientY, w: dockGeometry.w, h: dockGeometry.h, resize: true };
+      e.preventDefault();
+    }, true);
+
+    document.addEventListener("mousemove", (e)=>{
+      if (!dragStart || !layoutMode) return;
+      if (dragStart.resize) {
+        dockGeometry.w = Math.max(360, dragStart.w + (e.clientX - dragStart.mx));
+        dockGeometry.h = Math.max(180, dragStart.h + (e.clientY - dragStart.my));
+      } else {
+        dockGeometry.x = dragStart.x + (e.clientX - dragStart.mx);
+        dockGeometry.y = dragStart.y + (e.clientY - dragStart.my);
+      }
+      positionPanel();
+    }, true);
+
+    document.addEventListener("mouseup", ()=>{
+      if (!dragStart) return;
+      dragStart = null;
+      persistHostDockUiState();
+    }, true);
+
     const body = el("div","valdock-body");
     dockBody = body;
-    panel.append(portalBadge, closeBtn, body);
+    panel.append(moveBar, portalBadge, closeBtn, body, resizeHandle);
     dock.append(panel);
 
     document.body.appendChild(dock);
@@ -1296,8 +1359,6 @@ function suppressPreludeNudge(ms){
       return;
     }
 
-    console.log("[VAL Dock] host toggle");
-    setOpen(state.collapsed);
   }
 
   function handleHostWebMessage(ev){
@@ -1322,11 +1383,6 @@ function suppressPreludeNudge(ms){
       const unwrapped = unwrapEnvelope(msg);
       const msgType = (unwrapped && unwrapped.type) ? unwrapped.type : msg.type;
 
-      if (msgType === "dock.toggle") {
-        toggleDockFromHost("toggle");
-        return;
-      }
-
       if (msgType === "dock.open") {
         toggleDockFromHost("open");
         return;
@@ -1334,6 +1390,25 @@ function suppressPreludeNudge(ms){
 
       if (msgType === "dock.close") {
         toggleDockFromHost("close");
+        return;
+      }
+
+      if (msgType === "dock.layout.enable") {
+        setLayoutMode(true);
+        return;
+      }
+
+      if (msgType === "dock.layout.disable") {
+        setLayoutMode(false);
+        return;
+      }
+
+      if (msgType === DOCK_UI_STATE_DATA) {
+        applyDockUiStateFromHost(unwrapped);
+        positionPanel();
+        if (Object.prototype.hasOwnProperty.call(unwrapped, "isOpen")) {
+          setOpen(!!unwrapped.isOpen);
+        }
         return;
       }
 
