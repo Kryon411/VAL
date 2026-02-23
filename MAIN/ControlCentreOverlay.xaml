@@ -4,20 +4,25 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Width="30"
-        Height="30"
+        Width="36"
+        Height="36"
+        MinWidth="26"
+        MinHeight="26"
+        MaxWidth="96"
+        MaxHeight="96"
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
         Background="Transparent"
         ShowInTaskbar="False"
         Topmost="False"
-        SizeToContent="WidthAndHeight"
         ShowActivated="False">
-    <Grid>
+    <Grid x:Name="RootGrid"
+          Width="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualWidth}"
+          Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}">
         <Button x:Name="LauncherButton"
-                Width="30"
-                Height="30"
+                Width="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualWidth}"
+                Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}"
                 ToolTip="Control Centre"
                 AutomationProperties.Name="Control Centre"
                 Cursor="Hand"
@@ -27,6 +32,9 @@
                 Foreground="#E8F4FF"
                 Padding="0"
                 Click="LauncherButton_Click"
+                PreviewMouseLeftButtonDown="LauncherButton_PreviewMouseLeftButtonDown"
+                PreviewMouseMove="LauncherButton_PreviewMouseMove"
+                PreviewMouseLeftButtonUp="LauncherButton_PreviewMouseLeftButtonUp"
                 FocusVisualStyle="{x:Null}">
             <Button.Style>
                 <Style TargetType="Button">
@@ -34,7 +42,7 @@
                         <Setter.Value>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="LauncherBorder"
-                                        CornerRadius="15"
+                                        CornerRadius="20"
                                         BorderThickness="{TemplateBinding BorderThickness}"
                                         BorderBrush="{TemplateBinding BorderBrush}"
                                         Background="{TemplateBinding Background}">
@@ -77,5 +85,19 @@
                 </Style>
             </Button.Style>
         </Button>
+
+        <Border x:Name="ResizeHandle"
+                Width="10"
+                Height="10"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Margin="0,0,1,1"
+                CornerRadius="2"
+                Background="#80A8C8"
+                Cursor="SizeNWSE"
+                Visibility="Collapsed"
+                PreviewMouseLeftButtonDown="ResizeHandle_PreviewMouseLeftButtonDown"
+                PreviewMouseMove="ResizeHandle_PreviewMouseMove"
+                PreviewMouseLeftButtonUp="ResizeHandle_PreviewMouseLeftButtonUp" />
     </Grid>
 </Window>
