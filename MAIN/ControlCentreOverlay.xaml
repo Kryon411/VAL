@@ -12,9 +12,15 @@
         Background="Transparent"
         ShowInTaskbar="False"
         Topmost="False"
-        SizeToContent="WidthAndHeight"
+        SizeToContent="Manual"
         ShowActivated="False">
-    <Grid>
+    <Grid x:Name="LayoutRoot"
+          Width="30"
+          Height="30">
+        <Border x:Name="LayoutOutline"
+                BorderThickness="1"
+                BorderBrush="Transparent"
+                CornerRadius="15" />
         <Button x:Name="LauncherButton"
                 Width="30"
                 Height="30"
@@ -27,6 +33,9 @@
                 Foreground="#E8F4FF"
                 Padding="0"
                 Click="LauncherButton_Click"
+                PreviewMouseRightButtonDown="LauncherButton_PreviewMouseRightButtonDown"
+                PreviewMouseMove="LauncherButton_PreviewMouseMove"
+                PreviewMouseRightButtonUp="LauncherButton_PreviewMouseRightButtonUp"
                 FocusVisualStyle="{x:Null}">
             <Button.Style>
                 <Style TargetType="Button">
@@ -77,5 +86,24 @@
                 </Style>
             </Button.Style>
         </Button>
+        <Thumb x:Name="ResizeThumb"
+               Width="10"
+               Height="10"
+               HorizontalAlignment="Right"
+               VerticalAlignment="Bottom"
+               Margin="0"
+               Cursor="SizeNWSE"
+               Visibility="Collapsed"
+               DragDelta="ResizeThumb_DragDelta"
+               DragCompleted="ResizeThumb_DragCompleted">
+            <Thumb.Template>
+                <ControlTemplate TargetType="Thumb">
+                    <Border Background="#CC4A8FD0"
+                            BorderBrush="#EE8CCBFF"
+                            BorderThickness="1"
+                            CornerRadius="3" />
+                </ControlTemplate>
+            </Thumb.Template>
+        </Thumb>
     </Grid>
 </Window>

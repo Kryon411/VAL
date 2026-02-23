@@ -1,10 +1,12 @@
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.Extensions.Options;
 using VAL.Host;
 using VAL.Host.Options;
@@ -26,14 +28,40 @@ namespace VAL
         private ControlCentreOverlay? _ccOverlay;
         private bool _ccLoggedNotReady;
         private bool _isDockOpen;
+        private bool _layoutMode;
+        private bool _overlayMovedByUser;
+        private DateTime _lastLauncherClickUtc = DateTime.MinValue;
+        private HwndSource? _hwndSource;
+        private UiState _uiState = UiState.Default;
+        private readonly DispatcherTimer _stateWriteTimer;
+        private bool _layoutHotKeyRegistered;
 
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        private const int WM_HOTKEY = 0x0312;
+        private const int HOTKEY_ID_LAYOUT_MODE = 0x4C415956;
+        private const uint MOD_ALT = 0x0001;
+        private const uint MOD_CONTROL = 0x0002;
+        private const uint MOD_SHIFT = 0x0004;
+        private const uint VK_L = 0x4C;
         private const string DockOpenMessage = "{\"type\":\"dock.open\",\"source\":\"host\"}";
         private const string DockCloseMessage = "{\"type\":\"dock.close\",\"source\":\"host\"}";
+        private const string DockLayoutEnable = "{\"type\":\"dock.layout.enable\",\"source\":\"host\"}";
+        private const string DockLayoutDisable = "{\"type\":\"dock.layout.disable\",\"source\":\"host\"}";
+        private const string DockStateType = "dock.state";
         private const string DockUiStateSetType = "dock.ui_state.set";
+        private const string DockUiStateDataType = "dock.ui_state.data";
+        private static readonly JsonSerializerOptions CachedJsonOptions = new(JsonSerializerDefaults.Web);
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
         public MainWindow(
             IToastService toastService,
@@ -50,7 +78,21 @@ namespace VAL
             _startupOptions = startupOptions;
             _startupCrashGuard = startupCrashGuard;
 
+            _stateWriteTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(150)
+            };
+            _stateWriteTimer.Tick += (_, _) =>
+            {
+                _stateWriteTimer.Stop();
+                SaveUiState();
+            };
+
             InitializeComponent();
+            _uiState = LoadUiState();
+            _layoutMode = _uiState.LayoutMode;
+            _isDockOpen = _uiState.Dock.IsOpen;
+
             Title = _startupOptions.SafeMode ? "VAL (SAFE MODE)" : "VAL";
             DataContext = _viewModel;
             Loaded += MainWindow_Loaded;
@@ -94,6 +136,9 @@ namespace VAL
             {
                 var hwnd = new WindowInteropHelper(this).Handle;
                 _viewModel.AttachPortalWindow(hwnd);
+
+                _hwndSource = HwndSource.FromHwnd(hwnd);
+                _hwndSource?.AddHook(MainWindowWndProc);
             }
             catch
             {
@@ -106,11 +151,20 @@ namespace VAL
             _webViewRuntime.WebMessageJsonReceived -= _viewModel.HandleWebMessageJson;
             _webViewRuntime.WebMessageJsonReceived -= HandleWebMessageForDockState;
 
+            UnregisterLayoutHotKey();
+
+            if (_hwndSource != null)
+            {
+                _hwndSource.RemoveHook(MainWindowWndProc);
+                _hwndSource = null;
+            }
+
             try
             {
                 if (_ccOverlay != null)
                 {
-                    _ccOverlay.ToggleRequested -= ControlCentreOverlay_ToggleRequested;
+                    _ccOverlay.LauncherClicked -= ControlCentreOverlay_LauncherClicked;
+                    _ccOverlay.GeometryCommitted -= ControlCentreOverlay_GeometryCommitted;
                     _ccOverlay.Close();
                     _ccOverlay = null;
                 }
@@ -119,6 +173,8 @@ namespace VAL
             {
                 ValLog.Warn("MainWindow", "Failed to close Control Centre overlay window.");
             }
+
+            SaveUiState();
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -181,13 +237,35 @@ namespace VAL
             EnsureControlCentreOverlay();
             ShowControlCentreOverlayIfNeeded();
             UpdateControlCentreOverlayPosition();
+            ApplyLayoutMode(_layoutMode);
+            PostDockLayoutMode();
+            PostDockUiStateData();
 
             _startupCrashGuard.MarkSuccess();
         }
 
-        private void ControlCentreOverlay_ToggleRequested(object? sender, EventArgs e)
+        private void ControlCentreOverlay_LauncherClicked(object? sender, EventArgs e)
         {
+            if ((DateTime.UtcNow - _lastLauncherClickUtc).TotalMilliseconds < 250)
+            {
+                return;
+            }
+
+            _lastLauncherClickUtc = DateTime.UtcNow;
             PostDockStateMessage(_ccLoggedNotReady, value => _ccLoggedNotReady = value);
+        }
+
+        private void ControlCentreOverlay_GeometryCommitted(object? sender, Rect bounds)
+        {
+            if (!_layoutMode)
+            {
+                return;
+            }
+
+            _overlayMovedByUser = true;
+            var clamped = ClampToVirtualScreen(bounds);
+            _uiState.ControlCentre = Geometry.FromRect(clamped, _uiState.ControlCentre);
+            QueueStateSave();
         }
 
         private void PostDockStateMessage(bool loggedFlag, Action<bool> setLoggedFlag)
@@ -202,12 +280,12 @@ namespace VAL
                     }
 
                     setLoggedFlag(true);
-                    ValLog.Info("MainWindow", "Control Centre toggle ignored because WebView2 is not ready.");
+                    ValLog.Info("MainWindow", "Control Centre command ignored because WebView2 is not ready.");
                     return;
                 }
 
-                _isDockOpen = !_isDockOpen;
-                var payload = _isDockOpen ? DockOpenMessage : DockCloseMessage;
+                PostDockUiStateData();
+                var payload = _isDockOpen ? DockCloseMessage : DockOpenMessage;
                 WebView.CoreWebView2.PostWebMessageAsString(payload);
             }
             catch (Exception ex)
@@ -223,15 +301,35 @@ namespace VAL
                 using var document = JsonDocument.Parse(envelope.Json);
                 var root = document.RootElement;
 
-                if (!TryReadType(root, out var type) || !string.Equals(type, DockUiStateSetType, StringComparison.Ordinal))
+                if (!TryReadType(root, out var type))
                 {
                     return;
                 }
 
+                if (string.Equals(type, DockStateType, StringComparison.Ordinal) && TryReadIsOpen(root, out var dockOpen))
+                {
+                    _isDockOpen = dockOpen;
+                    _uiState.Dock.IsOpen = dockOpen;
+                    QueueStateSave();
+                    return;
+                }
+
+                if (!string.Equals(type, DockUiStateSetType, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                if (TryReadNumber(root, "x", out var x)) _uiState.Dock.X = x;
+                if (TryReadNumber(root, "y", out var y)) _uiState.Dock.Y = y;
+                if (TryReadNumber(root, "w", out var w)) _uiState.Dock.W = w;
+                if (TryReadNumber(root, "h", out var h)) _uiState.Dock.H = h;
                 if (TryReadIsOpen(root, out var isOpen))
                 {
                     _isDockOpen = isOpen;
+                    _uiState.Dock.IsOpen = isOpen;
                 }
+
+                QueueStateSave();
             }
             catch
             {
@@ -299,8 +397,46 @@ namespace VAL
             return false;
         }
 
+        private static bool TryReadNumber(JsonElement root, string name, out double value)
+        {
+            value = 0;
+
+            if (root.TryGetProperty(name, out var direct) && TryGetNumber(direct, out value))
+            {
+                return true;
+            }
+
+            if (root.TryGetProperty("payload", out var payload)
+                && payload.ValueKind == JsonValueKind.Object
+                && payload.TryGetProperty(name, out var nested)
+                && TryGetNumber(nested, out value))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetNumber(JsonElement value, out double result)
+        {
+            result = 0;
+            if (value.ValueKind == JsonValueKind.Number)
+            {
+                return value.TryGetDouble(out result);
+            }
+
+            if (value.ValueKind == JsonValueKind.String)
+            {
+                return double.TryParse(value.GetString(), out result);
+            }
+
+            return false;
+        }
+
         private void MainWindow_Activated(object? sender, EventArgs e)
         {
+            RegisterLayoutHotKey();
+
             if (_ccOverlay == null)
             {
                 return;
@@ -313,6 +449,8 @@ namespace VAL
 
         private void MainWindow_Deactivated(object? sender, EventArgs e)
         {
+            UnregisterLayoutHotKey();
+
             if (_ccOverlay != null)
             {
                 _ccOverlay.Topmost = false;
@@ -350,7 +488,12 @@ namespace VAL
 
             _ccOverlay = new ControlCentreOverlay();
             _ccOverlay.Owner = this;
-            _ccOverlay.ToggleRequested += ControlCentreOverlay_ToggleRequested;
+            _ccOverlay.LauncherClicked += ControlCentreOverlay_LauncherClicked;
+            _ccOverlay.GeometryCommitted += ControlCentreOverlay_GeometryCommitted;
+            _ccOverlay.SetLayoutMode(_layoutMode);
+
+            var ccRect = ClampToVirtualScreen(_uiState.ControlCentre.ToRect(defaultX: 0, defaultY: 0, defaultW: 30, defaultH: 30));
+            _ccOverlay.ApplyGeometry(ccRect.Left, ccRect.Top, ccRect.Width, ccRect.Height);
         }
 
         private void ShowControlCentreOverlayIfNeeded()
@@ -375,6 +518,11 @@ namespace VAL
                 return;
             }
 
+            if (_layoutMode && _overlayMovedByUser)
+            {
+                return;
+            }
+
             var dpi = VisualTreeHelper.GetDpi(this);
             var webViewOriginPx = WebView.PointToScreen(new Point(0, 0));
             var webViewOriginDip = new Point(webViewOriginPx.X / dpi.DpiScaleX, webViewOriginPx.Y / dpi.DpiScaleY);
@@ -382,12 +530,266 @@ namespace VAL
             const double rightInset = 16;
             const double topInset = 12;
 
-            var overlayWidth = _ccOverlay.ActualWidth > 0 ? _ccOverlay.ActualWidth : _ccOverlay.Width;
+            var overlayWidth = _ccOverlay.Width > 0 ? _ccOverlay.Width : 30;
+            var overlayHeight = _ccOverlay.Height > 0 ? _ccOverlay.Height : 30;
             var targetLeft = webViewOriginDip.X + WebView.ActualWidth - overlayWidth - rightInset;
             var targetTop = webViewOriginDip.Y + topInset;
+            var clamped = ClampToVirtualScreen(new Rect(targetLeft, targetTop, overlayWidth, overlayHeight));
 
-            _ccOverlay.Left = targetLeft;
-            _ccOverlay.Top = targetTop;
+            _ccOverlay.Left = clamped.Left;
+            _ccOverlay.Top = clamped.Top;
+            _uiState.ControlCentre = Geometry.FromRect(clamped, _uiState.ControlCentre);
+        }
+
+        private void ApplyLayoutMode(bool enabled)
+        {
+            _layoutMode = enabled;
+            _uiState.LayoutMode = enabled;
+            _ccOverlay?.SetLayoutMode(enabled);
+            if (!enabled)
+            {
+                _overlayMovedByUser = false;
+                UpdateControlCentreOverlayPosition();
+            }
+
+            QueueStateSave();
+        }
+
+        private void ToggleLayoutMode()
+        {
+            ApplyLayoutMode(!_layoutMode);
+            PostDockLayoutMode();
+        }
+
+        private void PostDockLayoutMode()
+        {
+            if (WebView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            WebView.CoreWebView2.PostWebMessageAsString(_layoutMode ? DockLayoutEnable : DockLayoutDisable);
+        }
+
+        private void PostDockUiStateData()
+        {
+            if (WebView.CoreWebView2 == null)
+            {
+                return;
+            }
+
+            var dockRect = ClampToVirtualScreen(_uiState.Dock.ToRect(defaultX: double.NaN, defaultY: double.NaN, defaultW: 560, defaultH: 460));
+            _uiState.Dock = Geometry.FromRect(dockRect, _uiState.Dock);
+
+            var payload = JsonSerializer.Serialize(new
+            {
+                type = DockUiStateDataType,
+                source = "host",
+                x = _uiState.Dock.X,
+                y = _uiState.Dock.Y,
+                w = _uiState.Dock.W,
+                h = _uiState.Dock.H,
+                isOpen = _uiState.Dock.IsOpen
+            }, CachedJsonOptions);
+
+            WebView.CoreWebView2.PostWebMessageAsString(payload);
+        }
+
+        private IntPtr MainWindowWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg != WM_HOTKEY || wParam.ToInt32() != HOTKEY_ID_LAYOUT_MODE)
+            {
+                return IntPtr.Zero;
+            }
+
+            ToggleLayoutMode();
+            handled = true;
+            return IntPtr.Zero;
+        }
+
+        private void RegisterLayoutHotKey()
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            if (_layoutHotKeyRegistered)
+            {
+                return;
+            }
+
+            var registered = RegisterHotKey(hwnd, HOTKEY_ID_LAYOUT_MODE, MOD_CONTROL | MOD_ALT | MOD_SHIFT, VK_L);
+            if (!registered)
+            {
+                var err = Marshal.GetLastWin32Error();
+                ValLog.Warn("MainWindow", $"RegisterHotKey failed for layout mode ({err}).");
+                return;
+            }
+
+            _layoutHotKeyRegistered = true;
+        }
+
+        private void UnregisterLayoutHotKey()
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            if (!_layoutHotKeyRegistered)
+            {
+                return;
+            }
+
+            if (!UnregisterHotKey(hwnd, HOTKEY_ID_LAYOUT_MODE))
+            {
+                var err = Marshal.GetLastWin32Error();
+                ValLog.Warn("MainWindow", $"UnregisterHotKey failed for layout mode ({err}).");
+            }
+
+            _layoutHotKeyRegistered = false;
+        }
+
+        private void QueueStateSave()
+        {
+            _stateWriteTimer.Stop();
+            _stateWriteTimer.Start();
+        }
+
+        private UiState LoadUiState()
+        {
+            try
+            {
+                var path = GetUiStatePath();
+                if (!File.Exists(path))
+                {
+                    return UiState.Default;
+                }
+
+                var json = File.ReadAllText(path);
+                var loaded = JsonSerializer.Deserialize<UiState>(json, CachedJsonOptions);
+                return loaded?.Normalize() ?? UiState.Default;
+            }
+            catch
+            {
+                return UiState.Default;
+            }
+        }
+
+        private void SaveUiState()
+        {
+            try
+            {
+                if (_ccOverlay != null)
+                {
+                    _uiState.ControlCentre = Geometry.FromRect(new Rect(_ccOverlay.Left, _ccOverlay.Top, _ccOverlay.Width, _ccOverlay.Height), _uiState.ControlCentre);
+                }
+
+                _uiState.Dock = Geometry.FromRect(ClampToVirtualScreen(_uiState.Dock.ToRect(double.NaN, double.NaN, 560, 460)), _uiState.Dock);
+                _uiState.Version = 1;
+                _uiState = _uiState.Normalize();
+
+                var path = GetUiStatePath();
+                var directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                var json = JsonSerializer.Serialize(_uiState, CachedJsonOptions);
+                File.WriteAllText(path, json);
+            }
+            catch
+            {
+                ValLog.Warn("MainWindow", "Failed to save control centre UI state.");
+            }
+        }
+
+        private static string GetUiStatePath()
+        {
+            return Path.Combine(AppContext.BaseDirectory, "State", "controlcentre.ui.json");
+        }
+
+        private static Rect ClampToVirtualScreen(Rect rect)
+        {
+            var screenLeft = SystemParameters.VirtualScreenLeft;
+            var screenTop = SystemParameters.VirtualScreenTop;
+            var screenWidth = SystemParameters.VirtualScreenWidth;
+            var screenHeight = SystemParameters.VirtualScreenHeight;
+
+            if (double.IsNaN(rect.X) || double.IsInfinity(rect.X))
+            {
+                rect.X = screenLeft + 16;
+            }
+
+            if (double.IsNaN(rect.Y) || double.IsInfinity(rect.Y))
+            {
+                rect.Y = screenTop + 16;
+            }
+
+            rect.Width = double.IsNaN(rect.Width) || rect.Width <= 1 ? 30 : rect.Width;
+            rect.Height = double.IsNaN(rect.Height) || rect.Height <= 1 ? 30 : rect.Height;
+
+            var maxLeft = screenLeft + Math.Max(0, screenWidth - rect.Width);
+            var maxTop = screenTop + Math.Max(0, screenHeight - rect.Height);
+            rect.X = Math.Min(Math.Max(rect.X, screenLeft), maxLeft);
+            rect.Y = Math.Min(Math.Max(rect.Y, screenTop), maxTop);
+            return rect;
+        }
+
+        private sealed class UiState
+        {
+            public int Version { get; set; } = 1;
+            public Geometry ControlCentre { get; set; } = new();
+            public Geometry Dock { get; set; } = new();
+            public bool LayoutMode { get; set; }
+
+            public static UiState Default => new()
+            {
+                Version = 1,
+                ControlCentre = new Geometry { X = null, Y = null, W = 30, H = 30 },
+                Dock = new Geometry { X = null, Y = null, W = 560, H = 460 },
+                LayoutMode = false
+            };
+
+            public UiState Normalize()
+            {
+                ControlCentre ??= new Geometry();
+                Dock ??= new Geometry();
+                return this;
+            }
+        }
+
+        private sealed class Geometry
+        {
+            public double? X { get; set; }
+            public double? Y { get; set; }
+            public double? W { get; set; }
+            public double? H { get; set; }
+            public bool IsOpen { get; set; }
+
+            public bool HasPosition => X.HasValue && Y.HasValue;
+
+            public Rect ToRect(double defaultX, double defaultY, double defaultW, double defaultH)
+            {
+                var x = X ?? defaultX;
+                var y = Y ?? defaultY;
+                var w = (W.HasValue && W.Value > 1) ? W.Value : defaultW;
+                var h = (H.HasValue && H.Value > 1) ? H.Value : defaultH;
+                return new Rect(x, y, w, h);
+            }
+
+            public static Geometry FromRect(Rect rect, Geometry current)
+            {
+                current.X = rect.X;
+                current.Y = rect.Y;
+                current.W = rect.Width;
+                current.H = rect.Height;
+                return current;
+            }
         }
     }
 }
