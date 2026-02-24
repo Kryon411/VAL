@@ -130,6 +130,12 @@ namespace VAL.Host.Services
         [JsonPropertyName("y")]
         public int? Y { get; set; }
 
+        [JsonPropertyName("w")]
+        public int? W { get; set; }
+
+        [JsonPropertyName("h")]
+        public int? H { get; set; }
+
         [JsonPropertyName("mode")]
         public string Mode { get; set; } = "floating";
 
@@ -142,6 +148,8 @@ namespace VAL.Host.Services
             IsOpen = false,
             X = null,
             Y = null,
+            W = null,
+            H = null,
             Mode = "floating",
             UpdatedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)
         };
@@ -154,6 +162,8 @@ namespace VAL.Host.Services
                 IsOpen = IsOpen,
                 X = X,
                 Y = Y,
+                W = W,
+                H = H,
                 Mode = string.IsNullOrWhiteSpace(Mode) ? "floating" : Mode,
                 UpdatedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)
             };
