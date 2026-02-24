@@ -737,7 +737,7 @@ namespace VAL
         private sealed class ControlCentreUiState
         {
             public int Version { get; set; } = 1;
-            public GeometryState ControlCentre { get; set; } = new(0, 0, 36, 36);
+            public GeometryState ControlCentre { get; set; } = new(0, 0, 0, 0);
             public DockGeometryState Dock { get; set; } = new();
             public bool LayoutMode { get; set; }
 
