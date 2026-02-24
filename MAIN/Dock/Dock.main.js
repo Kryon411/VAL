@@ -224,10 +224,10 @@ function suppressPreludeNudge(ms){
           ? parsed.collapsed
           : (typeof parsed.isOpen === "boolean" ? !parsed.isOpen : true),
         mode: DOCK_DEFAULT_MODE,
-        x: Math.round(dockGeometry.x),
-        y: Math.round(dockGeometry.y),
-        w: Math.round(dockGeometry.w),
-        h: Math.round(dockGeometry.h)
+        x: Number.isFinite(Number(parsed.x)) ? Number(parsed.x) : undefined,
+        y: Number.isFinite(Number(parsed.y)) ? Number(parsed.y) : undefined,
+        w: Number.isFinite(Number(parsed.w)) ? Number(parsed.w) : undefined,
+        h: Number.isFinite(Number(parsed.h)) ? Number(parsed.h) : undefined
       };
     } catch(_) {
       return fallback;
@@ -259,6 +259,7 @@ function suppressPreludeNudge(ms){
 
   let pendingDockUiStateResolve = null;
   let dockBuilt = false;
+  let layoutDragStart = null;
 
   function isShelfMode(){ return true; }
 
@@ -662,6 +663,18 @@ function suppressPreludeNudge(ms){
     return true;
   }
 
+  function applyGeometrySnapshot(snapshot){
+    if (!snapshot || typeof snapshot !== "object") return;
+    const nx = Number(snapshot.x);
+    const ny = Number(snapshot.y);
+    const nw = Number(snapshot.w);
+    const nh = Number(snapshot.h);
+    if (Number.isFinite(nx)) dockGeometry.x = nx;
+    if (Number.isFinite(ny)) dockGeometry.y = ny;
+    if (Number.isFinite(nw)) dockGeometry.w = Math.max(360, nw);
+    if (Number.isFinite(nh)) dockGeometry.h = Math.max(180, nh);
+  }
+
   function requestDockUiState(){
     return new Promise((resolve)=>{
       try {
@@ -706,6 +719,7 @@ function suppressPreludeNudge(ms){
     const fallbackState = loadLocalDockState();
     state.collapsed = fallbackState.collapsed;
     state.mode = DOCK_DEFAULT_MODE;
+    applyGeometrySnapshot(fallbackState);
     saveState();
     applyDockUiStateAfterBootstrap();
     persistHostDockUiState();
@@ -1110,6 +1124,9 @@ function suppressPreludeNudge(ms){
 
   function setLayoutMode(next){
     layoutMode = !!next;
+    if (!layoutMode) {
+      layoutDragStart = null;
+    }
     if (!panel) return;
     panel.classList.toggle("layout-mode", layoutMode);
   }
@@ -1196,34 +1213,33 @@ function suppressPreludeNudge(ms){
     }, true);
 
 
-    let dragStart = null;
     moveBar.addEventListener("mousedown", (e)=>{
       if (!layoutMode) return;
-      dragStart = { mx: e.clientX, my: e.clientY, x: dockGeometry.x, y: dockGeometry.y };
+      layoutDragStart = { mx: e.clientX, my: e.clientY, x: dockGeometry.x, y: dockGeometry.y };
       e.preventDefault();
     }, true);
 
     resizeHandle.addEventListener("mousedown", (e)=>{
       if (!layoutMode) return;
-      dragStart = { mx: e.clientX, my: e.clientY, w: dockGeometry.w, h: dockGeometry.h, resize: true };
+      layoutDragStart = { mx: e.clientX, my: e.clientY, w: dockGeometry.w, h: dockGeometry.h, resize: true };
       e.preventDefault();
     }, true);
 
     document.addEventListener("mousemove", (e)=>{
-      if (!dragStart || !layoutMode) return;
-      if (dragStart.resize) {
-        dockGeometry.w = Math.max(360, dragStart.w + (e.clientX - dragStart.mx));
-        dockGeometry.h = Math.max(180, dragStart.h + (e.clientY - dragStart.my));
+      if (!layoutDragStart || !layoutMode) return;
+      if (layoutDragStart.resize) {
+        dockGeometry.w = Math.max(360, layoutDragStart.w + (e.clientX - layoutDragStart.mx));
+        dockGeometry.h = Math.max(180, layoutDragStart.h + (e.clientY - layoutDragStart.my));
       } else {
-        dockGeometry.x = dragStart.x + (e.clientX - dragStart.mx);
-        dockGeometry.y = dragStart.y + (e.clientY - dragStart.my);
+        dockGeometry.x = layoutDragStart.x + (e.clientX - layoutDragStart.mx);
+        dockGeometry.y = layoutDragStart.y + (e.clientY - layoutDragStart.my);
       }
       positionPanel();
     }, true);
 
     document.addEventListener("mouseup", ()=>{
-      if (!dragStart) return;
-      dragStart = null;
+      if (!layoutDragStart) return;
+      layoutDragStart = null;
       persistHostDockUiState();
     }, true);
 
@@ -1317,6 +1333,7 @@ function suppressPreludeNudge(ms){
       const fallbackState = loadLocalDockState();
       state.collapsed = fallbackState.collapsed;
       state.mode = DOCK_DEFAULT_MODE;
+      applyGeometrySnapshot(fallbackState);
       saveState();
       finishDockBootstrap();
       applyDockUiStateAfterBootstrap();
