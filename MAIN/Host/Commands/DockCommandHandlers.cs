@@ -75,6 +75,12 @@ namespace VAL.Host.Commands
                 if (cmd.Root.TryGetProperty("y", out var yEl))
                     current.Y = ReadNullableInt(yEl, current.Y);
 
+                if (cmd.Root.TryGetProperty("w", out var wEl))
+                    current.W = ReadNullableInt(wEl, current.W);
+
+                if (cmd.Root.TryGetProperty("h", out var hEl))
+                    current.H = ReadNullableInt(hEl, current.H);
+
                 if (cmd.Root.TryGetProperty("mode", out var modeEl) && modeEl.ValueKind == JsonValueKind.String)
                     current.Mode = modeEl.GetString() ?? current.Mode;
 

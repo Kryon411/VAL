@@ -365,7 +365,22 @@ namespace VAL
 
             if (root.TryGetProperty("type", out var directType) && directType.ValueKind == JsonValueKind.String)
             {
-                type = directType.GetString();
+                var directTypeValue = directType.GetString();
+                if (string.Equals(directTypeValue, "command", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(directTypeValue, "event", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(directTypeValue, "log", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (root.TryGetProperty("name", out var envelopeName) && envelopeName.ValueKind == JsonValueKind.String)
+                    {
+                        type = envelopeName.GetString();
+                        if (!string.IsNullOrWhiteSpace(type))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                type = directTypeValue;
                 return !string.IsNullOrWhiteSpace(type);
             }
 

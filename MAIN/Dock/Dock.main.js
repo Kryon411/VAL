@@ -1135,7 +1135,7 @@ function suppressPreludeNudge(ms){
   }
 
   function emitDockState(){
-    try { post({ type: "dock.state", isOpen: !state.collapsed }); } catch(_) {}
+    /* legacy no-op: host-policy blocked; use dock.ui_state.set instead */
   }
 
   function setOpen(isOpen){
