@@ -262,13 +262,19 @@ namespace VAL
 
             if (_isDockOpen)
             {
+                _isDockOpen = false;
+                _uiState.Dock.IsOpen = false;
                 PostDockMessage(DockCloseMessage);
             }
             else
             {
+                _isDockOpen = true;
+                _uiState.Dock.IsOpen = true;
                 PostDockMessage(DockOpenMessage);
                 _dockInitStateTimer.Start();
             }
+
+            ScheduleStatePersist();
         }
 
         private void ControlCentreOverlay_GeometryChanged(object? sender, EventArgs e)
@@ -618,6 +624,7 @@ namespace VAL
         private void SendDockUiStateData()
         {
             var dock = _uiState.Dock;
+            dock.IsOpen = _isDockOpen;
             var payload = JsonSerializer.Serialize(new
             {
                 type = "dock.ui_state.data",
