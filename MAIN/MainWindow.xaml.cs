@@ -177,6 +177,7 @@ namespace VAL
             WindowState = WindowState.Maximized;
             _toastService.Initialize(this);
             LoadUiState();
+            _isDockOpen = _uiState.Dock.IsOpen;
             _layoutMode = _uiState.LayoutMode;
 
             var hwnd = new WindowInteropHelper(this).Handle;
