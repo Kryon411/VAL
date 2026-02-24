@@ -1125,6 +1125,9 @@ function suppressPreludeNudge(ms){
   function setLayoutMode(next){
     layoutMode = !!next;
     if (!layoutMode) {
+      if (layoutDragStart) {
+        persistHostDockUiState();
+      }
       layoutDragStart = null;
     }
     if (!panel) return;
