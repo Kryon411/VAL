@@ -286,7 +286,6 @@ namespace VAL
             }
 
             ClampOverlayToVirtualScreen();
-            _uiState.ControlCentre = new GeometryState(_ccOverlay.Left, _ccOverlay.Top, _ccOverlay.Width, _ccOverlay.Height);
             ScheduleStatePersist();
         }
 
@@ -662,7 +661,7 @@ namespace VAL
                 return;
             }
 
-            var geometry = _uiState.ControlCentre;
+            var geometry = new GeometryState(_ccOverlay.Left, _ccOverlay.Top, _ccOverlay.Width, _ccOverlay.Height);
             ClampWindowGeometry(_ccOverlay, ref geometry);
             _uiState.ControlCentre = geometry;
         }
