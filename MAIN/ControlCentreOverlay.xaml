@@ -109,6 +109,7 @@
                    RenderOptions.BitmapScalingMode="Fant" />
             <TextBlock x:Name="LauncherFallbackText"
                        Text="CC"
+                       Foreground="{Binding ElementName=LauncherButton, Path=Foreground}"
                        FontSize="9.5"
                        FontWeight="SemiBold"
                        HorizontalAlignment="Center"
