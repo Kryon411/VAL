@@ -233,8 +233,8 @@ namespace VAL
             }
 
             EnsureControlCentreOverlay();
-            ShowControlCentreOverlayIfNeeded();
             ApplyOverlayGeometry();
+            ShowControlCentreOverlayIfNeeded();
             ApplyLayoutMode();
 
             _dockInitStateTimer.Start();
