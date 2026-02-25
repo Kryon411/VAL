@@ -4,8 +4,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Width="40"
-        Height="40"
+        Width="36"
+        Height="36"
         MinWidth="34"
         MinHeight="34"
         MaxWidth="64"
@@ -67,25 +67,7 @@
                                         CornerRadius="999"
                                         BorderThickness="{TemplateBinding BorderThickness}"
                                         BorderBrush="{TemplateBinding BorderBrush}"
-                                        Background="{TemplateBinding Background}">
-                                    <Grid>
-                                        <Image x:Name="LauncherImage"
-                                               Width="23"
-                                               Height="23"
-                                               Stretch="Uniform"
-                                               Visibility="Collapsed"
-                                               SnapsToDevicePixels="True"
-                                               UseLayoutRounding="True"
-                                               RenderOptions.BitmapScalingMode="Fant" />
-                                        <TextBlock x:Name="LauncherFallbackText"
-                                                   Text="CC"
-                                                   FontSize="10"
-                                                   FontWeight="SemiBold"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   Visibility="Visible" />
-                                    </Grid>
-                                </Border>
+                                        Background="{TemplateBinding Background}" />
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#58779A" />
@@ -112,6 +94,27 @@
                 </Style>
             </Button.Style>
         </Button>
+
+        <Grid x:Name="LauncherGlyphLayer"
+              IsHitTestVisible="False"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center">
+            <Image x:Name="LauncherImage"
+                   Width="21"
+                   Height="21"
+                   Stretch="Uniform"
+                   Visibility="Collapsed"
+                   SnapsToDevicePixels="True"
+                   UseLayoutRounding="True"
+                   RenderOptions.BitmapScalingMode="Fant" />
+            <TextBlock x:Name="LauncherFallbackText"
+                       Text="CC"
+                       FontSize="9.5"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Visibility="Visible" />
+        </Grid>
 
         <Border x:Name="ResizeHandle"
                 Width="10"

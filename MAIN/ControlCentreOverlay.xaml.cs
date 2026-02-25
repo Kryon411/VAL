@@ -2,11 +2,11 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using VAL.Host;
 
 namespace VAL
 {
@@ -246,39 +246,33 @@ namespace VAL
 
         private void InitializeIcon()
         {
-            var imageSource = TryLoadPng(Path.Combine(AppContext.BaseDirectory, "Icons", "VAL.Logo.png")) as ImageSource
-                ?? TryLoadIcon(Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico"));
+            var pngPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL.Logo.png");
+            var icoPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico");
 
-            LauncherButton.ApplyTemplate();
-            var buttonImage = LauncherButton.Template.FindName("LauncherImage", LauncherButton) as Image;
-            var fallbackText = LauncherButton.Template.FindName("LauncherFallbackText", LauncherButton) as TextBlock;
-
+            var imageSource = TryLoadPng(pngPath) as ImageSource;
             if (imageSource != null)
             {
-                if (buttonImage != null)
-                {
-                    buttonImage.Source = imageSource;
-                    buttonImage.Visibility = Visibility.Visible;
-                }
-
-                if (fallbackText != null)
-                {
-                    fallbackText.Visibility = Visibility.Collapsed;
-                }
-
+                LauncherImage.Source = imageSource;
+                LauncherImage.Visibility = Visibility.Visible;
+                LauncherFallbackText.Visibility = Visibility.Collapsed;
+                ValLog.Info(nameof(ControlCentreOverlay), $"Launcher icon source: PNG ({pngPath})");
                 return;
             }
 
-            if (buttonImage != null)
+            imageSource = TryLoadIcon(icoPath);
+            if (imageSource != null)
             {
-                buttonImage.Source = null;
-                buttonImage.Visibility = Visibility.Collapsed;
+                LauncherImage.Source = imageSource;
+                LauncherImage.Visibility = Visibility.Visible;
+                LauncherFallbackText.Visibility = Visibility.Collapsed;
+                ValLog.Info(nameof(ControlCentreOverlay), $"Launcher icon source: ICO ({icoPath})");
+                return;
             }
 
-            if (fallbackText != null)
-            {
-                fallbackText.Visibility = Visibility.Visible;
-            }
+            LauncherImage.Source = null;
+            LauncherImage.Visibility = Visibility.Collapsed;
+            LauncherFallbackText.Visibility = Visibility.Visible;
+            ValLog.Warn(nameof(ControlCentreOverlay), "Launcher icon source: fallback text 'CC' (PNG/ICO unavailable).");
         }
 
         private static BitmapImage? TryLoadPng(string pngPath)
@@ -292,14 +286,16 @@ namespace VAL
 
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
-                bitmap.UriSource = new Uri(pngPath, UriKind.Absolute);
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+                bitmap.UriSource = new Uri(pngPath, UriKind.Absolute);
                 bitmap.EndInit();
                 bitmap.Freeze();
                 return bitmap;
             }
-            catch
+            catch (Exception ex)
             {
+                ValLog.Warn(nameof(ControlCentreOverlay), $"Failed to load launcher PNG '{pngPath}': {ex.Message}");
                 return null;
             }
         }
