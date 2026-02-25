@@ -20,6 +20,8 @@ namespace VAL
 
         private bool _isDragging;
         private Point _dragOffset;
+        private Point _dragStartWindowPos;
+        private bool _suppressClickOnce;
         private bool _isResizing;
         private Point _resizeStart;
         private double _startWidth;
@@ -28,6 +30,7 @@ namespace VAL
 
         public event EventHandler? Clicked;
         public event EventHandler? GeometryChanged;
+        public event EventHandler? LayoutToggleRequested;
 
         public bool LayoutModeEnabled
         {
@@ -105,6 +108,12 @@ namespace VAL
 
         private void LauncherButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_suppressClickOnce)
+            {
+                _suppressClickOnce = false;
+                return;
+            }
+
             Clicked?.Invoke(this, EventArgs.Empty);
         }
 
@@ -116,6 +125,8 @@ namespace VAL
             }
 
             _isDragging = true;
+            _suppressClickOnce = false;
+            _dragStartWindowPos = new Point(Left, Top);
             _dragOffset = e.GetPosition(this);
             LauncherButton.CaptureMouse();
             e.Handled = true;
@@ -128,15 +139,27 @@ namespace VAL
                 return;
             }
 
-            var screen = PointToScreen(e.GetPosition(this));
-            Left = screen.X - _dragOffset.X;
-            Top = screen.Y - _dragOffset.Y;
+            var screenDip = GetMouseScreenDip(e);
+            Left = screenDip.X - _dragOffset.X;
+            Top = screenDip.Y - _dragOffset.Y;
+
+            var movement = Math.Abs(Left - _dragStartWindowPos.X) + Math.Abs(Top - _dragStartWindowPos.Y);
+            if (movement > 2)
+            {
+                _suppressClickOnce = true;
+            }
+
             GeometryChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void LauncherButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             EndDrag();
+
+            if (_suppressClickOnce && !LauncherButton.IsMouseOver)
+            {
+                _suppressClickOnce = false;
+            }
         }
 
         private void ResizeHandle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -147,7 +170,7 @@ namespace VAL
             }
 
             _isResizing = true;
-            _resizeStart = PointToScreen(e.GetPosition(this));
+            _resizeStart = GetMouseScreenDip(e);
             _startWidth = Width;
             _startHeight = Height;
             ResizeHandle.CaptureMouse();
@@ -161,7 +184,7 @@ namespace VAL
                 return;
             }
 
-            var current = PointToScreen(e.GetPosition(this));
+            var current = GetMouseScreenDip(e);
             var width = Math.Clamp(_startWidth + (current.X - _resizeStart.X), MinOverlaySize, MaxOverlaySize);
             var height = Math.Clamp(_startHeight + (current.Y - _resizeStart.Y), MinOverlaySize, MaxOverlaySize);
             Width = width;
@@ -172,6 +195,29 @@ namespace VAL
         private void ResizeHandle_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             EndResize();
+        }
+
+        private void LauncherButton_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            LayoutToggleRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+        }
+
+        private Point GetMouseScreenDip(MouseEventArgs e)
+        {
+            var screenPx = PointToScreen(e.GetPosition(this));
+            return ScreenPixelsToDip(screenPx);
+        }
+
+        private Point ScreenPixelsToDip(Point screenPx)
+        {
+            var source = PresentationSource.FromVisual(this);
+            if (source?.CompositionTarget == null)
+            {
+                return screenPx;
+            }
+
+            return source.CompositionTarget.TransformFromDevice.Transform(screenPx);
         }
 
         private void EndDrag()
@@ -200,7 +246,8 @@ namespace VAL
 
         private void InitializeIcon()
         {
-            var imageSource = TryLoadIcon(Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico"));
+            var imageSource = TryLoadPng(Path.Combine(AppContext.BaseDirectory, "Icons", "VAL.Logo.png")) as ImageSource
+                ?? TryLoadIcon(Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico"));
 
             LauncherButton.ApplyTemplate();
             var buttonImage = LauncherButton.Template.FindName("LauncherImage", LauncherButton) as Image;
@@ -230,6 +277,29 @@ namespace VAL
             if (fallbackText != null)
             {
                 fallbackText.Visibility = Visibility.Visible;
+            }
+        }
+
+        private static BitmapImage? TryLoadPng(string pngPath)
+        {
+            try
+            {
+                if (!File.Exists(pngPath))
+                {
+                    return null;
+                }
+
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(pngPath, UriKind.Absolute);
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                return bitmap;
+            }
+            catch
+            {
+                return null;
             }
         }
 
