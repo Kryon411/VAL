@@ -569,8 +569,8 @@ namespace VAL
             var dpi = VisualTreeHelper.GetDpi(this);
             var webViewOriginPx = WebView.PointToScreen(new Point(0, 0));
             var webViewOriginDip = new Point(webViewOriginPx.X / dpi.DpiScaleX, webViewOriginPx.Y / dpi.DpiScaleY);
-            var w = 36d;
-            var h = 36d;
+            var w = 40d;
+            var h = 40d;
             var x = webViewOriginDip.X + Math.Max(0, WebView.ActualWidth - w - 16);
             var y = webViewOriginDip.Y + 12;
             return new GeometryState(x, y, w, h);
