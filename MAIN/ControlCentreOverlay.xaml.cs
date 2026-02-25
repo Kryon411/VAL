@@ -155,6 +155,11 @@ namespace VAL
         private void LauncherButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             EndDrag();
+
+            if (_suppressClickOnce && !LauncherButton.IsMouseOver)
+            {
+                _suppressClickOnce = false;
+            }
         }
 
         private void ResizeHandle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
