@@ -15,8 +15,8 @@ namespace VAL
         private const int WmNcHitTest = 0x0084;
         private const int HtTransparent = -1;
         private const int HtClient = 1;
-        private const double MinOverlaySize = 26;
-        private const double MaxOverlaySize = 96;
+        private const double MinOverlaySize = 34;
+        private const double MaxOverlaySize = 64;
 
         private bool _isDragging;
         private Point _dragOffset;
@@ -271,6 +271,7 @@ namespace VAL
 
             if (buttonImage != null)
             {
+                buttonImage.Source = null;
                 buttonImage.Visibility = Visibility.Collapsed;
             }
 

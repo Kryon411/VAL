@@ -4,12 +4,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Width="36"
-        Height="36"
-        MinWidth="26"
-        MinHeight="26"
-        MaxWidth="96"
-        MaxHeight="96"
+        Width="40"
+        Height="40"
+        MinWidth="34"
+        MinHeight="34"
+        MaxWidth="64"
+        MaxHeight="64"
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
@@ -37,8 +37,8 @@
                 AutomationProperties.Name="Control Centre"
                 Cursor="Hand"
                 BorderThickness="1"
-                BorderBrush="#2A4A66"
-                Background="#151F2F"
+                BorderBrush="#33495F"
+                Background="#141C2A"
                 Foreground="#E8F4FF"
                 Padding="0"
                 Click="LauncherButton_Click"
@@ -70,14 +70,16 @@
                                         Background="{TemplateBinding Background}">
                                     <Grid>
                                         <Image x:Name="LauncherImage"
-                                               Width="22"
-                                               Height="22"
+                                               Width="23"
+                                               Height="23"
                                                Stretch="Uniform"
                                                Visibility="Collapsed"
-                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                               SnapsToDevicePixels="True"
+                                               UseLayoutRounding="True"
+                                               RenderOptions.BitmapScalingMode="Fant" />
                                         <TextBlock x:Name="LauncherFallbackText"
                                                    Text="CC"
-                                                   FontSize="11"
+                                                   FontSize="10"
                                                    FontWeight="SemiBold"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
@@ -86,19 +88,22 @@
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#5D7AA0" />
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#1F2A3F" />
+                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#58779A" />
+                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#1A2536" />
                                         <Setter TargetName="LauncherBorder" Property="Effect">
                                             <Setter.Value>
-                                                <DropShadowEffect BlurRadius="14"
+                                                <DropShadowEffect BlurRadius="8"
                                                                   ShadowDepth="0"
-                                                                  Color="#4A8FD0"
-                                                                  Opacity="0.45" />
+                                                                  Color="#69A6DF"
+                                                                  Opacity="0.22" />
                                             </Setter.Value>
                                         </Setter>
                                     </Trigger>
                                     <Trigger Property="IsPressed" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#111B2A" />
+                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#101827" />
+                                    </Trigger>
+                                    <Trigger Property="IsKeyboardFocused" Value="True">
+                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#6A8CB0" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
