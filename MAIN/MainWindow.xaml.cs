@@ -162,6 +162,7 @@ namespace VAL
                 {
                     _ccOverlay.Clicked -= ControlCentreOverlay_Clicked;
                     _ccOverlay.GeometryChanged -= ControlCentreOverlay_GeometryChanged;
+                    _ccOverlay.LayoutToggleRequested -= ControlCentreOverlay_LayoutToggleRequested;
                     _ccOverlay.Close();
                     _ccOverlay = null;
                 }
@@ -523,6 +524,7 @@ namespace VAL
             _ccOverlay.Owner = this;
             _ccOverlay.Clicked += ControlCentreOverlay_Clicked;
             _ccOverlay.GeometryChanged += ControlCentreOverlay_GeometryChanged;
+            _ccOverlay.LayoutToggleRequested += ControlCentreOverlay_LayoutToggleRequested;
         }
 
         private void ShowControlCentreOverlayIfNeeded()
@@ -580,6 +582,11 @@ namespace VAL
             _uiState.LayoutMode = _layoutMode;
             ApplyLayoutMode();
             ScheduleStatePersist();
+        }
+
+        private void ControlCentreOverlay_LayoutToggleRequested(object? sender, EventArgs e)
+        {
+            ToggleLayoutMode();
         }
 
         private void ApplyLayoutMode()

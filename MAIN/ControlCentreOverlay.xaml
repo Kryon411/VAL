@@ -17,13 +17,23 @@
         ShowInTaskbar="False"
         Topmost="False"
         ShowActivated="False">
+    <Window.Resources>
+        <Style x:Key="LauncherToolTipStyle" TargetType="ToolTip">
+            <Setter Property="Background" Value="#1A2436" />
+            <Setter Property="Foreground" Value="#E8F4FF" />
+            <Setter Property="BorderBrush" Value="#4A6488" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Placement" Value="Right" />
+        </Style>
+    </Window.Resources>
+
     <Grid x:Name="RootGrid"
           Width="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualWidth}"
           Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}">
         <Button x:Name="LauncherButton"
                 Width="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualWidth}"
                 Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}"
-                ToolTip="Control Centre"
                 AutomationProperties.Name="Control Centre"
                 Cursor="Hand"
                 BorderThickness="1"
@@ -35,21 +45,33 @@
                 PreviewMouseLeftButtonDown="LauncherButton_PreviewMouseLeftButtonDown"
                 PreviewMouseMove="LauncherButton_PreviewMouseMove"
                 PreviewMouseLeftButtonUp="LauncherButton_PreviewMouseLeftButtonUp"
+                PreviewMouseRightButtonUp="LauncherButton_PreviewMouseRightButtonUp"
                 FocusVisualStyle="{x:Null}">
+            <Button.ToolTip>
+                <ToolTip Style="{StaticResource LauncherToolTipStyle}">
+                    <TextBlock TextWrapping="Wrap" MaxWidth="220">
+                        <Run Text="Control Centre" />
+                        <LineBreak />
+                        <Run Text="Right-click: Toggle layout mode" />
+                        <LineBreak />
+                        <Run Text="Hotkey: Ctrl+Alt+Shift+L" />
+                    </TextBlock>
+                </ToolTip>
+            </Button.ToolTip>
             <Button.Style>
                 <Style TargetType="Button">
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="LauncherBorder"
-                                        CornerRadius="20"
+                                        CornerRadius="999"
                                         BorderThickness="{TemplateBinding BorderThickness}"
                                         BorderBrush="{TemplateBinding BorderBrush}"
                                         Background="{TemplateBinding Background}">
                                     <Grid>
                                         <Image x:Name="LauncherImage"
-                                               Width="18"
-                                               Height="18"
+                                               Width="22"
+                                               Height="22"
                                                Stretch="Uniform"
                                                Visibility="Collapsed"
                                                RenderOptions.BitmapScalingMode="HighQuality" />
