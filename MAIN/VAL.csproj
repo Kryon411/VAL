@@ -135,6 +135,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Remove="Icons\VAL.Logo.png" />
+    <Resource Include="Icons\VAL.Logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />

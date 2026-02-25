@@ -246,16 +246,16 @@ namespace VAL
 
         private void InitializeIcon()
         {
-            var pngPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL.Logo.png");
+            const string launcherPackUri = "pack://application:,,,/Icons/VAL.Logo.png";
             var icoPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico");
 
-            var imageSource = TryLoadPng(pngPath) as ImageSource;
+            ImageSource? imageSource = TryLoadPackPng(launcherPackUri);
             if (imageSource != null)
             {
                 LauncherImage.Source = imageSource;
                 LauncherImage.Visibility = Visibility.Visible;
                 LauncherFallbackText.Visibility = Visibility.Collapsed;
-                ValLog.Info(nameof(ControlCentreOverlay), $"Launcher icon source: PNG ({pngPath})");
+                ValLog.Info(nameof(ControlCentreOverlay), "Launcher icon source: PackResource PNG");
                 return;
             }
 
@@ -272,35 +272,30 @@ namespace VAL
             LauncherImage.Source = null;
             LauncherImage.Visibility = Visibility.Collapsed;
             LauncherFallbackText.Visibility = Visibility.Visible;
-            ValLog.Warn(nameof(ControlCentreOverlay), "Launcher icon source: fallback text 'CC' (PNG/ICO unavailable).");
+            ValLog.Warn(nameof(ControlCentreOverlay), "Launcher icon source: fallback text 'CC' (pack resource/ICO unavailable).");
         }
 
-        private static BitmapImage? TryLoadPng(string pngPath)
+        private static ImageSource? TryLoadPackPng(string packUri)
         {
             try
             {
-                if (!File.Exists(pngPath))
-                {
-                    return null;
-                }
-
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
                 bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
-                bitmap.UriSource = new Uri(pngPath, UriKind.Absolute);
+                bitmap.UriSource = new Uri(packUri, UriKind.Absolute);
                 bitmap.EndInit();
                 bitmap.Freeze();
                 return bitmap;
             }
             catch (Exception ex)
             {
-                ValLog.Warn(nameof(ControlCentreOverlay), $"Failed to load launcher PNG '{pngPath}': {ex.Message}");
+                ValLog.Warn(nameof(ControlCentreOverlay), $"Failed to load launcher pack PNG '{packUri}': {ex.Message}");
                 return null;
             }
         }
 
-        private static BitmapFrame? TryLoadIcon(string iconPath)
+        private static ImageSource? TryLoadIcon(string iconPath)
         {
             try
             {
@@ -314,8 +309,9 @@ namespace VAL
                 bitmap.Freeze();
                 return bitmap;
             }
-            catch
+            catch (Exception ex)
             {
+                ValLog.Warn(nameof(ControlCentreOverlay), $"Failed to load launcher ICO '{iconPath}': {ex.Message}");
                 return null;
             }
         }
