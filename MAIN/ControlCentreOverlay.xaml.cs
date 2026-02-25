@@ -249,7 +249,7 @@ namespace VAL
             const string launcherPackUri = "pack://application:,,,/Icons/VAL.Logo.png";
             var icoPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico");
 
-            var imageSource = TryLoadPackPng(launcherPackUri);
+            ImageSource? imageSource = TryLoadPackPng(launcherPackUri);
             if (imageSource != null)
             {
                 LauncherImage.Source = imageSource;
@@ -275,7 +275,7 @@ namespace VAL
             ValLog.Warn(nameof(ControlCentreOverlay), "Launcher icon source: fallback text 'CC' (pack resource/ICO unavailable).");
         }
 
-        private static BitmapImage? TryLoadPackPng(string packUri)
+        private static ImageSource? TryLoadPackPng(string packUri)
         {
             try
             {
@@ -295,7 +295,7 @@ namespace VAL
             }
         }
 
-        private static BitmapFrame? TryLoadIcon(string iconPath)
+        private static ImageSource? TryLoadIcon(string iconPath)
         {
             try
             {
