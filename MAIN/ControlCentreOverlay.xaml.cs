@@ -275,7 +275,7 @@ namespace VAL
             ValLog.Warn(nameof(ControlCentreOverlay), "Launcher icon source: fallback text 'CC' (pack resource/ICO unavailable).");
         }
 
-        private static ImageSource? TryLoadPackPng(string packUri)
+        private static BitmapImage? TryLoadPackPng(string packUri)
         {
             try
             {
@@ -295,7 +295,7 @@ namespace VAL
             }
         }
 
-        private static ImageSource? TryLoadIcon(string iconPath)
+        private static BitmapFrame? TryLoadIcon(string iconPath)
         {
             try
             {
