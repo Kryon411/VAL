@@ -19,23 +19,30 @@
         ShowActivated="False">
     <Window.Resources>
         <Style x:Key="LauncherToolTipStyle" TargetType="ToolTip">
-            <Setter Property="Background" Value="#F5020A14" />
-            <Setter Property="Foreground" Value="#B0EBF5FF" />
-            <Setter Property="BorderBrush" Value="#2E78B4" />
+            <Setter Property="Background" Value="#E3121E30" />
+            <Setter Property="Foreground" Value="#D8E6F2" />
+            <Setter Property="BorderBrush" Value="#5A6FA4D2" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Padding" Value="10,8" />
             <Setter Property="Placement" Value="Right" />
             <Setter Property="HasDropShadow" Value="False" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToolTip">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
+                        <Border BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12"
+                                CornerRadius="13"
                                 SnapsToDevicePixels="True">
-                            <ContentPresenter Margin="{TemplateBinding Padding}" />
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#EB17253A" Offset="0" />
+                                    <GradientStop Color="#DD111B2B" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
+                                              TextElement.FontSize="{TemplateBinding FontSize}" />
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -64,7 +71,7 @@
                 FocusVisualStyle="{x:Null}">
             <Button.ToolTip>
                 <ToolTip Style="{StaticResource LauncherToolTipStyle}">
-                    <TextBlock TextWrapping="Wrap" MaxWidth="200" LineHeight="15">
+                    <TextBlock TextWrapping="Wrap" MaxWidth="200" LineHeight="14">
                         <Run Text="Control Centre" />
                         <LineBreak />
                         <Run Text="Right-click: Toggle layout mode" />
@@ -90,11 +97,14 @@
                                         <Setter TargetName="LauncherBorder" Property="Effect" Value="{x:Null}" />
                                     </Trigger>
                                     <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="Transparent" />
                                         <Setter TargetName="LauncherBorder" Property="Background" Value="Transparent" />
+                                        <Setter TargetName="LauncherBorder" Property="Effect" Value="{x:Null}" />
                                     </Trigger>
                                     <Trigger Property="IsKeyboardFocused" Value="True">
                                         <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="Transparent" />
                                         <Setter TargetName="LauncherBorder" Property="Background" Value="Transparent" />
+                                        <Setter TargetName="LauncherBorder" Property="Effect" Value="{x:Null}" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -109,8 +119,8 @@
               HorizontalAlignment="Center"
               VerticalAlignment="Center">
             <Image x:Name="LauncherImage"
-                   Width="27"
-                   Height="27"
+                   Width="30"
+                   Height="30"
                    Stretch="Uniform"
                    Visibility="Collapsed"
                    SnapsToDevicePixels="True"
