@@ -19,12 +19,27 @@
         ShowActivated="False">
     <Window.Resources>
         <Style x:Key="LauncherToolTipStyle" TargetType="ToolTip">
-            <Setter Property="Background" Value="#1A2436" />
-            <Setter Property="Foreground" Value="#E8F4FF" />
-            <Setter Property="BorderBrush" Value="#4A6488" />
+            <Setter Property="Background" Value="#F5020A14" />
+            <Setter Property="Foreground" Value="#B0EBF5FF" />
+            <Setter Property="BorderBrush" Value="#2E78B4" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="8,6" />
             <Setter Property="Placement" Value="Right" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter Margin="{TemplateBinding Padding}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -36,9 +51,9 @@
                 Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}"
                 AutomationProperties.Name="Control Centre"
                 Cursor="Hand"
-                BorderThickness="0.4"
-                BorderBrush="#16344966"
-                Background="#04000000"
+                BorderThickness="0"
+                BorderBrush="Transparent"
+                Background="Transparent"
                 Foreground="#E8F4FF"
                 Padding="0"
                 Click="LauncherButton_Click"
@@ -49,7 +64,7 @@
                 FocusVisualStyle="{x:Null}">
             <Button.ToolTip>
                 <ToolTip Style="{StaticResource LauncherToolTipStyle}">
-                    <TextBlock TextWrapping="Wrap" MaxWidth="220">
+                    <TextBlock TextWrapping="Wrap" MaxWidth="200" LineHeight="15">
                         <Run Text="Control Centre" />
                         <LineBreak />
                         <Run Text="Right-click: Toggle layout mode" />
@@ -70,23 +85,16 @@
                                         Background="{TemplateBinding Background}" />
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#4A698DB2" />
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#10192A" />
-                                        <Setter TargetName="LauncherBorder" Property="Effect">
-                                            <Setter.Value>
-                                                <DropShadowEffect BlurRadius="8"
-                                                                  ShadowDepth="0"
-                                                                  Color="#69A6DF"
-                                                                  Opacity="0.10" />
-                                            </Setter.Value>
-                                        </Setter>
+                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="Transparent" />
+                                        <Setter TargetName="LauncherBorder" Property="Background" Value="Transparent" />
+                                        <Setter TargetName="LauncherBorder" Property="Effect" Value="{x:Null}" />
                                     </Trigger>
                                     <Trigger Property="IsPressed" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#141F31" />
+                                        <Setter TargetName="LauncherBorder" Property="Background" Value="Transparent" />
                                     </Trigger>
                                     <Trigger Property="IsKeyboardFocused" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#5F83A9CC" />
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#0B1523" />
+                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="Transparent" />
+                                        <Setter TargetName="LauncherBorder" Property="Background" Value="Transparent" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -101,8 +109,8 @@
               HorizontalAlignment="Center"
               VerticalAlignment="Center">
             <Image x:Name="LauncherImage"
-                   Width="24"
-                   Height="24"
+                   Width="27"
+                   Height="27"
                    Stretch="Uniform"
                    Visibility="Collapsed"
                    SnapsToDevicePixels="True"
