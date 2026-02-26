@@ -36,9 +36,9 @@
                 Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}"
                 AutomationProperties.Name="Control Centre"
                 Cursor="Hand"
-                BorderThickness="0.8"
-                BorderBrush="#2E4357"
-                Background="#0E1622"
+                BorderThickness="0.4"
+                BorderBrush="#16344966"
+                Background="#04000000"
                 Foreground="#E8F4FF"
                 Padding="0"
                 Click="LauncherButton_Click"
@@ -70,22 +70,23 @@
                                         Background="{TemplateBinding Background}" />
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#4B6989" />
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#132031" />
+                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#4A698DB2" />
+                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#10192A" />
                                         <Setter TargetName="LauncherBorder" Property="Effect">
                                             <Setter.Value>
                                                 <DropShadowEffect BlurRadius="8"
                                                                   ShadowDepth="0"
                                                                   Color="#69A6DF"
-                                                                  Opacity="0.14" />
+                                                                  Opacity="0.10" />
                                             </Setter.Value>
                                         </Setter>
                                     </Trigger>
                                     <Trigger Property="IsPressed" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#0A121D" />
+                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#141F31" />
                                     </Trigger>
                                     <Trigger Property="IsKeyboardFocused" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#5E7EA1" />
+                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="#5F83A9CC" />
+                                        <Setter TargetName="LauncherBorder" Property="Background" Value="#0B1523" />
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -100,8 +101,8 @@
               HorizontalAlignment="Center"
               VerticalAlignment="Center">
             <Image x:Name="LauncherImage"
-                   Width="20"
-                   Height="20"
+                   Width="24"
+                   Height="24"
                    Stretch="Uniform"
                    Visibility="Collapsed"
                    SnapsToDevicePixels="True"
