@@ -102,6 +102,7 @@ namespace VAL
 
             _webViewRuntime.WebMessageJsonReceived += _viewModel.HandleWebMessageJson;
             _webViewRuntime.WebMessageJsonReceived += HandleWebMessageForDockState;
+            _webViewRuntime.NavigationCompleted += WebViewRuntime_NavigationCompleted;
         }
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -147,6 +148,7 @@ namespace VAL
         {
             _webViewRuntime.WebMessageJsonReceived -= _viewModel.HandleWebMessageJson;
             _webViewRuntime.WebMessageJsonReceived -= HandleWebMessageForDockState;
+            _webViewRuntime.NavigationCompleted -= WebViewRuntime_NavigationCompleted;
 
             UnregisterLayoutHotKey();
 
@@ -495,6 +497,35 @@ namespace VAL
             {
                 ClampOverlayToVirtualScreen();
             }
+        }
+
+        private void WebViewRuntime_NavigationCompleted()
+        {
+            _ = Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    if (WindowState == WindowState.Minimized)
+                    {
+                        return;
+                    }
+
+                    ShowControlCentreOverlayIfNeeded();
+
+                    if (_ccOverlay != null && IsActive)
+                    {
+                        _ccOverlay.Topmost = true;
+                        _ccOverlay.Topmost = false;
+                    }
+
+                    _dockInitStateTimer.Stop();
+                    _dockInitStateTimer.Start();
+                }
+                catch
+                {
+                    ValLog.Warn("MainWindow", "Failed to refresh overlay state after navigation.");
+                }
+            });
         }
 
         private void MainWindow_LocationChanged(object? sender, EventArgs e)

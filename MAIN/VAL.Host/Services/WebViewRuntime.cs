@@ -274,27 +274,27 @@ namespace VAL.Host.Services
                 return;
             }
 
-            var core = Core;
             try
             {
-                if (core == null)
+                e.Handled = true;
+
+                var uri = e.Uri;
+                if (string.IsNullOrWhiteSpace(uri))
+                    return;
+
+                if (!WebOriginPolicy.TryIsNavigationAllowed(uri, out _))
                 {
-                    e.Handled = true;
+                    LogBlockedNavigation(uri);
                     return;
                 }
 
-                e.NewWindow = core;
-                e.Handled = true;
+                Core?.Navigate(uri);
             }
             catch
             {
                 try
                 {
                     e.Handled = true;
-
-                    var uri = e.Uri;
-                    if (!string.IsNullOrWhiteSpace(uri))
-                        core?.Navigate(uri);
                 }
                 catch
                 {
