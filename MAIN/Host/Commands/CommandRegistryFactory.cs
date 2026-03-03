@@ -269,23 +269,18 @@ namespace VAL.Host
             ));
 
             // ---- Navigation ----
-            // Deprecated/fenced: keep registered so host rejection is explicit and diagnosable.
             registry.Register(new CommandSpec(
                 WebCommandNames.NavCommandGoChat,
                 "Navigation",
                 Array.Empty<string>(),
-                handleNavigationGoChat,
-                IsDeprecated: true,
-                DeprecationReason: "Navigation command is deprecated in host command spine and intentionally fenced."
+                handleNavigationGoChat
             ));
 
             registry.Register(new CommandSpec(
                 WebCommandNames.NavCommandGoBack,
                 "Navigation",
                 Array.Empty<string>(),
-                handleNavigationGoBack,
-                IsDeprecated: true,
-                DeprecationReason: "Navigation command is deprecated in host command spine and intentionally fenced."
+                handleNavigationGoBack
             ));
 
             // ---- Dock ----
