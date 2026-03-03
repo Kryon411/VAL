@@ -23,7 +23,7 @@ namespace VAL.Tests.Commands
         }
 
         [Fact]
-        public void RegisterCommandsFencesDeprecatedNavigationCommand()
+        public void RegisterCommandsAcceptsNavigationCommand()
         {
             var registry = new CommandRegistry();
             RegisterAllCommands(registry);
@@ -33,8 +33,8 @@ namespace VAL.Tests.Commands
 
             var result = registry.Dispatch(command);
 
-            Assert.Equal(CommandDispatchStatus.RejectedDeprecated, result.Status);
-            Assert.Contains("deprecated", result.Detail, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(CommandDispatchStatus.Accepted, result.Status);
+            Assert.True(result.IsAccepted);
         }
 
         private static void RegisterAllCommands(CommandRegistry registry)
