@@ -5,6 +5,7 @@ using VAL.Host.Commands;
 using VAL.Host.Options;
 using VAL.Host.Security;
 using VAL.Host.Services;
+using VAL.Host.Startup;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Hosting
@@ -16,8 +17,40 @@ namespace VAL.Host.Hosting
             IConfiguration configuration,
             Action<ValHostBuilder>? configure = null)
         {
+            return AddValHostCore(services, configuration, configure, configureServices: null);
+        }
+
+        public static IServiceCollection AddValHost(
+            this IServiceCollection services,
+            IConfiguration configuration,
+            StartupOptions startupOptions,
+            SmokeTestSettings smokeSettings,
+            Action<ValHostBuilder>? configure = null)
+        {
+            ArgumentNullException.ThrowIfNull(startupOptions);
+            ArgumentNullException.ThrowIfNull(smokeSettings);
+
+            return AddValHostCore(
+                services,
+                configuration,
+                configure,
+                configureServices: serviceCollection =>
+                {
+                    serviceCollection.AddSingleton(smokeSettings);
+                    serviceCollection.AddSingleton<SmokeTestState>();
+                    serviceCollection.AddSingleton(startupOptions);
+                });
+        }
+
+        private static IServiceCollection AddValHostCore(
+            IServiceCollection services,
+            IConfiguration configuration,
+            Action<ValHostBuilder>? configure,
+            Action<IServiceCollection>? configureServices)
+        {
             var builder = new ValHostBuilder(services, configuration);
             configure?.Invoke(builder);
+            configureServices?.Invoke(services);
 
             services.AddOptions<ValOptions>()
                 .Bind(configuration.GetSection(ValOptions.SectionName))
