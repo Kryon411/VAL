@@ -1,16 +1,17 @@
 using System;
 using System.IO;
-using VAL.Host.Portal;
 
 namespace VAL.Host.Services
 {
     public sealed class DataWipeService : IDataWipeService
     {
         private readonly IAppPaths _appPaths;
+        private readonly IPortalRuntimeStateManager _portalRuntimeStateManager;
 
-        public DataWipeService(IAppPaths appPaths)
+        public DataWipeService(IAppPaths appPaths, IPortalRuntimeStateManager portalRuntimeStateManager)
         {
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
+            _portalRuntimeStateManager = portalRuntimeStateManager ?? throw new ArgumentNullException(nameof(portalRuntimeStateManager));
         }
 
         public DataWipeResult WipeData()
@@ -29,7 +30,7 @@ namespace VAL.Host.Services
 
             try
             {
-                PortalRuntime.ClearStaging();
+                _portalRuntimeStateManager.ClearStaging();
             }
             catch
             {
