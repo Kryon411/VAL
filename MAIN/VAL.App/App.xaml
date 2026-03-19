@@ -4,7 +4,7 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/VAL;component/UI/VALWindowTheme.xaml" />
+                <ResourceDictionary Source="/VAL.App;component/UI/VALWindowTheme.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

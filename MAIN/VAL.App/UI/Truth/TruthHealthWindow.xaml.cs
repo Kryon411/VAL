@@ -5,10 +5,10 @@ namespace VAL.UI.Truth
 {
     public partial class TruthHealthWindow : Window
     {
-        public TruthHealthWindow()
+        public TruthHealthWindow(ITruthHealthReportService reportService)
         {
             InitializeComponent();
-            DataContext = new TruthHealthViewModel(new TruthHealthReportService());
+            DataContext = new TruthHealthViewModel(reportService);
         }
     }
 }

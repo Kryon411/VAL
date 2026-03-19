@@ -24,7 +24,7 @@ namespace VAL
         private readonly MainWindowViewModel _viewModel;
         private readonly WebViewOptions _webViewOptions;
         private readonly StartupOptions _startupOptions;
-        private readonly StartupCrashGuard _startupCrashGuard;
+        private readonly IStartupCrashGuard _startupCrashGuard;
         private readonly DispatcherTimer _persistTimer;
         private readonly DispatcherTimer _dockInitStateTimer;
 
@@ -68,7 +68,7 @@ namespace VAL
             MainWindowViewModel viewModel,
             IOptions<WebViewOptions> webViewOptions,
             StartupOptions startupOptions,
-            StartupCrashGuard startupCrashGuard)
+            IStartupCrashGuard startupCrashGuard)
         {
             _toastService = toastService;
             _webViewRuntime = webViewRuntime;

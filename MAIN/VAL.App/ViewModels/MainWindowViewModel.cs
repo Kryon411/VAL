@@ -14,7 +14,7 @@ namespace VAL.ViewModels
     public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         private readonly IOperationCoordinator _operationCoordinator;
-        private readonly ICommandDispatcher _commandDispatcher;
+        private readonly HostCommandRouter _commandRouter;
         private readonly IPortalRuntimeService _portalRuntimeService;
         private readonly IModuleRuntimeService _moduleRuntimeService;
         private readonly IContinuumPump _continuumPump;
@@ -31,7 +31,7 @@ namespace VAL.ViewModels
 
         public MainWindowViewModel(
             IOperationCoordinator operationCoordinator,
-            ICommandDispatcher commandDispatcher,
+            HostCommandRouter commandRouter,
             IPortalRuntimeService portalRuntimeService,
             IModuleRuntimeService moduleRuntimeService,
             IContinuumPump continuumPump,
@@ -42,7 +42,7 @@ namespace VAL.ViewModels
             StartupOptions startupOptions)
         {
             _operationCoordinator = operationCoordinator;
-            _commandDispatcher = commandDispatcher;
+            _commandRouter = commandRouter;
             _portalRuntimeService = portalRuntimeService;
             _moduleRuntimeService = moduleRuntimeService;
             _continuumPump = continuumPump;
@@ -132,7 +132,7 @@ namespace VAL.ViewModels
         {
             try
             {
-                var result = _commandDispatcher.HandleWebMessageJson(envelope);
+                var result = _commandRouter.HandleWebMessage(envelope);
                 HandleCommandResult(result);
             }
             catch

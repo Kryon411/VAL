@@ -57,6 +57,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="VAL.App\VAL.App.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="VAL.Host\VAL.Host.csproj" />
   </ItemGroup>
 

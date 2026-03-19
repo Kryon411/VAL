@@ -14,7 +14,7 @@ namespace VAL;
 public partial class App : Application
 {
     private static readonly Uri ThemeDictionaryUri =
-        new("pack://application:,,,/VAL;component/UI/VALWindowTheme.xaml", UriKind.Absolute);
+        new("pack://application:,,,/VAL.App;component/UI/VALWindowTheme.xaml", UriKind.Absolute);
 
     private readonly IServiceProvider _services;
 

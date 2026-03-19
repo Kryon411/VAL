@@ -246,7 +246,7 @@ namespace VAL
 
         private void InitializeIcon()
         {
-            const string launcherPackUri = "pack://application:,,,/Icons/VAL.Logo.png";
+            const string launcherPackUri = "pack://application:,,,/VAL;component/Icons/VAL.Logo.png";
             var icoPath = Path.Combine(AppContext.BaseDirectory, "Icons", "VAL_Blue_Lens.ico");
 
             ImageSource? imageSource = TryLoadPackPng(launcherPackUri);

@@ -4,6 +4,7 @@ using VAL.Continuum.Pipeline.Truth;
 using VAL.Host;
 using VAL.Host.Logging;
 using VAL.Host.Security;
+using ContinuumTruthHealthReport = VAL.Continuum.Pipeline.Truth.TruthHealthReport;
 
 namespace VAL.Host.Services
 {
@@ -73,7 +74,7 @@ namespace VAL.Host.Services
                         Reports: reports);
                 }
 
-                var report = TruthHealth.Build(chatId, truthPath, repairLogPath, repairTailFirst: false);
+                var report = ToSnapshotReport(TruthHealth.Build(chatId, truthPath, repairLogPath, repairTailFirst: false));
                 var isLargeLog = report.Bytes > WarnMb * 1024L * 1024L;
                 var snapshot = new TruthHealthSnapshot(report, relativePath, isLargeLog);
 
@@ -119,7 +120,7 @@ namespace VAL.Host.Services
 
                     var truthPath = Path.Combine(chatDir, TruthStorage.TruthFileName);
                     var repairLogPath = Path.Combine(chatDir, "Truth.repair.log");
-                    var report = TruthHealth.Build(chatId, truthPath, repairLogPath, repairTailFirst: false);
+                    var report = ToSnapshotReport(TruthHealth.Build(chatId, truthPath, repairLogPath, repairTailFirst: false));
                     var relativePath = Path.Combine("Memory", "Chats", chatId, TruthStorage.TruthFileName);
                     var isLargeLog = report.Bytes > WarnMb * 1024L * 1024L;
                     reports.Add(new TruthHealthSnapshot(report, relativePath, isLargeLog));
@@ -182,6 +183,18 @@ namespace VAL.Host.Services
                 return;
 
             ValLog.Warn(nameof(TruthHealthReportService), "Truth health report generation failed.");
+        }
+
+        private static TruthHealthReport ToSnapshotReport(ContinuumTruthHealthReport report)
+        {
+            return new TruthHealthReport(
+                report.ChatId,
+                report.Bytes,
+                report.PhysicalLineCount,
+                report.ParsedEntryCount,
+                report.LastParsedPhysicalLineNumber,
+                report.LastRepairUtc,
+                report.LastRepairBytesRemoved);
         }
     }
 }

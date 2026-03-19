@@ -6,7 +6,7 @@ using VAL.Host.Hosting;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
 using VAL.Host.Startup;
-using VAL.ViewModels;
+using VAL.Hosting;
 
 namespace VAL.Host
 {
@@ -89,14 +89,9 @@ namespace VAL.Host
             builder.Services.AddSingleton<IContinuumPump, ContinuumPump>();
             builder.Services.AddSingleton<SmokeTestRunner>();
             builder.Services.AddSingleton(crashGuard);
+            builder.Services.AddSingleton<IStartupCrashGuard>(crashGuard);
 
-            builder.Services.AddTransient<DiagnosticsViewModel>();
-            builder.Services.AddTransient<DiagnosticsWindow>();
-            builder.Services.AddTransient<UI.Truth.TruthHealthViewModel>();
-            builder.Services.AddTransient<UI.Truth.TruthHealthWindow>();
-            builder.Services.AddSingleton<MainWindowViewModel>();
-            builder.Services.AddSingleton<MainWindow>();
-            builder.Services.AddSingleton<App>();
+            builder.Services.AddValAppShell();
         }
     }
 }

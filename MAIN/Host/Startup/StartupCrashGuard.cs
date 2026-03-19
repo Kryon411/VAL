@@ -9,7 +9,7 @@ using VAL.Host.Logging;
 
 namespace VAL.Host.Startup
 {
-    public sealed class StartupCrashGuard
+    public sealed class StartupCrashGuard : IStartupCrashGuard
     {
         private const string Category = "StartupCrashGuard";
         private const int CrashThreshold = 2;
