@@ -18,5 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VAL.Contracts\VAL.Contracts.csproj" />
+    <ProjectReference Include="..\VAL.Truth\VAL.Truth.csproj" />
   </ItemGroup>
 </Project>

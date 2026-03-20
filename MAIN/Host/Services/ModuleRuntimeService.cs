@@ -96,7 +96,7 @@ namespace VAL.Host.Services
                 _modulesInitializedForCore = core;
 
                 ContinuumHost.PostToWebMessage = _webMessageSender.Send;
-                AbyssRuntime.Initialize(_webMessageSender);
+                AbyssRuntime.Initialize(_webMessageSender, AbyssToastBridge.Show);
                 SendPrivacySettings();
             }
             catch (System.Exception ex)

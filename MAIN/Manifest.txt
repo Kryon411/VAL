@@ -19,8 +19,7 @@ MAIN/appsettings.json
 MAIN/Dock/Dock.main.js
 MAIN/Dock/Dock.module.json
 MAIN/Dock/Dock.styles.css
-MAIN/Host/Abyss/AbyssRuntime.cs
-MAIN/Host/Abyss/AbyssSearch.cs
+MAIN/Host/Abyss/AbyssToastBridge.cs
 MAIN/Host/Commands/AbyssCommandHandlers.cs
 MAIN/Host/Commands/CommandDiagnosticsReporter.cs
 MAIN/Host/Commands/CommandRegistryFactory.cs
@@ -34,7 +33,6 @@ MAIN/Host/Commands/ToolsCommandHandlers.cs
 MAIN/Host/Commands/VoidCommandHandlers.cs
 MAIN/Host/IToastHub.cs
 MAIN/Host/OperationCoordinator.cs
-MAIN/Host/Security/SafePathResolver.cs
 MAIN/Host/Services/Adapters/CommandDispatcherAdapter.cs
 MAIN/Host/Services/Adapters/ModuleLoaderAdapter.cs
 MAIN/Host/Services/Adapters/OperationCoordinatorAdapter.cs
@@ -111,6 +109,11 @@ MAIN/Tools/TruthDoctor/Program.cs
 MAIN/Tools/TruthDoctor/TruthDoctor.csproj
 MAIN/Tools/TruthStress/Program.cs
 MAIN/Tools/TruthStress/TruthStress.csproj
+MAIN/VAL.Abyss/AbyssRuntime.cs
+MAIN/VAL.Abyss/AbyssSearch.cs
+MAIN/VAL.Abyss/AbyssToastRequest.cs
+MAIN/VAL.Abyss/Properties/InternalsVisibleTo.cs
+MAIN/VAL.Abyss/VAL.Abyss.csproj
 MAIN/VAL.App/App.xaml
 MAIN/VAL.App/App.xaml.cs
 MAIN/VAL.App/ControlCentreOverlay.xaml
@@ -163,6 +166,7 @@ MAIN/VAL.Host/Options/ValOptions.cs
 MAIN/VAL.Host/Options/WebViewOptions.cs
 MAIN/VAL.Host/Portal/PortalRuntime.cs
 MAIN/VAL.Host/Portal/PortalStaging.cs
+MAIN/VAL.Host/Security/SafePathResolver.cs
 MAIN/VAL.Host/Security/WebCommandRegistry.cs
 MAIN/VAL.Host/Security/WebMessageOriginGuard.cs
 MAIN/VAL.Host/Security/WebMessageType.cs

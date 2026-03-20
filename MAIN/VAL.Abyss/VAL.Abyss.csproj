@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>VAL.Abyss</AssemblyName>
+    <RootNamespace>VAL.Abyss</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VAL.Contracts\VAL.Contracts.csproj" />
+    <ProjectReference Include="..\VAL.Host\VAL.Host.csproj" />
+    <ProjectReference Include="..\VAL.Truth\VAL.Truth.csproj" />
+  </ItemGroup>
+</Project>

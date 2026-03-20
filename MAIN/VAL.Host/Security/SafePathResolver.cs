@@ -4,7 +4,7 @@ using VAL.Continuum.Pipeline.Truth;
 
 namespace VAL.Host.Security
 {
-    internal static class SafePathResolver
+    public static class SafePathResolver
     {
         public static bool TryResolveChatTruthPath(string productRoot, string chatId, out string truthPath, out string chatDir)
         {

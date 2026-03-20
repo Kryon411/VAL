@@ -35,6 +35,7 @@
   <ItemGroup>
     <Compile Remove="VAL.Tests\**\*.cs" />
     <Compile Remove="VAL.App\**\*.cs" />
+    <Compile Remove="VAL.Abyss\**\*.cs" />
     <Compile Remove="VAL.Host\**\*.cs" />
     <Compile Remove="VAL.Truth\**\*.cs" />
     <Compile Remove="VAL.Contracts\**\*.cs" />
@@ -59,6 +60,10 @@
 
   <ItemGroup>
     <ProjectReference Include="VAL.App\VAL.App.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="VAL.Abyss\VAL.Abyss.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -150,6 +155,7 @@
 
   <ItemGroup>
     <ApplicationDefinition Remove="VAL.App\**\*.xaml" />
+    <ApplicationDefinition Remove="VAL.Abyss\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Host\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Truth\**\*.xaml" />
     <ApplicationDefinition Remove="VAL.Contracts\**\*.xaml" />
@@ -159,30 +165,35 @@
 
   <ItemGroup>
     <Page Remove="VAL.App\**\*.xaml" />
+    <Page Remove="VAL.Abyss\**\*.xaml" />
     <Page Remove="VAL.Host\**\*.xaml" />
     <Page Remove="VAL.Truth\**\*.xaml" />
     <Page Remove="VAL.Contracts\**\*.xaml" />
     <Page Remove="VAL.Tests\**\*.xaml" />
     <Page Remove="VAL.Tools\**\*.xaml" />
     <Resource Remove="VAL.App\**\*.xaml" />
+    <Resource Remove="VAL.Abyss\**\*.xaml" />
     <Resource Remove="VAL.Host\**\*.xaml" />
     <Resource Remove="VAL.Truth\**\*.xaml" />
     <Resource Remove="VAL.Contracts\**\*.xaml" />
     <Resource Remove="VAL.Tests\**\*.xaml" />
     <Resource Remove="VAL.Tools\**\*.xaml" />
     <EmbeddedResource Remove="VAL.App\**\*.xaml" />
+    <EmbeddedResource Remove="VAL.Abyss\**\*.xaml" />
     <EmbeddedResource Remove="VAL.Host\**\*.xaml" />
     <EmbeddedResource Remove="VAL.Truth\**\*.xaml" />
     <EmbeddedResource Remove="VAL.Contracts\**\*.xaml" />
     <EmbeddedResource Remove="VAL.Tests\**\*.xaml" />
     <EmbeddedResource Remove="VAL.Tools\**\*.xaml" />
     <Content Remove="VAL.App\**\*.xaml" />
+    <Content Remove="VAL.Abyss\**\*.xaml" />
     <Content Remove="VAL.Host\**\*.xaml" />
     <Content Remove="VAL.Truth\**\*.xaml" />
     <Content Remove="VAL.Contracts\**\*.xaml" />
     <Content Remove="VAL.Tests\**\*.xaml" />
     <Content Remove="VAL.Tools\**\*.xaml" />
     <None Remove="VAL.App\**\*.xaml" />
+    <None Remove="VAL.Abyss\**\*.xaml" />
     <None Remove="VAL.Host\**\*.xaml" />
     <None Remove="VAL.Truth\**\*.xaml" />
     <None Remove="VAL.Contracts\**\*.xaml" />
@@ -194,6 +205,7 @@
     <Content Remove="Tools\**\*" />
     <Content Remove="VAL.Tests\**\*" />
     <Content Remove="VAL.App\**\*" />
+    <Content Remove="VAL.Abyss\**\*" />
     <Content Remove="VAL.Host\**\*" />
     <Content Remove="VAL.Truth\**\*" />
     <Content Remove="VAL.Contracts\**\*" />
@@ -201,11 +213,13 @@
     <None Remove="Tools\**\*" />
     <None Remove="VAL.Tests\**\*" />
     <None Remove="VAL.App\**\*" />
+    <None Remove="VAL.Abyss\**\*" />
     <None Remove="VAL.Host\**\*" />
     <None Remove="VAL.Truth\**\*" />
     <None Remove="VAL.Contracts\**\*" />
     <None Remove="VAL.Tools\**\*" />
     <Page Remove="VAL.App\**\*" />
+    <Page Remove="VAL.Abyss\**\*" />
     <Page Remove="VAL.Host\**\*" />
     <Page Remove="VAL.Truth\**\*" />
     <Page Remove="VAL.Contracts\**\*" />

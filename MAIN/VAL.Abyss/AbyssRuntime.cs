@@ -21,15 +21,17 @@ namespace VAL.Host.Abyss
         private static readonly int[] DefaultInjectIndices = { 1 };
         private static readonly string[] SnippetLineSeparators = { "\r\n", "\n" };
         private static IWebMessageSender? _messageSender;
+        private static Action<AbyssToastRequest>? _toastSink;
         private static List<AbyssSearchResult> _lastResults = new();
         private static string? _lastQuery;
         private static string? _lastQueryOriginal;
         private static string? _lastGeneratedUtc;
         private static CancellationTokenSource? _searchCts;
 
-        public static void Initialize(IWebMessageSender messageSender)
+        public static void Initialize(IWebMessageSender messageSender, Action<AbyssToastRequest>? toastSink = null)
         {
             _messageSender = messageSender;
+            _toastSink = toastSink;
         }
 
         public static void InjectPrompt(string? chatId)
@@ -42,12 +44,12 @@ namespace VAL.Host.Abyss
         {
             if (string.IsNullOrWhiteSpace(query))
             {
-                ToastHub.TryShow(ToastKey.AbyssNoQuery, chatId: chatId);
+                ShowToast(AbyssToastKind.NoQuery, chatId);
                 return;
             }
 
             maxResults = Math.Max(1, Math.Min(4, maxResults));
-            ToastHub.TryShow(ToastKey.AbyssSearching, chatId: chatId);
+            ShowToast(AbyssToastKind.Searching, chatId);
 
             var token = BeginSearchCancellation();
 
@@ -60,7 +62,7 @@ namespace VAL.Host.Abyss
                     if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                     {
                         ClearLastResults();
-                        ToastHub.TryShow(ToastKey.AbyssNoTruthLogs, chatId: chatId);
+                        ShowToast(AbyssToastKind.NoTruthLogs, chatId);
                         EmitResults(chatId);
                         return;
                     }
@@ -77,19 +79,16 @@ namespace VAL.Host.Abyss
 
                     if (results.Count == 0)
                     {
-                        ToastHub.TryShow(ToastKey.AbyssNoMatches, chatId: chatId);
+                        ShowToast(AbyssToastKind.NoMatches, chatId);
                     }
                     else
                     {
-                        ToastHub.TryShow(
-                            ToastKey.AbyssMatches,
-                            chatId: chatId,
-                            titleOverride: $"Abyss: {results.Count} matches");
+                        ShowToast(AbyssToastKind.Matches, chatId, $"Abyss: {results.Count} matches");
                     }
 
                     var resultsPath = WriteResultsFile(chatId, query, results);
                     if (!string.IsNullOrWhiteSpace(resultsPath))
-                        ToastHub.TryShow(ToastKey.AbyssResultsWritten, chatId: chatId);
+                        ShowToast(AbyssToastKind.ResultsWritten, chatId);
 
                     EmitResults(chatId);
                 }
@@ -113,7 +112,7 @@ namespace VAL.Host.Abyss
 
             if (string.IsNullOrWhiteSpace(query))
             {
-                ToastHub.TryShow(ToastKey.AbyssNoQuery, chatId: chatId);
+                ShowToast(AbyssToastKind.NoQuery, chatId);
                 return;
             }
 
@@ -122,7 +121,7 @@ namespace VAL.Host.Abyss
 
         public static void FetchLast(string? chatId, int count, bool inject)
         {
-            ToastHub.TryShow(ToastKey.AbyssSearching, chatId: chatId);
+            ShowToast(AbyssToastKind.Searching, chatId);
 
             Task.Run(() =>
             {
@@ -131,7 +130,7 @@ namespace VAL.Host.Abyss
                 if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 {
                     ClearLastResults();
-                    ToastHub.TryShow(ToastKey.AbyssNoTruthLogs, chatId: chatId);
+                    ShowToast(AbyssToastKind.NoTruthLogs, chatId);
                     EmitResults(chatId);
                     return;
                 }
@@ -147,19 +146,16 @@ namespace VAL.Host.Abyss
                 if (results.Count == 0)
                 {
                     ClearLastResults();
-                    ToastHub.TryShow(ToastKey.AbyssNoMatches, chatId: chatId);
+                    ShowToast(AbyssToastKind.NoMatches, chatId);
                     EmitResults(chatId);
                     return;
                 }
 
-                ToastHub.TryShow(
-                    ToastKey.AbyssMatches,
-                    chatId: chatId,
-                    titleOverride: $"Abyss: {results.Count} matches");
+                ShowToast(AbyssToastKind.Matches, chatId, $"Abyss: {results.Count} matches");
 
                 var resultsPath = WriteResultsFile(chatId, "(Last)", results);
                 if (!string.IsNullOrWhiteSpace(resultsPath))
-                    ToastHub.TryShow(ToastKey.AbyssResultsWritten, chatId: chatId);
+                    ShowToast(AbyssToastKind.ResultsWritten, chatId);
 
                 EmitResults(chatId);
 
@@ -174,14 +170,14 @@ namespace VAL.Host.Abyss
         {
             if (indices == null || indices.Count == 0)
             {
-                ToastHub.TryShow(ToastKey.AbyssNoSelection, chatId: chatId);
+                ShowToast(AbyssToastKind.NoSelection, chatId);
                 return;
             }
 
             var first = indices[0];
             if (first <= 0)
             {
-                ToastHub.TryShow(ToastKey.AbyssNoSelection, chatId: chatId);
+                ShowToast(AbyssToastKind.NoSelection, chatId);
                 return;
             }
 
@@ -198,7 +194,7 @@ namespace VAL.Host.Abyss
 
             if (snapshot.Count == 0)
             {
-                ToastHub.TryShow(ToastKey.AbyssNoMatches, chatId: chatId);
+                ShowToast(AbyssToastKind.NoMatches, chatId);
                 return;
             }
 
@@ -226,17 +222,14 @@ namespace VAL.Host.Abyss
 
             if (selected == null)
             {
-                ToastHub.TryShow(ToastKey.AbyssNoSelection, chatId: chatId);
+                ShowToast(AbyssToastKind.NoSelection, chatId);
                 return;
             }
 
             var payload = BuildInjectPayload(selected, _lastQueryOriginal ?? _lastQuery ?? string.Empty);
             SendInjectText(payload, chatId);
 
-            ToastHub.TryShow(
-                ToastKey.AbyssInjected,
-                chatId: chatId,
-                titleOverride: "Abyss: injected result");
+            ShowToast(AbyssToastKind.Injected, chatId, "Abyss: injected result");
         }
 
         public static void EmitResults(string? chatId)
@@ -283,7 +276,7 @@ namespace VAL.Host.Abyss
                 // ignore
             }
 
-            ToastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: true);
+            ShowToast(AbyssToastKind.ActionUnavailable, chatId, bypassLaunchQuiet: true);
         }
 
         private static void SendInjectText(string text, string? chatId)
@@ -503,6 +496,15 @@ namespace VAL.Host.Abyss
             {
                 _lastResults = new List<AbyssSearchResult>();
             }
+        }
+
+        private static void ShowToast(
+            AbyssToastKind kind,
+            string? chatId = null,
+            string? titleOverride = null,
+            bool bypassLaunchQuiet = false)
+        {
+            _toastSink?.Invoke(new AbyssToastRequest(kind, chatId, titleOverride, bypassLaunchQuiet));
         }
 
         private static void SendEnvelope(string type, string name, object payload, string? chatId = null)
