@@ -30,6 +30,8 @@ namespace TruthDoctor
 
     internal static class Program
     {
+        private static readonly JsonSerializerOptions IndentedJsonSerializerOptions = new() { WriteIndented = true };
+
         private static int Main(string[] args)
         {
             if (!TryParseArgs(args, out var options, out var error))
@@ -141,7 +143,7 @@ namespace TruthDoctor
                 options.CompactLines,
                 DateTime.UtcNow);
 
-            var json = JsonSerializer.Serialize(meta, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(meta, IndentedJsonSerializerOptions);
             File.WriteAllText(metaPath, json, encoding);
         }
 
@@ -157,14 +159,14 @@ namespace TruthDoctor
                 Reports = reports
             };
 
-            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(payload, IndentedJsonSerializerOptions);
             File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         }
 
-        private static IEnumerable<string> ResolveChatIds(string root, string? chatId)
+        private static string[] ResolveChatIds(string root, string? chatId)
         {
             if (!string.IsNullOrWhiteSpace(chatId))
-                return new[] { chatId };
+                return new[] { chatId! };
 
             var chatsRoot = Path.Combine(root, "Memory", "Chats");
             if (!Directory.Exists(chatsRoot))
