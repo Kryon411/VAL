@@ -12,7 +12,6 @@ namespace VAL.Host
             bool bypassLaunchQuiet = false,
             string? titleOverride = null,
             string? subtitleOverride = null,
-            ToastManager.ToastDurationBucket? durationOverride = null,
             string? groupKeyOverride = null,
             bool? replaceGroupOverride = null,
             bool? bypassBurstDedupeOverride = null,

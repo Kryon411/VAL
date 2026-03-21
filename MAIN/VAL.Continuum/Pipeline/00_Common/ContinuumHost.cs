@@ -41,7 +41,7 @@ namespace VAL.Continuum
                 _injectQueue = injectQueue;
         }
 
-        private static IToastHub Toasts => _toastHub ??= new ToastHubAdapter();
+        private static IToastHub Toasts => _toastHub ?? throw new InvalidOperationException("ContinuumHost has not been configured.");
         private static IContinuumWriter Writer => _writer ??= new ContinuumWriter();
         private static IContinuumInjectInbox InjectQueue => _injectQueue ??= new ContinuumInjectInbox();
 
@@ -260,7 +260,7 @@ namespace VAL.Continuum
 
             if (type.Equals(WebCommandNames.ContinuumCommandToggleLogging, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
                 HandleToggleLogging(msg.enabled ?? true, reason);
                 return;
             }
@@ -279,7 +279,7 @@ namespace VAL.Continuum
 
             if (type.Equals(WebCommandNames.ContinuumUiComposerInteraction, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
                 HandleChronicleComposerInteraction(msg.chatId, msg.capturedTurns ?? 0, reason);
                 return;
             }
@@ -288,7 +288,7 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.ContinuumCommandInjectPreamble, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandInjectPrelude, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
                 HandleInjectPrelude(msg.chatId, reason);
                 return;
             }
@@ -378,7 +378,7 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.ContinuumCommandPulse, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandRefreshQuick, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
                 HandlePulse(msg.chatId, reason);
                 return;
             }
@@ -392,7 +392,7 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.ContinuumCommandChronicleCancel, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandCancelChronicle, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
                 HandleChronicleCancel(msg.chatId, reason);
                 return;
             }
@@ -400,7 +400,7 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.ContinuumCommandChronicleRebuildTruth, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandChronicle, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastHub.ParseReason(msg.reason, ToastReason.DockClick);
+                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
                 HandleChronicleRebuild(msg.chatId, reason);
                 return;
             }
@@ -659,7 +659,7 @@ namespace VAL.Continuum
                     },
                     bypassLaunchQuiet: true,
                     origin: ToastOrigin.Continuum,
-                    reason: ToastHub.ParseReason(msg.reason, ToastReason.DockClick)
+                    reason: ToastReasonParser.Parse(msg.reason, ToastReason.DockClick)
                 );
             }
             catch
