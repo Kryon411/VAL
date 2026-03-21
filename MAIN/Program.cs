@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using VAL.Continuum.Pipeline.Telemetry;
+using VAL.Continuum.Pipeline.Truth;
 using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
@@ -50,6 +52,17 @@ namespace VAL
 
                 host.Start();
 
+                var toastHub = host.Services.GetRequiredService<IToastHub>();
+                TruthTelemetryBridge.Configure(TelemetryThresholdMonitor.UpdateFromTruthBytes);
+                TelemetryThresholdMonitor.Configure((chatId, level) =>
+                {
+                    toastHub.TryShow(
+                        MapTelemetryToast(level),
+                        chatId: chatId,
+                        origin: ToastOrigin.Telemetry,
+                        reason: ToastReason.Background);
+                });
+
                 var appPaths = host.Services.GetRequiredService<IAppPaths>();
                 var buildInfo = host.Services.GetRequiredService<IBuildInfo>();
                 var webViewOptions = host.Services.GetRequiredService<IOptions<WebViewOptions>>().Value;
@@ -88,6 +101,8 @@ namespace VAL
                 {
                     try
                     {
+                        TruthTelemetryBridge.Configure(null);
+                        TelemetryThresholdMonitor.Configure(null);
                         host.StopAsync().GetAwaiter().GetResult();
                     }
                     catch
@@ -100,6 +115,17 @@ namespace VAL
                     }
                 }
             }
+        }
+
+        private static ToastKey MapTelemetryToast(ContinuumTelemetryThresholdLevel level)
+        {
+            return level switch
+            {
+                ContinuumTelemetryThresholdLevel.Early => ToastKey.TelemetrySessionSizeEarly,
+                ContinuumTelemetryThresholdLevel.Large => ToastKey.TelemetrySessionSizeLarge,
+                ContinuumTelemetryThresholdLevel.VeryLarge => ToastKey.TelemetrySessionSizeVeryLarge,
+                _ => throw new ArgumentOutOfRangeException(nameof(level), level, null),
+            };
         }
     }
 }

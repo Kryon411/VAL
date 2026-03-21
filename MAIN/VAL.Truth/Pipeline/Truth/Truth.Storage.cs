@@ -396,11 +396,7 @@ namespace VAL.Continuum.Pipeline.Truth
         {
             try
             {
-                // We keep this loosely coupled: if Telemetry is removed from a build, Truth still compiles and runs.
-                var t = Type.GetType("VAL.Continuum.Pipeline.Telemetry.TelemetryThresholdMonitor, VAL");
-                var m = t?.GetMethod("UpdateFromTruthBytes");
-                if (m != null)
-                    m.Invoke(null, new object?[] { chatId, bytes });
+                TruthTelemetryBridge.Publish(chatId, bytes);
             }
             catch
             {

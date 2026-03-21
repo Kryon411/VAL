@@ -1,9 +1,15 @@
 using System;
 using System.Collections.Concurrent;
-using VAL.Host;
 
 namespace VAL.Continuum.Pipeline.Telemetry
 {
+    public enum ContinuumTelemetryThresholdLevel
+    {
+        Early = 1,
+        Large = 2,
+        VeryLarge = 3,
+    }
+
     // TelemetryThresholdMonitor: emits progressive session-size nudges.
     // MUST be best-effort and never throw; Truth writing must always win.
     public static class TelemetryThresholdMonitor
@@ -20,6 +26,13 @@ namespace VAL.Continuum.Pipeline.Telemetry
 
         private static readonly ConcurrentDictionary<string, ChatState> _stateByChat =
             new ConcurrentDictionary<string, ChatState>(StringComparer.Ordinal);
+
+        private static Action<string, ContinuumTelemetryThresholdLevel>? _sink;
+
+        public static void Configure(Action<string, ContinuumTelemetryThresholdLevel>? sink)
+        {
+            _sink = sink;
+        }
 
         public static void UpdateFromTruthBytes(string chatId, long bytes)
         {
@@ -39,45 +52,23 @@ namespace VAL.Continuum.Pipeline.Telemetry
 
         private static void Evaluate(string chatId, long bytes, ChatState state)
         {
-            int level = 0;
-            if (bytes >= CriticalBytes) level = 3;
-            else if (bytes >= MediumBytes) level = 2;
-            else if (bytes >= SoftBytes) level = 1;
+            ContinuumTelemetryThresholdLevel? level = null;
+            if (bytes >= CriticalBytes) level = ContinuumTelemetryThresholdLevel.VeryLarge;
+            else if (bytes >= MediumBytes) level = ContinuumTelemetryThresholdLevel.Large;
+            else if (bytes >= SoftBytes) level = ContinuumTelemetryThresholdLevel.Early;
 
-            if (level <= state.LastLevel)
+            if (level == null)
                 return;
 
-            // Update state first so repeated updates don't spam if toast/UI is unavailable.
-            state.LastLevel = level;
+            if ((int)level.Value <= state.LastLevel)
+                return;
+
+            // Update state first so repeated updates don't spam if the sink is unavailable.
+            state.LastLevel = (int)level.Value;
 
             try
             {
-                switch (level)
-                {
-                    case 1:
-                        ToastHub.TryShow(
-                            ToastKey.TelemetrySessionSizeEarly,
-                            chatId,
-                            origin: ToastOrigin.Telemetry,
-                            reason: ToastReason.Background);
-                        break;
-
-                    case 2:
-                        ToastHub.TryShow(
-                            ToastKey.TelemetrySessionSizeLarge,
-                            chatId,
-                            origin: ToastOrigin.Telemetry,
-                            reason: ToastReason.Background);
-                        break;
-
-                    case 3:
-                        ToastHub.TryShow(
-                            ToastKey.TelemetrySessionSizeVeryLarge,
-                            chatId,
-                            origin: ToastOrigin.Telemetry,
-                            reason: ToastReason.Background);
-                        break;
-                }
+                _sink?.Invoke(chatId, level.Value);
             }
             catch
             {
