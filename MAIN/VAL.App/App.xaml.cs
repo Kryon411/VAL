@@ -1,6 +1,6 @@
 using System;
 using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
+using VAL.Host.Services;
 
 namespace VAL;
 
@@ -16,14 +16,14 @@ public partial class App : Application
     private static readonly Uri ThemeDictionaryUri =
         new("pack://application:,,,/VAL.App;component/UI/VALWindowTheme.xaml", UriKind.Absolute);
 
-    private readonly IServiceProvider _services;
+    private readonly MainWindow _mainWindow;
+    private readonly IDesktopUiContext _uiContext;
 
-    public App(IServiceProvider services)
+    public App(MainWindow mainWindow, IDesktopUiContext uiContext)
     {
-        _services = services ?? throw new ArgumentNullException(nameof(services));
+        _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+        _uiContext = uiContext ?? throw new ArgumentNullException(nameof(uiContext));
     }
-
-    public IServiceProvider Services => _services;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -31,9 +31,9 @@ public partial class App : Application
 
         EnsureThemeLoaded();
 
-        var mainWindow = _services.GetRequiredService<MainWindow>();
-        MainWindow = mainWindow;
-        mainWindow.Show();
+        _uiContext.RegisterMainWindow(_mainWindow);
+        MainWindow = _mainWindow;
+        _mainWindow.Show();
     }
 
     private static void EnsureThemeLoaded()

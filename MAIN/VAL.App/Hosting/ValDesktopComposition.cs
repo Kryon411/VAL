@@ -1,4 +1,5 @@
 using System;
+using System.Windows.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VAL.Continuum;
@@ -37,6 +38,9 @@ namespace VAL.Hosting
             ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(crashGuard);
 
+            var desktopUiContext = new DesktopUiContext(Dispatcher.CurrentDispatcher);
+
+            builder.Services.AddSingleton<IDesktopUiContext>(desktopUiContext);
             builder.Services.AddSingleton<ICommandDiagnosticsReporter, CommandDiagnosticsReporter>();
             builder.Services.AddSingleton<ContinuumHost>();
             builder.Services.AddSingleton<ContinuumCommandHandlers>();

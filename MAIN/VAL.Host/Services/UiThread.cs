@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Threading;
 
 namespace VAL.Host.Services
@@ -9,9 +8,9 @@ namespace VAL.Host.Services
     {
         private readonly Dispatcher _dispatcher;
 
-        public UiThread()
+        public UiThread(IDesktopUiContext uiContext)
         {
-            _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
+            _dispatcher = uiContext?.Dispatcher ?? throw new ArgumentNullException(nameof(uiContext));
         }
 
         public void Invoke(Action action)

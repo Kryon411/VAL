@@ -1,18 +1,20 @@
 using System;
-using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
 using VAL.UI.Truth;
 
 namespace VAL.Host.Services
 {
     public sealed class TruthHealthWindowService : ITruthHealthWindowService
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly IWindowFactory<TruthHealthWindow> _windowFactory;
+        private readonly IDesktopUiContext _uiContext;
         private TruthHealthWindow? _window;
 
-        public TruthHealthWindowService(IServiceProvider serviceProvider)
+        public TruthHealthWindowService(
+            IWindowFactory<TruthHealthWindow> windowFactory,
+            IDesktopUiContext uiContext)
         {
-            _serviceProvider = serviceProvider;
+            _windowFactory = windowFactory;
+            _uiContext = uiContext;
         }
 
         public void ShowTruthHealth()
@@ -25,8 +27,8 @@ namespace VAL.Host.Services
                     return;
                 }
 
-                _window = _serviceProvider.GetRequiredService<TruthHealthWindow>();
-                _window.Owner = Application.Current?.MainWindow;
+                _window = _windowFactory.Create();
+                _window.Owner = _uiContext.MainWindow;
                 _window.Closed += (_, __) => _window = null;
                 _window.Show();
             }

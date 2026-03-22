@@ -21,6 +21,7 @@ namespace VAL.Host.Portal
 
         private readonly IWebMessageSender _messageSender;
         private readonly IDockModelService _dockModelService;
+        private readonly IDesktopUiContext _uiContext;
         private readonly PortalStaging _staging = new();
         private bool _enabled;
         private bool _privacyAllowed = true;
@@ -74,10 +75,12 @@ namespace VAL.Host.Portal
 
         public PortalRuntime(
             IWebMessageSender messageSender,
-            IDockModelService dockModelService)
+            IDockModelService dockModelService,
+            IDesktopUiContext uiContext)
         {
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _dockModelService = dockModelService ?? throw new ArgumentNullException(nameof(dockModelService));
+            _uiContext = uiContext ?? throw new ArgumentNullException(nameof(uiContext));
         }
 
         public void Initialize(Action focusWebView)
@@ -111,7 +114,7 @@ namespace VAL.Host.Portal
 
             try
             {
-                var mw = Application.Current?.MainWindow;
+                var mw = _uiContext.MainWindow;
                 if (mw == null) return;
 
                 var hwnd = new WindowInteropHelper(mw).Handle;
@@ -588,19 +591,13 @@ namespace VAL.Host.Portal
             return IntPtr.Zero;
         }
 
-        private static void RunOnUI(Action action)
+        private void RunOnUI(Action action)
         {
             try
             {
-                var app = Application.Current;
-                if (app?.Dispatcher == null)
-                {
-                    action();
-                    return;
-                }
-
-                if (app.Dispatcher.CheckAccess()) action();
-                else app.Dispatcher.Invoke(action);
+                var dispatcher = _uiContext.Dispatcher;
+                if (dispatcher.CheckAccess()) action();
+                else dispatcher.Invoke(action);
             }
             catch
             {
