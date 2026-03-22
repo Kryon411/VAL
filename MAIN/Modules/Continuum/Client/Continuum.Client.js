@@ -1,5 +1,5 @@
 try { console.log("[VAL Continuum] script loaded"); } catch (_) {}
-/* Continuum.Client.js — v3.1.33
+/* Continuum.Client.js — v3.1.34
  * Pulse new-chat sequencing:
  *  - On openNewChat, inject only after navigation has moved away from the origin chat
  *    and the destination composer passes explicit readiness checks.
@@ -12,7 +12,7 @@ try {
 (function () {
   "use strict";
 
-  const CONTINUUM_VERSION = "3.1.33";
+  const CONTINUUM_VERSION = "3.1.34";
   const INJECT_READY_STABILIZE_MS = 120;
   const NEW_CHAT_TURN_LIMIT = 1;
   const NEW_CHAT_RETRY_INTERVAL_MS = 20000;
@@ -79,6 +79,7 @@ try {
     lastMutationAtById: new Map(),
 
     pendingSeed: null,
+    signalAwaiting: null,
     injectorTimer: null,
     injectorLastStatusAt: 0,
 
@@ -102,6 +103,21 @@ try {
     },
   };
 
+  function clearSignalAwaiting(requestId) {
+    try {
+      const active = state.signalAwaiting;
+      if (!active) return false;
+
+      const rid = (requestId || "").toString().trim();
+      if (rid && active.requestId && rid !== active.requestId) return false;
+
+      state.signalAwaiting = null;
+      return true;
+    } catch (_) {}
+
+    return false;
+  }
+
   function getChatIdFromLocation() {
     try {
       const m = location.pathname.match(/\/c\/([a-f0-9\-]{36})/i);
@@ -120,6 +136,9 @@ try {
     if (changedChat) {
       state.attachedChatId = id;
       state.hostAttachedChatId = null;
+      if (state.signalAwaiting && state.signalAwaiting.chatId && state.signalAwaiting.chatId !== id) {
+        state.signalAwaiting = null;
+      }
 
       state.turnCounter = 0;
       state.seenTruthFp = new Set();
@@ -316,6 +335,39 @@ try {
   const TURN_SELECTOR = "[data-testid^='conversation-turn-'], [data-message-id]";
   const ASSISTANT_SETTLE_STABLE_MS = 450;
 
+  function collectAssistantTurnIds() {
+    const ids = new Set();
+
+    try {
+      const turns = Array.from(document.querySelectorAll(TURN_SELECTOR));
+      for (const turnEl of turns) {
+        const id = getTurnId(turnEl);
+        if (!id) continue;
+
+        const role = inferRoleFromTurn(turnEl);
+        if (role === "assistant") ids.add(id);
+      }
+    } catch (_) {}
+
+    return ids;
+  }
+
+  function armSignalAwaiting(seed, chatIdForEvent) {
+    try {
+      const requestId = ((seed && seed.requestId) || "").toString().trim();
+      if (!requestId) return false;
+
+      state.signalAwaiting = {
+        requestId,
+        chatId: getChatIdFromLocation() || chatIdForEvent || state.chatId || null,
+        knownAssistantIds: collectAssistantTurnIds()
+      };
+      return true;
+    } catch (_) {}
+
+    return false;
+  }
+
   function isStopPresent() {
     try { return !!document.querySelector(STOP_SELECTOR); } catch (_) { return false; }
   }
@@ -432,6 +484,18 @@ try {
       const logged = logTruthLine(role, id, text);
       if (logged && role === "assistant") {
         post({ type: "continuum.event", chatId: state.chatId, evt: `assistant.settled:${id}`, text });
+
+        const awaiting = state.signalAwaiting;
+        if (awaiting && awaiting.chatId === state.chatId && !awaiting.knownAssistantIds.has(id)) {
+          post({
+            type: "continuum.event",
+            chatId: state.chatId,
+            evt: `signal.reply.settled:${id}`,
+            requestId: awaiting.requestId,
+            text
+          });
+          state.signalAwaiting = null;
+        }
       }
 
       return logged;
@@ -534,6 +598,7 @@ try {
       }
       state.attachedChatId = null;
       state.hostAttachedChatId = null;
+      clearSignalAwaiting();
       try { if (state.prelude) state.prelude.lastRootHrefSent = null; } catch (_) {}
       stopAttachWatchdog();
       ensureAttachedIfReady();
@@ -786,14 +851,27 @@ try {
 
       const btn = findSendButton();
       if (!btn) {
-        post({ type: "continuum.event", chatId: chatIdForEvent || "unknown", evt: "signal.send.failed:no_button" });
+        clearSignalAwaiting(seed.requestId);
+        post({
+          type: "continuum.event",
+          chatId: chatIdForEvent || "unknown",
+          evt: "signal.send.failed:no_button",
+          requestId: (seed.requestId || "").toString()
+        });
         return false;
       }
 
+      armSignalAwaiting(seed, chatIdForEvent);
       btn.click();
       return true;
     } catch (_) {
-      post({ type: "continuum.event", chatId: chatIdForEvent || "unknown", evt: "signal.send.failed:exception" });
+      clearSignalAwaiting(seed && seed.requestId);
+      post({
+        type: "continuum.event",
+        chatId: chatIdForEvent || "unknown",
+        evt: "signal.send.failed:exception",
+        requestId: seed && seed.requestId ? seed.requestId.toString() : ""
+      });
       return false;
     }
   }
@@ -1631,7 +1709,8 @@ function handleHostMessage(event) {
         requestedAt: Date.now(),
         readySignature: null,
         readyAt: 0,
-        autoSend: msg.autoSend === true
+        autoSend: msg.autoSend === true,
+        requestId: (msg.requestId || "").toString()
       };
 
       startInjectorLoop();

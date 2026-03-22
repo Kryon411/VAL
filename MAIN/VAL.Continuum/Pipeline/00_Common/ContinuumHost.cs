@@ -123,6 +123,7 @@ namespace VAL.Continuum
         {
             public long OperationId { get; init; }
             public string ChatId { get; init; } = string.Empty;
+            public string SignalRequestId { get; init; } = string.Empty;
             public PulseSnapshot Snapshot { get; init; } = new();
             public DeterministicPulseSections DeterministicSections { get; init; } = new();
             public string DeterministicFallbackPacket { get; init; } = string.Empty;
@@ -1049,15 +1050,15 @@ namespace VAL.Continuum
             if (string.IsNullOrWhiteSpace(evt))
                 return;
 
-            if (evt.StartsWith("assistant.settled:", StringComparison.OrdinalIgnoreCase))
+            if (TryParseSignalReplySettled(evt, out _))
             {
-                HandleSignalAssistantSettled(msg);
+                HandleSignalReplySettled(msg);
                 return;
             }
 
             if (evt.StartsWith("signal.send.failed:", StringComparison.OrdinalIgnoreCase))
             {
-                HandleSignalFailure(msg.chatId);
+                HandleSignalFailure(msg.chatId, msg.requestId);
                 return;
             }
 
@@ -1115,10 +1116,29 @@ namespace VAL.Continuum
                    label.Equals("new_chat_root", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void HandleSignalAssistantSettled(Msg msg)
+        internal static bool TryParseSignalReplySettled(string evt, out string assistantTurnId)
+        {
+            assistantTurnId = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(evt))
+                return false;
+
+            const string prefix = "signal.reply.settled:";
+            if (!evt.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            assistantTurnId = (evt.Substring(prefix.Length) ?? string.Empty).Trim();
+            return !string.IsNullOrWhiteSpace(assistantTurnId);
+        }
+
+        private static void HandleSignalReplySettled(Msg msg)
         {
             var cid = SessionContext.ResolveChatId(msg.chatId);
             if (string.IsNullOrWhiteSpace(cid))
+                return;
+
+            var requestId = (msg.requestId ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(requestId))
                 return;
 
             if (!TryGetPendingSignalPulse(cid, out var pending))
@@ -1127,27 +1147,30 @@ namespace VAL.Continuum
             if (OperationCoordinator.CurrentOperationId != pending.OperationId)
                 return;
 
+            if (!requestId.Equals(pending.SignalRequestId, StringComparison.OrdinalIgnoreCase))
+                return;
+
             var signalReply = msg.text ?? string.Empty;
             if (string.IsNullOrWhiteSpace(signalReply))
             {
-                HandleSignalFailure(cid);
+                HandleSignalFailure(cid, requestId);
                 return;
             }
 
             if (!SignalPacket.TryParse(signalReply, out var signalSummary))
             {
-                HandleSignalFailure(cid);
+                HandleSignalFailure(cid, requestId);
                 return;
             }
 
             var renderedPulsePacket = PulsePacketComposer.Compose(pending.Snapshot, pending.DeterministicSections, signalSummary);
             if (string.IsNullOrWhiteSpace(renderedPulsePacket))
             {
-                HandleSignalFailure(cid);
+                HandleSignalFailure(cid, requestId);
                 return;
             }
 
-            if (!TryTakePendingSignalPulse(cid, pending.OperationId, out pending))
+            if (!TryTakePendingSignalPulse(cid, pending.OperationId, requestId, out pending))
                 return;
 
             try
@@ -1167,13 +1190,13 @@ namespace VAL.Continuum
             }
         }
 
-        private static void HandleSignalFailure(string? chatId)
+        private static void HandleSignalFailure(string? chatId, string? requestId)
         {
             var cid = SessionContext.ResolveChatId(chatId);
             if (string.IsNullOrWhiteSpace(cid))
                 return;
 
-            if (!TryTakePendingSignalPulseForCurrentOperation(cid, out var pending))
+            if (!TryTakePendingSignalPulseForCurrentOperation(cid, requestId, out var pending))
                 return;
 
             InjectQueue.Enqueue(pending.DeterministicFallbackSeed);
@@ -1204,7 +1227,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static bool TryTakePendingSignalPulseForCurrentOperation(string chatId, out PendingSignalPulse pending)
+        private static bool TryTakePendingSignalPulseForCurrentOperation(string chatId, string? requestId, out PendingSignalPulse pending)
         {
             pending = null!;
 
@@ -1215,16 +1238,25 @@ namespace VAL.Continuum
             if (operationId <= 0)
                 return false;
 
-            return TryTakePendingSignalPulse(chatId, operationId, out pending);
+            return TryTakePendingSignalPulse(chatId, operationId, requestId, out pending);
         }
 
-        private static bool TryTakePendingSignalPulse(string chatId, long operationId, out PendingSignalPulse pending)
+        private static bool TryTakePendingSignalPulse(string chatId, long operationId, string? requestId, out PendingSignalPulse pending)
         {
             lock (Sync)
             {
                 if (_pendingSignalPulse == null ||
                     _pendingSignalPulse.OperationId != operationId ||
                     !_pendingSignalPulse.ChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase))
+                {
+                    pending = null!;
+                    return false;
+                }
+
+                var expectedRequestId = _pendingSignalPulse.SignalRequestId;
+                if (!string.IsNullOrWhiteSpace(requestId) &&
+                    !string.IsNullOrWhiteSpace(expectedRequestId) &&
+                    !requestId.Equals(expectedRequestId, StringComparison.OrdinalIgnoreCase))
                 {
                     pending = null!;
                     return false;
@@ -1252,7 +1284,7 @@ namespace VAL.Continuum
                         if (OperationCoordinator.CurrentOperationId != pending.OperationId)
                             return;
 
-                        if (TryTakePendingSignalPulse(pending.ChatId, pending.OperationId, out var timedOutPending))
+                        if (TryTakePendingSignalPulse(pending.ChatId, pending.OperationId, pending.SignalRequestId, out var timedOutPending))
                             InjectQueue.Enqueue(timedOutPending.DeterministicFallbackSeed);
                     });
                 }
@@ -1438,7 +1470,7 @@ namespace VAL.Continuum
                 return;
             }
 
-            var signalInput = SignalInputBuilder.Build(signalPrompt, snapshot, deterministicSections);
+            var signalInput = SignalInputBuilder.Build(signalPrompt);
             if (string.IsNullOrWhiteSpace(signalInput))
             {
                 InjectQueue.Enqueue(deterministicFallbackSeed);
@@ -1452,10 +1484,12 @@ namespace VAL.Continuum
                 return;
             }
 
+            var signalRequestId = Guid.NewGuid().ToString("N");
             var pending = new PendingSignalPulse
             {
                 OperationId = operationId,
                 ChatId = chatId,
+                SignalRequestId = signalRequestId,
                 Snapshot = snapshot,
                 DeterministicSections = deterministicSections,
                 DeterministicFallbackPacket = deterministicFallbackPacket,
@@ -1474,6 +1508,7 @@ namespace VAL.Continuum
                 EssenceText = signalInput,
                 OpenNewChat = false,
                 AutoSend = true,
+                RequestId = signalRequestId,
                 SourceFileName = "SignalInputBuilder",
                 EssenceFileName = "Signal.Prompt.v1.txt"
             });

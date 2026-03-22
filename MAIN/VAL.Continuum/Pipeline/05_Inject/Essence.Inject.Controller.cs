@@ -13,6 +13,7 @@ namespace VAL.Continuum.Pipeline.Inject
             public string ChatId { get; set; } = string.Empty;
             public string Mode { get; set; } = "Pulse";
             public string EssenceText { get; set; } = string.Empty;
+            public string RequestId { get; set; } = string.Empty;
 
             public bool OpenNewChat { get; set; } = true;
             public bool AutoSend { get; set; }

@@ -24,8 +24,8 @@ namespace VAL.Continuum.Pipeline
             AppendBlock(sb, ContinuumPreamble.BuildPulseContinuityPreamble());
             AppendBulletSection(sb, PreviousChatSummaryHeading, ComposePreviousChatSummary(snapshot, deterministicSections, signalSummary));
             AppendExchangeSection(sb, WhereWeLeftOffHeading, deterministicSections.WhereWeLeftOff);
-            AppendBulletSection(sb, OpenLoopsHeading, ComposeOpenLoops(deterministicSections, signalSummary));
-            AppendBulletSection(sb, CriticalContextHeading, ComposeCriticalContext(deterministicSections, signalSummary));
+            AppendBulletSection(sb, OpenLoopsHeading, ComposeOpenLoops(deterministicSections));
+            AppendBulletSection(sb, CriticalContextHeading, ComposeCriticalContext(deterministicSections));
             AppendTruthWalkbackSection(sb, deterministicSections.TruthWalkbackHighlights);
             return sb.ToString().Trim();
         }
@@ -75,14 +75,14 @@ namespace VAL.Continuum.Pipeline
             return EnsureBullets(bullets);
         }
 
-        private static IReadOnlyList<string> ComposeOpenLoops(DeterministicPulseSections deterministicSections, SignalSummary? signalSummary)
+        private static IReadOnlyList<string> ComposeOpenLoops(DeterministicPulseSections deterministicSections)
         {
-            return MergeBullets(signalSummary?.OpenLoops, deterministicSections.OpenLoopFacts);
+            return MergeBullets(deterministicSections.OpenLoopFacts);
         }
 
-        private static IReadOnlyList<string> ComposeCriticalContext(DeterministicPulseSections deterministicSections, SignalSummary? signalSummary)
+        private static IReadOnlyList<string> ComposeCriticalContext(DeterministicPulseSections deterministicSections)
         {
-            return MergeBullets(signalSummary?.CriticalContext, deterministicSections.CriticalFacts, deterministicSections.ArtifactsAndReferences);
+            return MergeBullets(deterministicSections.CriticalFacts, deterministicSections.ArtifactsAndReferences);
         }
 
         private static IReadOnlyList<string> MergeBullets(params IReadOnlyList<string>?[] sources)

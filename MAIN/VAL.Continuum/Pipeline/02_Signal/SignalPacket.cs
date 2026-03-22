@@ -7,18 +7,10 @@ namespace VAL.Continuum.Pipeline.Signal
     internal static class SignalPacket
     {
         internal const string PreviousChatSummaryHeading = "PREVIOUS CHAT SUMMARY";
-        internal const string OpenLoopsHeading = "OPEN LOOPS";
-        internal const string CriticalContextHeading = "CRITICAL CONTEXT";
-
-        private static readonly string[] SignalHeadings =
-        {
-            PreviousChatSummaryHeading,
-            OpenLoopsHeading,
-            CriticalContextHeading
-        };
 
         private static readonly HashSet<string> ForbiddenHeadings = new(StringComparer.Ordinal)
         {
+            "CONTINUUM SIGNAL INPUT (EXCLUDE FROM CONTINUITY)",
             "VAL Pulse Handoff",
             "End of Pulse Handoff",
             "PRIME DIRECTIVE (READ FIRST)",
@@ -27,6 +19,12 @@ namespace VAL.Continuum.Pipeline.Signal
             "WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)",
             "WHERE WE LEFT OFF",
             "HOW TO PROCEED",
+            "OPEN LOOPS",
+            "OPEN LOOP FACTS",
+            "CRITICAL CONTEXT",
+            "CRITICAL FACTS",
+            "FROZEN PULSE SNAPSHOT",
+            "DETERMINISTIC SOURCE MATERIAL",
             "ARTIFACTS AND REFERENCES",
             "ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)",
             "CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)",
@@ -41,7 +39,7 @@ namespace VAL.Continuum.Pipeline.Signal
             if (string.IsNullOrWhiteSpace(normalized))
                 return false;
 
-            if (!TrySplitSections(normalized, SignalHeadings, out var prefix, out var sections))
+            if (!TrySplitSingleSection(normalized, PreviousChatSummaryHeading, out var prefix, out var body))
                 return false;
 
             if (!string.IsNullOrWhiteSpace(prefix))
@@ -50,20 +48,12 @@ namespace VAL.Continuum.Pipeline.Signal
             if (ContainsForbiddenHeading(normalized))
                 return false;
 
-            if (!TryParseBulletSection(GetSection(sections, PreviousChatSummaryHeading), out var previousChatSummary))
-                return false;
-
-            if (!TryParseBulletSection(GetSection(sections, OpenLoopsHeading), out var openLoops))
-                return false;
-
-            if (!TryParseBulletSection(GetSection(sections, CriticalContextHeading), out var criticalContext))
+            if (!TryParseBulletSection(body, out var previousChatSummary))
                 return false;
 
             summary = new SignalSummary
             {
-                PreviousChatSummary = previousChatSummary,
-                OpenLoops = openLoops,
-                CriticalContext = criticalContext
+                PreviousChatSummary = previousChatSummary
             };
 
             return true;
@@ -122,41 +112,38 @@ namespace VAL.Continuum.Pipeline.Signal
                 bullets.Add(value);
         }
 
-        private static bool TrySplitSections(
+        private static bool TrySplitSingleSection(
             string text,
-            IReadOnlyList<string> headings,
+            string heading,
             out string prefix,
-            out Dictionary<string, string> sections)
+            out string body)
         {
             prefix = string.Empty;
-            sections = new Dictionary<string, string>(StringComparer.Ordinal);
+            body = string.Empty;
 
             var normalized = Normalize(text).Trim('\n');
             var lines = normalized.Split('\n');
             if (lines.Length == 0)
                 return false;
 
-            var headingIndexes = new List<int>(headings.Count);
-            int searchStart = 0;
+            int headingIndex = FindHeadingLine(lines, heading, 0);
+            if (headingIndex < 0)
+                return false;
 
-            foreach (var heading in headings)
+            prefix = Normalize(string.Join("\n", lines, 0, headingIndex));
+            body = Normalize(string.Join("\n", lines, headingIndex + 1, lines.Length - headingIndex - 1));
+
+            if (string.IsNullOrWhiteSpace(body))
+                return false;
+
+            for (int i = headingIndex + 1; i < lines.Length; i++)
             {
-                int found = FindHeadingLine(lines, heading, searchStart);
-                if (found < 0)
+                var candidate = lines[i].Trim();
+                if (string.IsNullOrWhiteSpace(candidate))
+                    continue;
+
+                if (string.Equals(candidate, heading, StringComparison.Ordinal))
                     return false;
-
-                headingIndexes.Add(found);
-                searchStart = found + 1;
-            }
-
-            prefix = Normalize(string.Join("\n", lines, 0, headingIndexes[0]));
-
-            for (int i = 0; i < headings.Count; i++)
-            {
-                int start = headingIndexes[i] + 1;
-                int endExclusive = (i + 1 < headingIndexes.Count) ? headingIndexes[i + 1] : lines.Length;
-                var body = string.Join("\n", lines, start, endExclusive - start);
-                sections[headings[i]] = Normalize(body);
             }
 
             return true;
@@ -184,9 +171,6 @@ namespace VAL.Continuum.Pipeline.Signal
 
             return false;
         }
-
-        private static string GetSection(IReadOnlyDictionary<string, string> sections, string heading)
-            => sections.TryGetValue(heading, out var body) ? body : string.Empty;
 
         private static string Normalize(string text)
         {

@@ -126,16 +126,7 @@ namespace VAL.Tests.Continuum
                 PreviousChatSummary = new[]
                 {
                     "Continuum now owns final Pulse packet composition.",
-                    "Signal is narrowed to semantic summary output only."
-                },
-                OpenLoops = new[]
-                {
-                    "Rewire ContinuumHost to carry the frozen snapshot through Signal."
-                },
-                CriticalContext = new[]
-                {
-                    "Keep deterministic fallback intact if Signal fails.",
-                    "Do not let Pulse orchestration become the WWLO anchor."
+                    "Signal is narrowed to a visible PREVIOUS CHAT SUMMARY only."
                 }
             };
         }

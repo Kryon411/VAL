@@ -1,26 +1,18 @@
-CONTINUUM SIGNAL INPUT (EXCLUDE FROM CONTINUITY)
+Before Pulse opens a fresh continuation chat, write a compact PREVIOUS CHAT SUMMARY for this thread.
 
-Prepare a compact semantic handoff summary from the frozen Continuum snapshot below.
-
-Use only the supplied frozen snapshot.
-Do not rely on earlier live chat context.
+Summarize the thread state immediately before this request.
+Exclude this request itself and any Pulse / Continuum orchestration from the summary.
 Do not continue the work.
 Do not solve anything new.
 Do not speculate.
 Do not be conversational.
-Do not quote long blocks verbatim.
+Do not mention Pulse, Continuum, Signal, snapshots, Truth logs, templates, or packet assembly.
 Keep the output compact, plain-text, and bullet-based.
-Do not include packet wrappers, nested handoff structure, WWLO, Truth Walkback, artifacts, or any extra sections.
-If a section has nothing useful to report, write "- None."
-Output only the three sections below.
+Use 2 to 6 bullets when possible.
+If there is nothing useful to report, write "- None."
+Output only the section below.
 
 Output exactly:
 
 PREVIOUS CHAT SUMMARY
-- 
-
-OPEN LOOPS
-- 
-
-CRITICAL CONTEXT
 - 

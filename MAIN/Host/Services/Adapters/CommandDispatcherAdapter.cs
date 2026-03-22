@@ -30,6 +30,7 @@ namespace VAL.Host.Services.Adapters
                 chatId = seed.ChatId,
                 mode = seed.Mode,
                 text = seed.EssenceText,
+                requestId = seed.RequestId,
                 sourceFile = seed.SourceFileName,
                 essenceFile = seed.EssenceFileName,
                 openNewChat = seed.OpenNewChat,

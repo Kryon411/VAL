@@ -71,6 +71,7 @@ namespace VAL.Continuum.Pipeline
                 return Array.Empty<TruthMessage>();
 
             var filtered = new List<TruthMessage>(messages.Count);
+            var skipNextAssistantSignalReply = false;
             for (int i = 0; i < messages.Count; i++)
             {
                 var message = messages[i];
@@ -80,7 +81,20 @@ namespace VAL.Continuum.Pipeline
                 if (!IsWithinFrozenBoundary(message, frozenBoundaryLineIndex))
                     continue;
 
-                if (LooksLikePulseOrchestrationMessage(message))
+                var normalized = Normalize(message.Text);
+                if (message.Role == TruthRole.User && LooksLikeSignalPrompt(normalized))
+                {
+                    skipNextAssistantSignalReply = true;
+                    continue;
+                }
+
+                if (skipNextAssistantSignalReply && message.Role == TruthRole.Assistant)
+                {
+                    skipNextAssistantSignalReply = false;
+                    continue;
+                }
+
+                if (LooksLikePulseOrchestrationMessage(message, normalized))
                     continue;
 
                 filtered.Add(message);
@@ -103,9 +117,9 @@ namespace VAL.Continuum.Pipeline
             return message.LineIndex <= frozenBoundaryLineIndex;
         }
 
-        private static bool LooksLikePulseOrchestrationMessage(TruthMessage message)
+        private static bool LooksLikePulseOrchestrationMessage(TruthMessage message, string? normalized = null)
         {
-            var normalized = Normalize(message?.Text);
+            normalized = Normalize(normalized ?? message?.Text);
             if (string.IsNullOrWhiteSpace(normalized))
                 return false;
 
@@ -123,13 +137,18 @@ namespace VAL.Continuum.Pipeline
             if (string.IsNullOrWhiteSpace(normalized))
                 return false;
 
-            return normalized.StartsWith("CONTINUUM SIGNAL INPUT (EXCLUDE FROM CONTINUITY)", StringComparison.Ordinal) ||
+            return normalized.StartsWith("Before Pulse opens a fresh continuation chat, write a compact PREVIOUS CHAT SUMMARY for this thread.", StringComparison.Ordinal) ||
+                   normalized.StartsWith("CONTINUUM SIGNAL INPUT (EXCLUDE FROM CONTINUITY)", StringComparison.Ordinal) ||
                    normalized.StartsWith("Prepare a VAL Pulse handoff for a new chat.", StringComparison.Ordinal) ||
                    normalized.StartsWith("Prepare a compact semantic handoff summary from the frozen Continuum snapshot below.", StringComparison.Ordinal) ||
+                   normalized.Contains("Summarize the thread state immediately before this request.", StringComparison.Ordinal) ||
                    (normalized.Contains("Output only these sections.", StringComparison.Ordinal) &&
                     normalized.Contains("PREVIOUS CHAT SUMMARY", StringComparison.Ordinal) &&
                     normalized.Contains("OPEN LOOPS", StringComparison.Ordinal) &&
-                    normalized.Contains("CRITICAL CONTEXT", StringComparison.Ordinal));
+                    normalized.Contains("CRITICAL CONTEXT", StringComparison.Ordinal)) ||
+                   (normalized.Contains("Output exactly:", StringComparison.Ordinal) &&
+                    normalized.Contains("PREVIOUS CHAT SUMMARY", StringComparison.Ordinal) &&
+                    normalized.Contains("- ", StringComparison.Ordinal));
         }
 
         private static bool LooksLikeSignalOutput(string normalized)

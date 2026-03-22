@@ -41,5 +41,27 @@ namespace VAL.Tests.Continuum
 
             Assert.Equal(expected, actual);
         }
+
+        [Theory]
+        [InlineData("signal.reply.settled:assistant-turn-1", "assistant-turn-1")]
+        [InlineData("signal.reply.settled:abc123", "abc123")]
+        public void TryParseSignalReplySettledParsesAssistantTurnId(string evt, string expectedAssistantTurnId)
+        {
+            var ok = ContinuumHost.TryParseSignalReplySettled(evt, out var assistantTurnId);
+
+            Assert.True(ok);
+            Assert.Equal(expectedAssistantTurnId, assistantTurnId);
+        }
+
+        [Theory]
+        [InlineData("assistant.settled:assistant-turn-1")]
+        [InlineData("signal.reply.settled:")]
+        [InlineData("")]
+        public void TryParseSignalReplySettledRejectsInvalidEvents(string evt)
+        {
+            var ok = ContinuumHost.TryParseSignalReplySettled(evt, out _);
+
+            Assert.False(ok);
+        }
     }
 }
