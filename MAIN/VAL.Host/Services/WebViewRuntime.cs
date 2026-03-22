@@ -243,7 +243,7 @@ namespace VAL.Host.Services
                             return;
                         }
 
-                        WebMessageJsonReceived?.Invoke(new WebMessageEnvelope(json, sourceUri!));
+                        WebMessageJsonReceived?.Invoke(new WebMessageEnvelope(json, sourceUri!, envelope));
                     };
                     _newWindowRequestedHandler ??= (_, e) => HandleNewWindowRequested(e);
 

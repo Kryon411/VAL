@@ -22,6 +22,7 @@ namespace VAL.Host.Commands
     {
         private static readonly long BlockedTypeLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
         private static long _lastBlockedTypeLogTicks;
+        private static readonly JsonElement EmptyPayload = JsonSerializer.SerializeToElement(new { });
 
         private readonly CommandRegistry _commandRegistry;
         private readonly ICommandDiagnosticsReporter? _diagnosticsReporter;
@@ -43,17 +44,18 @@ namespace VAL.Host.Commands
             if (string.IsNullOrWhiteSpace(json))
                 return HostCommandExecutionResult.Blocked("<empty>", "Command payload was empty.", isDockInvocation: false, diagnosticDetail: "empty-json");
 
-            if (!WebMessageType.TryGetType(json, out var messageType))
+            if (!webMessage.TryGetParsedEnvelope(out var parsedEnvelope))
                 return HostCommandExecutionResult.Blocked("<unknown>", "Command payload was invalid.", isDockInvocation: false, diagnosticDetail: "invalid-message-type");
+
+            var messageType = parsedEnvelope.Type?.Trim();
+            if (string.IsNullOrWhiteSpace(messageType))
+                return HostCommandExecutionResult.Blocked("<unknown>", "Command payload was invalid.", isDockInvocation: false, diagnosticDetail: "missing-message-type");
 
             if (!WebCommandRegistry.IsAllowed(messageType))
             {
                 LogBlockedType(messageType, webMessage.SourceUri, "message-type-allowlist");
                 return HostCommandExecutionResult.Blocked(messageType, "Command is not allowed by host policy.", isDockInvocation: false, diagnosticDetail: "message-type-allowlist");
             }
-
-            if (!MessageEnvelope.TryParse(json, out var parsedEnvelope))
-                return HostCommandExecutionResult.Blocked(messageType, "Command payload could not be parsed.", IsDockMessageSource(null), diagnosticDetail: "envelope-parse-failed");
 
             var isDockInvocation = IsDockMessageSource(parsedEnvelope.Source);
 
@@ -77,15 +79,12 @@ namespace VAL.Host.Commands
             _sessionContext.Observe(commandName, parsedEnvelope.ChatId);
 
             var payload = parsedEnvelope.Payload;
-            if (payload.HasValue && payload.Value.ValueKind == JsonValueKind.Object)
-            {
-                var cmd = new HostCommand(commandName, json, parsedEnvelope.ChatId, webMessage.SourceUri, payload.Value);
-                return Dispatch(cmd, isDockInvocation);
-            }
+            var payloadRoot = payload.HasValue && payload.Value.ValueKind == JsonValueKind.Object
+                ? payload.Value
+                : EmptyPayload;
 
-            using var emptyDoc = JsonDocument.Parse("{}");
-            var fallbackCmd = new HostCommand(commandName, json, parsedEnvelope.ChatId, webMessage.SourceUri, emptyDoc.RootElement);
-            return Dispatch(fallbackCmd, isDockInvocation);
+            var cmd = new HostCommand(commandName, json, parsedEnvelope.ChatId, webMessage.SourceUri, payloadRoot);
+            return Dispatch(cmd, isDockInvocation);
         }
 
         private HostCommandExecutionResult Dispatch(HostCommand cmd, bool isDockInvocation)

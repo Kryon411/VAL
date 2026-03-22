@@ -90,6 +90,31 @@ namespace VAL.Tests.Commands
             Assert.True(invoked);
         }
 
+        [Fact]
+        public void HandleWebMessageUsesPreParsedEnvelopeWhenAvailable()
+        {
+            var invoked = false;
+            var router = CreateRouter(registry =>
+            {
+                registry.Register(new CommandSpec(
+                    WebCommandNames.ToolsOpenTruthHealth,
+                    "Tools",
+                    Array.Empty<string>(),
+                    _ => invoked = true));
+            });
+
+            const string json = """
+                                {"type":"command","name":"tools.open_truth_health","source":"dock","payload":{}}
+                                """;
+            Assert.True(MessageEnvelope.TryParse(json, out var parsedEnvelope));
+
+            var result = router.HandleWebMessage(new WebMessageEnvelope(json, TestSourceUri, parsedEnvelope));
+
+            Assert.Equal(HostCommandExecutionStatus.Success, result.Status);
+            Assert.True(result.IsDockInvocation);
+            Assert.True(invoked);
+        }
+
         private static HostCommandRouter CreateRouter(Action<CommandRegistry> register)
         {
             var registry = new CommandRegistry();

@@ -321,15 +321,18 @@ namespace VAL
         {
             try
             {
-                using var document = JsonDocument.Parse(envelope.Json);
-                var root = document.RootElement;
-
-                if (!TryReadType(root, out var type))
+                if (!envelope.TryGetParsedEnvelope(out var parsedEnvelope))
                 {
                     return;
                 }
 
-                if (string.Equals(type, DockStateType, StringComparison.Ordinal) && TryReadIsOpen(root, out var dockIsOpen))
+                var type = parsedEnvelope.Name?.Trim();
+                if (string.IsNullOrWhiteSpace(type))
+                {
+                    return;
+                }
+
+                if (string.Equals(type, DockStateType, StringComparison.Ordinal) && TryReadIsOpen(parsedEnvelope, out var dockIsOpen))
                 {
                     _isDockOpen = dockIsOpen;
                     _uiState.Dock.IsOpen = dockIsOpen;
@@ -342,13 +345,13 @@ namespace VAL
                     return;
                 }
 
-                if (TryReadIsOpen(root, out var isOpen))
+                if (TryReadIsOpen(parsedEnvelope, out var isOpen))
                 {
                     _isDockOpen = isOpen;
                     _uiState.Dock.IsOpen = isOpen;
                 }
 
-                UpdateDockGeometryFromMessage(root);
+                UpdateDockGeometryFromMessage(parsedEnvelope);
                 ScheduleStatePersist();
             }
             catch
@@ -357,48 +360,14 @@ namespace VAL
             }
         }
 
-        private static bool TryReadType(JsonElement root, out string? type)
+        private static bool TryReadIsOpen(MessageEnvelope envelope, out bool isOpen)
         {
-            type = null;
+            isOpen = false;
 
-            if (root.ValueKind != JsonValueKind.Object)
+            if (!TryGetPayloadRoot(envelope, out var root))
             {
                 return false;
             }
-
-            if (root.TryGetProperty("type", out var directType) && directType.ValueKind == JsonValueKind.String)
-            {
-                var directTypeValue = directType.GetString();
-                if (string.Equals(directTypeValue, "command", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(directTypeValue, "event", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(directTypeValue, "log", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (root.TryGetProperty("name", out var envelopeName) && envelopeName.ValueKind == JsonValueKind.String)
-                    {
-                        type = envelopeName.GetString();
-                        if (!string.IsNullOrWhiteSpace(type))
-                        {
-                            return true;
-                        }
-                    }
-                }
-
-                type = directTypeValue;
-                return !string.IsNullOrWhiteSpace(type);
-            }
-
-            if (root.TryGetProperty("name", out var nameType) && nameType.ValueKind == JsonValueKind.String)
-            {
-                type = nameType.GetString();
-                return !string.IsNullOrWhiteSpace(type);
-            }
-
-            return false;
-        }
-
-        private static bool TryReadIsOpen(JsonElement root, out bool isOpen)
-        {
-            isOpen = false;
 
             if (root.TryGetProperty("isOpen", out var direct) && TryReadBoolean(direct, out isOpen))
             {
@@ -447,8 +416,13 @@ namespace VAL
             return null;
         }
 
-        private void UpdateDockGeometryFromMessage(JsonElement root)
+        private void UpdateDockGeometryFromMessage(MessageEnvelope envelope)
         {
+            if (!TryGetPayloadRoot(envelope, out var root))
+            {
+                return;
+            }
+
             var x = TryReadDoubleProperty(root, "x");
             var y = TryReadDoubleProperty(root, "y");
             var w = TryReadDoubleProperty(root, "w");
@@ -460,6 +434,19 @@ namespace VAL
             if (h.HasValue) _uiState.Dock.H = h.Value;
 
             ClampDockGeometry();
+        }
+
+        private static bool TryGetPayloadRoot(MessageEnvelope envelope, out JsonElement root)
+        {
+            root = default;
+
+            if (!envelope.Payload.HasValue || envelope.Payload.Value.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            root = envelope.Payload.Value;
+            return true;
         }
 
         private void MainWindow_Activated(object? sender, EventArgs e)

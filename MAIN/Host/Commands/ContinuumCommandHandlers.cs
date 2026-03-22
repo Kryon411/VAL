@@ -19,7 +19,7 @@ namespace VAL.Host.Commands
         {
             try
             {
-                _continuumHost.HandleJson(cmd.RawJson);
+                _continuumHost.HandleCommand(cmd);
             }
             catch (Exception ex)
             {

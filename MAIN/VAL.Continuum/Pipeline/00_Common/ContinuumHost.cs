@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VAL.Contracts;
 using VAL.Host;
+using VAL.Host.Commands;
 using VAL.Host.Services;
 using VAL.Host.WebMessaging;
 using VAL.Continuum.Pipeline.QuickRefresh;
@@ -232,22 +233,17 @@ namespace VAL.Continuum
 
         
 
-        public void HandleJson(string json)
+        public void HandleCommand(HostCommand cmd)
         {
-            if (string.IsNullOrWhiteSpace(json))
+            if (string.IsNullOrWhiteSpace(cmd.Type))
                 return;
 
-            if (!MessageEnvelope.TryParse(json, out var envelope))
-                return;
-
-            var type = envelope.Name?.Trim();
-            if (string.IsNullOrWhiteSpace(type))
-                return;
+            var type = cmd.Type.Trim();
 
             Msg? msg = null;
-            if (envelope.Payload.HasValue && envelope.Payload.Value.ValueKind == JsonValueKind.Object)
+            if (cmd.Root.ValueKind == JsonValueKind.Object)
             {
-                try { msg = envelope.Payload.Value.Deserialize<Msg>(); } catch { msg = null; }
+                try { msg = cmd.Root.Deserialize<Msg>(); } catch { msg = null; }
             }
 
             if (msg == null)
@@ -256,8 +252,8 @@ namespace VAL.Continuum
             if (string.IsNullOrWhiteSpace(msg.type))
                 msg.type = type;
 
-            if (string.IsNullOrWhiteSpace(msg.chatId) && !string.IsNullOrWhiteSpace(envelope.ChatId))
-                msg.chatId = envelope.ChatId;
+            if (string.IsNullOrWhiteSpace(msg.chatId) && !string.IsNullOrWhiteSpace(cmd.ChatId))
+                msg.chatId = cmd.ChatId;
 
             // Authoritative session context update.
             SessionContext.Observe(type, msg.chatId);
