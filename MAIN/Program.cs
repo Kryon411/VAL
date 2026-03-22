@@ -1,12 +1,7 @@
 using System;
 using System.IO;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using VAL.Continuum.Pipeline.Telemetry;
-using VAL.Continuum.Pipeline.Truth;
-using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Startup;
@@ -21,7 +16,6 @@ namespace VAL
         {
             IHost? host = null;
             var smokeSettings = SmokeTestSettings.FromArgs(args);
-            SmokeTestState? smokeState = null;
             var startupOptions = StartupOptionsParser.Parse(args);
             var crashGuard = new StartupCrashGuard();
             var crashGuardSafeMode = crashGuard.EvaluateAndMarkStarting();
@@ -51,46 +45,7 @@ namespace VAL
                     })
                     .Build();
 
-                host.Start();
-
-                var toastHub = host.Services.GetRequiredService<IToastHub>();
-                TruthTelemetryBridge.Configure(TelemetryThresholdMonitor.UpdateFromTruthBytes);
-                TelemetryThresholdMonitor.Configure((chatId, level) =>
-                {
-                    toastHub.TryShow(
-                        MapTelemetryToast(level),
-                        chatId: chatId,
-                        origin: ToastOrigin.Telemetry,
-                        reason: ToastReason.Background);
-                });
-
-                var appPaths = host.Services.GetRequiredService<IAppPaths>();
-                var buildInfo = host.Services.GetRequiredService<IBuildInfo>();
-                var webViewOptions = host.Services.GetRequiredService<IOptions<WebViewOptions>>().Value;
-                safeBoot.LogStartupInfo(buildInfo, appPaths, webViewOptions);
-                if (startupOptions.SafeMode)
-                {
-                    ValLog.Info("Startup", "SAFE MODE: modules disabled");
-                }
-
-                // App is code-only (no InitializeComponent). MainWindow is created in App.OnStartup.
-                var app = host.Services.GetRequiredService<App>();
-                var crashHandler = host.Services.GetRequiredService<ICrashHandler>();
-                crashHandler.Register(app);
-
-                if (smokeSettings.Enabled)
-                {
-                    var smokeRunner = host.Services.GetRequiredService<SmokeTestRunner>();
-                    smokeState = host.Services.GetRequiredService<SmokeTestState>();
-                    smokeRunner.Register(app, smokeState);
-                }
-
-                app.Run();
-
-                if (smokeSettings.Enabled && smokeState != null)
-                {
-                    Environment.ExitCode = smokeState.Completion.Task.GetAwaiter().GetResult();
-                }
+                Environment.ExitCode = host.RunValDesktopApp(safeBoot, startupOptions);
             }
             catch (Exception ex)
             {
@@ -100,33 +55,9 @@ namespace VAL
             {
                 if (host != null)
                 {
-                    try
-                    {
-                        TruthTelemetryBridge.Configure(null);
-                        TelemetryThresholdMonitor.Configure(null);
-                        host.StopAsync().GetAwaiter().GetResult();
-                    }
-                    catch
-                    {
-                        // Ignore shutdown errors.
-                    }
-                    finally
-                    {
-                        host.Dispose();
-                    }
+                    host.Dispose();
                 }
             }
-        }
-
-        private static ToastKey MapTelemetryToast(ContinuumTelemetryThresholdLevel level)
-        {
-            return level switch
-            {
-                ContinuumTelemetryThresholdLevel.Early => ToastKey.TelemetrySessionSizeEarly,
-                ContinuumTelemetryThresholdLevel.Large => ToastKey.TelemetrySessionSizeLarge,
-                ContinuumTelemetryThresholdLevel.VeryLarge => ToastKey.TelemetrySessionSizeVeryLarge,
-                _ => throw new ArgumentOutOfRangeException(nameof(level), level, null),
-            };
         }
     }
 }

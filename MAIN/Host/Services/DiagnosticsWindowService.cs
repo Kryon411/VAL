@@ -10,11 +10,15 @@ namespace VAL.Host.Services
     public sealed class DiagnosticsWindowService : IDiagnosticsWindowService
     {
         private readonly IServiceProvider _serviceProvider;
+        private readonly ICommandDiagnosticsReporter _diagnosticsReporter;
         private DiagnosticsWindow? _window;
 
-        public DiagnosticsWindowService(IServiceProvider serviceProvider)
+        public DiagnosticsWindowService(
+            IServiceProvider serviceProvider,
+            ICommandDiagnosticsReporter diagnosticsReporter)
         {
             _serviceProvider = serviceProvider;
+            _diagnosticsReporter = diagnosticsReporter;
         }
 
         public void ShowDiagnostics()
@@ -39,7 +43,10 @@ namespace VAL.Host.Services
             catch (Exception ex)
             {
                 // Diagnostics must never crash the app.
-                ToolsCommandHandlers.ReportDiagnosticsFailure(WebCommandNames.ToolsOpenDiagnostics, ex, "exception");
+                _diagnosticsReporter.ReportDiagnosticsFailure(
+                    null,
+                    ex,
+                    "exception");
             }
         }
     }

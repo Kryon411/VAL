@@ -22,6 +22,7 @@ namespace VAL.ViewModels
         private readonly IAppPaths _appPaths;
         private readonly IDiagnosticsWindowService _diagnosticsWindowService;
         private readonly ITruthHealthWindowService _truthHealthWindowService;
+        private readonly IToastService _toastService;
         private readonly StartupOptions _startupOptions;
 
         private long _lastExitWarnedOperationId;
@@ -39,6 +40,7 @@ namespace VAL.ViewModels
             IAppPaths appPaths,
             IDiagnosticsWindowService diagnosticsWindowService,
             ITruthHealthWindowService truthHealthWindowService,
+            IToastService toastService,
             StartupOptions startupOptions)
         {
             _operationCoordinator = operationCoordinator;
@@ -50,6 +52,7 @@ namespace VAL.ViewModels
             _appPaths = appPaths;
             _diagnosticsWindowService = diagnosticsWindowService;
             _truthHealthWindowService = truthHealthWindowService;
+            _toastService = toastService;
             _startupOptions = startupOptions;
 
             ToggleDockCommand = new RelayCommand(() => IsDockOpen = !IsDockOpen);
@@ -138,27 +141,25 @@ namespace VAL.ViewModels
             catch
             {
                 ValLog.Warn(nameof(MainWindowViewModel), "Failed to handle web message.");
-                ToastManager.ShowCatalog(
+                _toastService.ShowMessage(
                     "Command failed.",
                     "The action could not be completed. See Logs/VAL.log for details.",
-                    ToastManager.ToastDurationBucket.M,
                     groupKey: "host.command.error",
                     replaceGroup: true,
                     bypassBurstDedupe: true);
             }
         }
 
-        private static void HandleCommandResult(HostCommandExecutionResult result)
+        private void HandleCommandResult(HostCommandExecutionResult result)
         {
             if (!result.IsDockInvocation)
                 return;
 
             if (result.IsBlocked)
             {
-                ToastManager.ShowCatalog(
+                _toastService.ShowMessage(
                     result.Reason,
                     null,
-                    ToastManager.ToastDurationBucket.M,
                     groupKey: "host.command.blocked",
                     replaceGroup: true,
                     bypassBurstDedupe: true);
@@ -174,10 +175,9 @@ namespace VAL.ViewModels
             ValLog.Warn(nameof(MainWindowViewModel),
                 $"Dock command failed '{commandName}' (reason: {result.Reason}, diagnostic: {diagnostic}, exception: {exception}).");
 
-            ToastManager.ShowCatalog(
+            _toastService.ShowMessage(
                 result.Reason,
                 "The action failed. See Logs/VAL.log for details.",
-                ToastManager.ToastDurationBucket.M,
                 groupKey: "host.command.error",
                 replaceGroup: true,
                 bypassBurstDedupe: true);

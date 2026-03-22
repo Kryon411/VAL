@@ -1,7 +1,4 @@
 using System;
-using System.Threading;
-using VAL.Contracts;
-using VAL.Host;
 using VAL.Host.Logging;
 using VAL.Host.Services;
 
@@ -12,18 +9,20 @@ namespace VAL.Host.Commands
         private readonly IUiThread _uiThread;
         private readonly ITruthHealthWindowService _truthHealthWindowService;
         private readonly IDiagnosticsWindowService _diagnosticsWindowService;
+        private readonly ICommandDiagnosticsReporter _diagnosticsReporter;
         private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
-        private static int _diagnosticsFailureToastShown;
 
         public ToolsCommandHandlers(
             IUiThread uiThread,
             ITruthHealthWindowService truthHealthWindowService,
-            IDiagnosticsWindowService diagnosticsWindowService)
+            IDiagnosticsWindowService diagnosticsWindowService,
+            ICommandDiagnosticsReporter diagnosticsReporter)
         {
             _uiThread = uiThread ?? throw new ArgumentNullException(nameof(uiThread));
             _truthHealthWindowService = truthHealthWindowService ?? throw new ArgumentNullException(nameof(truthHealthWindowService));
             _diagnosticsWindowService = diagnosticsWindowService ?? throw new ArgumentNullException(nameof(diagnosticsWindowService));
+            _diagnosticsReporter = diagnosticsReporter ?? throw new ArgumentNullException(nameof(diagnosticsReporter));
         }
 
         public void HandleOpenTruthHealth(HostCommand cmd)
@@ -47,7 +46,7 @@ namespace VAL.Host.Commands
             }
             catch (Exception ex)
             {
-                ReportDiagnosticsFailure(cmd, ex, "exception");
+                _diagnosticsReporter.ReportDiagnosticsFailure(cmd, ex, "exception");
             }
         }
 
@@ -60,50 +59,6 @@ namespace VAL.Host.Commands
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";
             ValLog.Warn(nameof(ToolsCommandHandlers),
                 $"Tools command failed ({action}) for {cmd.Type} (source: {sourceHost}). {LogSanitizer.Sanitize(ex.ToString())}");
-        }
-
-        internal static void ReportDiagnosticsFailure(HostCommand? cmd, Exception? ex, string reason)
-        {
-            var sourceHost = cmd?.SourceUri?.Host ?? "unknown";
-            var cmdType = cmd?.Type ?? WebCommandNames.ToolsOpenDiagnostics;
-            var detail = ex != null
-                ? LogSanitizer.Sanitize(ex.ToString())
-                : "No exception details.";
-            ValLog.Warn(nameof(ToolsCommandHandlers),
-                $"Diagnostics command failed ({reason}) for {cmdType} (source: {sourceHost}). {detail}");
-            ShowDiagnosticsFailureToast();
-        }
-
-        internal static void ReportDiagnosticsFailure(string? sourceHost, Exception? ex, string reason)
-        {
-            var host = string.IsNullOrWhiteSpace(sourceHost) ? "unknown" : sourceHost;
-            var detail = ex != null
-                ? LogSanitizer.Sanitize(ex.ToString())
-                : "No exception details.";
-            ValLog.Warn(nameof(ToolsCommandHandlers),
-                $"Diagnostics command failed ({reason}) (source: {host}). {detail}");
-            ShowDiagnosticsFailureToast();
-        }
-
-        private static void ShowDiagnosticsFailureToast()
-        {
-            if (Interlocked.Exchange(ref _diagnosticsFailureToastShown, 1) == 1)
-                return;
-
-            try
-            {
-                ToastManager.ShowCatalog(
-                    "Diagnostics failed (see Logs/VAL.log)",
-                    null,
-                    ToastManager.ToastDurationBucket.M,
-                    groupKey: "tools.diagnostics",
-                    replaceGroup: true,
-                    bypassBurstDedupe: true);
-            }
-            catch
-            {
-                // Toast failures should not crash the app.
-            }
         }
     }
 }

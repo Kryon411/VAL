@@ -9,5 +9,21 @@ namespace VAL.Host.Services.Adapters
         {
             ToastManager.Initialize(hostWindow);
         }
+
+        public void ShowMessage(
+            string title,
+            string? subtitle = null,
+            string? groupKey = null,
+            bool replaceGroup = false,
+            bool bypassBurstDedupe = false)
+        {
+            ToastManager.ShowCatalog(
+                title,
+                subtitle,
+                ToastManager.ToastDurationBucket.M,
+                groupKey,
+                replaceGroup,
+                bypassBurstDedupe);
+        }
     }
 }
