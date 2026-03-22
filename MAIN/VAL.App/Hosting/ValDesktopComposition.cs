@@ -3,6 +3,7 @@ using System.Windows.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VAL.Continuum;
+using VAL.Continuum.Pipeline.Telemetry;
 using VAL.Host;
 using VAL.Host.Abyss;
 using VAL.Host.Commands;
@@ -79,6 +80,7 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
             builder.Services.AddSingleton<VAL.Continuum.Pipeline.Truth.IContinuumWriter, VAL.Continuum.Pipeline.Truth.ContinuumWriter>();
             builder.Services.AddSingleton<VAL.Continuum.Pipeline.Inject.IContinuumInjectInbox, VAL.Continuum.Pipeline.Inject.ContinuumInjectInbox>();
+            builder.Services.AddSingleton<TelemetryThresholdMonitor>();
             builder.Services.AddSingleton<IContinuumPump, ContinuumPump>();
             builder.Services.AddSingleton<SmokeTestRunner>();
             builder.Services.AddSingleton(crashGuard);

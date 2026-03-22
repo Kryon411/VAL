@@ -12,7 +12,7 @@ namespace VAL.Continuum.Pipeline.Telemetry
 
     // TelemetryThresholdMonitor: emits progressive session-size nudges.
     // MUST be best-effort and never throw; Truth writing must always win.
-    public static class TelemetryThresholdMonitor
+    public sealed class TelemetryThresholdMonitor
     {
         // Thresholds are conservative and based on file size (Truth.log bytes).
         public const long SoftBytes = 250_000;
@@ -24,17 +24,12 @@ namespace VAL.Continuum.Pipeline.Telemetry
             public int LastLevel;
         }
 
-        private static readonly ConcurrentDictionary<string, ChatState> _stateByChat =
+        private readonly ConcurrentDictionary<string, ChatState> _stateByChat =
             new ConcurrentDictionary<string, ChatState>(StringComparer.Ordinal);
 
-        private static Action<string, ContinuumTelemetryThresholdLevel>? _sink;
+        public event Action<string, ContinuumTelemetryThresholdLevel>? ThresholdReached;
 
-        public static void Configure(Action<string, ContinuumTelemetryThresholdLevel>? sink)
-        {
-            _sink = sink;
-        }
-
-        public static void UpdateFromTruthBytes(string chatId, long bytes)
+        public void UpdateFromTruthBytes(string chatId, long bytes)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return;
             if (bytes <= 0) return;
@@ -50,7 +45,7 @@ namespace VAL.Continuum.Pipeline.Telemetry
             }
         }
 
-        private static void Evaluate(string chatId, long bytes, ChatState state)
+        private void Evaluate(string chatId, long bytes, ChatState state)
         {
             ContinuumTelemetryThresholdLevel? level = null;
             if (bytes >= CriticalBytes) level = ContinuumTelemetryThresholdLevel.VeryLarge;
@@ -68,7 +63,7 @@ namespace VAL.Continuum.Pipeline.Telemetry
 
             try
             {
-                _sink?.Invoke(chatId, level.Value);
+                ThresholdReached?.Invoke(chatId, level.Value);
             }
             catch
             {

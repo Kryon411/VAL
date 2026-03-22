@@ -23,6 +23,7 @@ namespace VAL.Hosting
             ArgumentNullException.ThrowIfNull(startupOptions);
 
             SmokeTestState? smokeState = null;
+            TelemetryRegistration? telemetryRegistration = null;
             var smokeSettings = host.Services.GetRequiredService<SmokeTestSettings>();
 
             try
@@ -30,7 +31,9 @@ namespace VAL.Hosting
                 host.Start();
 
                 var services = host.Services;
-                ConfigureTelemetry(services.GetRequiredService<IToastHub>());
+                telemetryRegistration = ConfigureTelemetry(
+                    services.GetRequiredService<IToastHub>(),
+                    services.GetRequiredService<TelemetryThresholdMonitor>());
                 LogStartup(safeBoot, services, startupOptions);
 
                 var app = services.GetRequiredService<App>();
@@ -53,21 +56,30 @@ namespace VAL.Hosting
             }
             finally
             {
-                Shutdown(host);
+                Shutdown(host, telemetryRegistration);
             }
         }
 
-        private static void ConfigureTelemetry(IToastHub toastHub)
+        private static TelemetryRegistration ConfigureTelemetry(
+            IToastHub toastHub,
+            TelemetryThresholdMonitor monitor)
         {
-            TruthTelemetryBridge.Configure(TelemetryThresholdMonitor.UpdateFromTruthBytes);
-            TelemetryThresholdMonitor.Configure((chatId, level) =>
+            ArgumentNullException.ThrowIfNull(toastHub);
+            ArgumentNullException.ThrowIfNull(monitor);
+
+            void OnThresholdReached(string chatId, ContinuumTelemetryThresholdLevel level)
             {
                 toastHub.TryShow(
                     MapTelemetryToast(level),
                     chatId: chatId,
                     origin: ToastOrigin.Telemetry,
                     reason: ToastReason.Background);
-            });
+            }
+
+            monitor.ThresholdReached += OnThresholdReached;
+            TruthTelemetryBridge.Configure(monitor.UpdateFromTruthBytes);
+
+            return new TelemetryRegistration(monitor, OnThresholdReached);
         }
 
         private static void LogStartup(
@@ -86,12 +98,11 @@ namespace VAL.Hosting
             }
         }
 
-        private static void Shutdown(IHost host)
+        private static void Shutdown(IHost host, TelemetryRegistration? telemetryRegistration)
         {
             try
             {
-                TruthTelemetryBridge.Configure(null);
-                TelemetryThresholdMonitor.Configure(null);
+                telemetryRegistration?.Dispose();
                 host.StopAsync().GetAwaiter().GetResult();
             }
             catch
@@ -109,6 +120,31 @@ namespace VAL.Hosting
                 ContinuumTelemetryThresholdLevel.VeryLarge => ToastKey.TelemetrySessionSizeVeryLarge,
                 _ => throw new ArgumentOutOfRangeException(nameof(level), level, null),
             };
+        }
+
+        private sealed class TelemetryRegistration : IDisposable
+        {
+            private readonly TelemetryThresholdMonitor _monitor;
+            private readonly Action<string, ContinuumTelemetryThresholdLevel> _handler;
+            private bool _disposed;
+
+            public TelemetryRegistration(
+                TelemetryThresholdMonitor monitor,
+                Action<string, ContinuumTelemetryThresholdLevel> handler)
+            {
+                _monitor = monitor;
+                _handler = handler;
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                    return;
+
+                _disposed = true;
+                TruthTelemetryBridge.Configure(null);
+                _monitor.ThresholdReached -= _handler;
+            }
         }
     }
 }
