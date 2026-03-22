@@ -30,6 +30,7 @@ namespace VAL.Host.Services
         private readonly IAppPaths _appPaths;
         private readonly IBuildInfo _buildInfo;
         private readonly IWebViewRuntime _webViewRuntime;
+        private readonly IModuleLoader _moduleLoader;
         private readonly IModuleRuntimeService _moduleRuntimeService;
         private readonly IWebMessageSender _webMessageSender;
         private readonly Continuum.ContinuumHost _continuumHost;
@@ -45,6 +46,7 @@ namespace VAL.Host.Services
             IAppPaths appPaths,
             IBuildInfo buildInfo,
             IWebViewRuntime webViewRuntime,
+            IModuleLoader moduleLoader,
             IModuleRuntimeService moduleRuntimeService,
             IWebMessageSender webMessageSender,
             Continuum.ContinuumHost continuumHost,
@@ -58,6 +60,7 @@ namespace VAL.Host.Services
             _appPaths = appPaths;
             _buildInfo = buildInfo;
             _webViewRuntime = webViewRuntime;
+            _moduleLoader = moduleLoader;
             _moduleRuntimeService = moduleRuntimeService;
             _webMessageSender = webMessageSender;
             _continuumHost = continuumHost;
@@ -180,7 +183,7 @@ namespace VAL.Host.Services
             finally
             {
                 result.EndTime = DateTimeOffset.Now;
-                result.ModuleStatuses = ModuleLoader.GetModuleStatuses();
+                result.ModuleStatuses = _moduleLoader.GetModuleStatuses();
                 TryWriteReport(result);
             }
 
@@ -280,7 +283,7 @@ namespace VAL.Host.Services
             }
         }
 
-        private static async Task WaitForModulesAsync(SmokeTestResult result, CancellationToken token)
+        private async Task WaitForModulesAsync(SmokeTestResult result, CancellationToken token)
         {
             var pollInterval = TimeSpan.FromMilliseconds(250);
             var expected = new HashSet<string>(ExpectedModules, StringComparer.OrdinalIgnoreCase);
@@ -289,7 +292,7 @@ namespace VAL.Host.Services
             {
                 token.ThrowIfCancellationRequested();
 
-                var statuses = ModuleLoader.GetModuleStatuses();
+                var statuses = _moduleLoader.GetModuleStatuses();
                 result.ModuleStatuses = statuses;
 
                 var expectedStatuses = statuses
@@ -376,7 +379,7 @@ namespace VAL.Host.Services
                 Exception = exception,
                 StartTime = DateTimeOffset.Now,
                 EndTime = DateTimeOffset.Now,
-                ModuleStatuses = ModuleLoader.GetModuleStatuses(),
+                ModuleStatuses = _moduleLoader.GetModuleStatuses(),
                 ValOptions = _valOptions.Value,
                 WebViewOptions = _webViewOptions.Value,
                 ModuleOptions = _moduleOptions.Value,
@@ -467,7 +470,7 @@ namespace VAL.Host.Services
             builder.AppendLine();
             builder.AppendLine("Module Statuses");
 
-            foreach (var status in result.ModuleStatuses ?? new List<ModuleLoader.ModuleStatusInfo>())
+            foreach (var status in result.ModuleStatuses ?? new List<ModuleStatusInfo>())
             {
                 builder.AppendLine(CultureInfo.InvariantCulture, $"- {status.Name} | {status.Status} | {status.Path}");
             }
@@ -507,7 +510,7 @@ namespace VAL.Host.Services
             public bool LogAppendSucceeded { get; set; }
             public bool MessageSenderWired { get; set; }
             public bool ModulesRootReady { get; set; }
-            public IReadOnlyList<ModuleLoader.ModuleStatusInfo>? ModuleStatuses { get; set; }
+            public IReadOnlyList<ModuleStatusInfo>? ModuleStatuses { get; set; }
             public ValOptions? ValOptions { get; set; }
             public WebViewOptions? WebViewOptions { get; set; }
             public ModuleOptions? ModuleOptions { get; set; }

@@ -6,12 +6,13 @@ using System.Linq;
 using System.Buffers;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
 using VAL.Host.Json;
 using VAL.Host.Logging;
 using VAL.Host.Options;
 
-namespace VAL.Host
+namespace VAL.Host.Services
 {
     /// <summary>
     /// Loads *.module.json UI modules into the WebView2 instance.
@@ -25,31 +26,30 @@ namespace VAL.Host
     ///   loaded in order (with "entry" ensured as well).
     /// - No UI toasts are emitted here (kept quiet; use devtools console for troubleshooting).
     /// </summary>
-    public static class ModuleLoader
+    public sealed class ModuleLoaderService : IModuleLoader
     {
         private const string SupportedApiVersion = "1";
-        private static readonly ModuleRegistrationTracker _registrationTracker = new();
-        private static readonly object _statusLock = new();
-        private static readonly Dictionary<string, ModuleStatusInfo> _moduleStatuses = new(StringComparer.OrdinalIgnoreCase);
-        private static readonly RateLimiter RateLimiter = new();
+        private readonly ModuleOptions _moduleOptions;
+        private readonly IAppPaths _appPaths;
+        private readonly IBuildInfo _buildInfo;
+        private readonly ModuleRegistrationTracker _registrationTracker = new();
+        private readonly object _statusLock = new();
+        private readonly Dictionary<string, ModuleStatusInfo> _moduleStatuses = new(StringComparer.OrdinalIgnoreCase);
+        private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
         private static readonly HashSet<string> SupportedCapabilities = new(StringComparer.OrdinalIgnoreCase)
         {
             "ui"
         };
 
-        public sealed class ModuleStatusInfo
+        public ModuleLoaderService(
+            IOptions<ModuleOptions> moduleOptions,
+            IAppPaths appPaths,
+            IBuildInfo buildInfo)
         {
-            public ModuleStatusInfo(string name, string status, string path)
-            {
-                Name = name;
-                Status = status;
-                Path = path;
-            }
-
-            public string Name { get; }
-            public string Status { get; }
-            public string Path { get; }
+            _moduleOptions = moduleOptions?.Value ?? throw new ArgumentNullException(nameof(moduleOptions));
+            _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
+            _buildInfo = buildInfo ?? throw new ArgumentNullException(nameof(buildInfo));
         }
 
         private sealed class ModuleManifest
@@ -65,7 +65,7 @@ namespace VAL.Host
             public string[]? capabilities { get; set; }
         }
 
-        public static IReadOnlyList<ModuleStatusInfo> GetModuleStatuses()
+        public IReadOnlyList<ModuleStatusInfo> GetModuleStatuses()
         {
             lock (_statusLock)
             {
@@ -76,7 +76,7 @@ namespace VAL.Host
             }
         }
 
-        private static void RecordModuleStatus(string configPath, string moduleName, string status)
+        private void RecordModuleStatus(string configPath, string moduleName, string status)
         {
             if (string.IsNullOrWhiteSpace(configPath) || string.IsNullOrWhiteSpace(moduleName))
                 return;
@@ -135,7 +135,7 @@ namespace VAL.Host
             return Version.TryParse(trimmed, out var parsed) ? parsed : null;
         }
 
-        public static async Task Initialize(
+        private async Task InitializeCoreAsync(
             CoreWebView2 core,
             string? modulesRoot,
             string? contentRoot,
@@ -458,11 +458,11 @@ namespace VAL.Host
                 }
                 catch (Exception ex)
                 {
-                    if (RateLimiter.Allow("module.discovery.console_log", LogInterval))
-                    {
-                        ValLog.Warn(nameof(ModuleLoader),
-                            $"Module discovery devtools log failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
-                    }
+                        if (_rateLimiter.Allow("module.discovery.console_log", LogInterval))
+                        {
+                            ValLog.Warn(nameof(ModuleLoaderService),
+                                $"Module discovery devtools log failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+                        }
                 }
 
                 foreach (var configPath in configs)
@@ -504,6 +504,16 @@ namespace VAL.Host
             var loadedCount = statusSnapshot.Count(status => string.Equals(status.Status, "Loaded", StringComparison.OrdinalIgnoreCase));
             var skippedCount = statusSnapshot.Count - loadedCount;
             ValLog.Info("ModuleLoader", $"Modules Status: {loadedCount} loaded, {skippedCount} skipped.");
+        }
+
+        public Task InitializeAsync(CoreWebView2 core)
+        {
+            return InitializeCoreAsync(
+                core,
+                _appPaths.ModulesRoot,
+                _appPaths.ContentRoot,
+                _moduleOptions,
+                _buildInfo.Version);
         }
     }
 }

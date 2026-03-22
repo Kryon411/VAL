@@ -6,7 +6,6 @@ using System.Windows;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
-using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
 
@@ -23,12 +22,19 @@ namespace VAL.ViewModels
             IProcessLauncher processLauncher,
             IOptions<WebViewOptions> webViewOptions,
             IOptions<ModuleOptions> moduleOptions,
+            IModuleLoader moduleLoader,
             IHostEnvironment hostEnvironment)
         {
             _processLauncher = processLauncher;
             _appPaths = appPaths;
 
-            DiagnosticsText = BuildDiagnosticsText(buildInfo, webViewOptions.Value, moduleOptions.Value, hostEnvironment, appPaths);
+            DiagnosticsText = BuildDiagnosticsText(
+                buildInfo,
+                webViewOptions.Value,
+                moduleOptions.Value,
+                moduleLoader,
+                hostEnvironment,
+                appPaths);
 
             CopyDiagnosticsCommand = new RelayCommand(CopyDiagnostics);
             OpenLogsFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.LogsRoot));
@@ -60,6 +66,7 @@ namespace VAL.ViewModels
             IBuildInfo buildInfo,
             WebViewOptions webViewOptions,
             ModuleOptions moduleOptions,
+            IModuleLoader moduleLoader,
             IHostEnvironment hostEnvironment,
             IAppPaths appPaths)
         {
@@ -118,7 +125,7 @@ namespace VAL.ViewModels
             builder.AppendLine();
             builder.AppendLine("Modules Status");
             builder.AppendLine("-------------------------------");
-            var moduleStatuses = ModuleLoader.GetModuleStatuses();
+            var moduleStatuses = moduleLoader.GetModuleStatuses();
             if (moduleStatuses.Count == 0)
             {
                 builder.AppendLine("(none)");

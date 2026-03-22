@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using VAL.Contracts;
-using VAL.Host;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Services
@@ -13,6 +12,7 @@ namespace VAL.Host.Services
         private readonly IWebMessageSender _webMessageSender;
         private readonly IPrivacySettingsService _privacySettingsService;
         private readonly ISessionContext _sessionContext;
+        private readonly IModuleLoader _moduleLoader;
         private readonly object _sync = new();
 
         private bool _continuumLoggingEnabled = true;
@@ -24,11 +24,13 @@ namespace VAL.Host.Services
         public DockModelService(
             IWebMessageSender webMessageSender,
             IPrivacySettingsService privacySettingsService,
-            ISessionContext sessionContext)
+            ISessionContext sessionContext,
+            IModuleLoader moduleLoader)
         {
             _webMessageSender = webMessageSender;
             _privacySettingsService = privacySettingsService;
             _sessionContext = sessionContext;
+            _moduleLoader = moduleLoader;
 
             ApplyPrivacySnapshot(_privacySettingsService.GetSnapshot());
             _privacySettingsService.SettingsChanged += OnPrivacySettingsChanged;
@@ -341,7 +343,7 @@ namespace VAL.Host.Services
                 }
             };
 
-            var moduleStatuses = ModuleLoader.GetModuleStatuses().ToList();
+            var moduleStatuses = _moduleLoader.GetModuleStatuses().ToList();
             var moduleIssues = moduleStatuses
                 .Where(status => !string.Equals(status.Status, "Loaded", StringComparison.OrdinalIgnoreCase))
                 .ToList();

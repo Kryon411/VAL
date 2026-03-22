@@ -34,7 +34,6 @@ MAIN/Host/Commands/VoidCommandHandlers.cs
 MAIN/Host/IToastHub.cs
 MAIN/Host/OperationCoordinator.cs
 MAIN/Host/Services/Adapters/CommandDispatcherAdapter.cs
-MAIN/Host/Services/Adapters/ModuleLoaderAdapter.cs
 MAIN/Host/Services/Adapters/OperationCoordinatorAdapter.cs
 MAIN/Host/Services/Adapters/SessionContextAdapter.cs
 MAIN/VAL.App/Host/DesktopToastService.cs
@@ -160,7 +159,7 @@ MAIN/VAL.Host/Logging/LogLevel.cs
 MAIN/VAL.Host/Logging/LogSanitizer.cs
 MAIN/VAL.Host/Logging/RateLimiter.cs
 MAIN/VAL.Host/Logging/RollingFileLogSink.cs
-MAIN/VAL.Host/ModuleLoader.cs
+MAIN/VAL.Host/ModuleLoaderService.cs
 MAIN/VAL.Host/ModuleRegistrationTracker.cs
 MAIN/VAL.Host/Options/ModuleOptions.cs
 MAIN/VAL.Host/Options/ValOptions.cs
@@ -181,6 +180,7 @@ MAIN/VAL.Host/Services/IContinuumPump.cs
 MAIN/VAL.Host/Services/IDiagnosticsWindowService.cs
 MAIN/VAL.Host/Services/IDockModelService.cs
 MAIN/VAL.Host/Services/IModuleLoader.cs
+MAIN/VAL.Host/Services/ModuleStatusInfo.cs
 MAIN/VAL.Host/Services/IModuleRuntimeService.cs
 MAIN/VAL.Host/Services/IOperationCoordinator.cs
 MAIN/VAL.Host/Services/IPortalRuntimeService.cs

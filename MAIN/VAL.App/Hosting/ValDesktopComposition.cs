@@ -57,7 +57,8 @@ namespace VAL.Hosting
             builder.CommandRegistryConfigurators.Add((serviceProvider, registry) =>
                 serviceProvider.GetRequiredService<CommandRegistryComposer>().Register(registry));
 
-            builder.Services.AddSingleton<IModuleLoader, ModuleLoaderAdapter>();
+            builder.Services.AddSingleton<ModuleLoaderService>();
+            builder.Services.AddSingleton<IModuleLoader>(sp => sp.GetRequiredService<ModuleLoaderService>());
             builder.Services.AddSingleton<SessionContext>();
             builder.Services.AddSingleton<ISessionContext>(sp => sp.GetRequiredService<SessionContext>());
             builder.Services.AddSingleton<OperationCoordinator>();
