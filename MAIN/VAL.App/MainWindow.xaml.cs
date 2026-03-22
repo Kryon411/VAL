@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
@@ -25,6 +24,7 @@ namespace VAL
         private readonly WebViewOptions _webViewOptions;
         private readonly StartupOptions _startupOptions;
         private readonly IStartupCrashGuard _startupCrashGuard;
+        private readonly IControlCentreUiStateStore _uiStateStore;
         private readonly DispatcherTimer _persistTimer;
         private readonly DispatcherTimer _dockInitStateTimer;
 
@@ -51,7 +51,6 @@ namespace VAL
         private const string DockLayoutDisableMessage = "{\"type\":\"dock.layout.disable\",\"source\":\"host\"}";
         private const string DockUiStateSetType = "dock.ui_state.set";
         private const string DockStateType = "dock.state";
-        private static readonly JsonSerializerOptions UiStateJsonOptions = new() { WriteIndented = true };
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
@@ -68,7 +67,8 @@ namespace VAL
             MainWindowViewModel viewModel,
             IOptions<WebViewOptions> webViewOptions,
             StartupOptions startupOptions,
-            IStartupCrashGuard startupCrashGuard)
+            IStartupCrashGuard startupCrashGuard,
+            IControlCentreUiStateStore uiStateStore)
         {
             _toastService = toastService;
             _webViewRuntime = webViewRuntime;
@@ -76,6 +76,7 @@ namespace VAL
             _webViewOptions = webViewOptions.Value;
             _startupOptions = startupOptions;
             _startupCrashGuard = startupCrashGuard;
+            _uiStateStore = uiStateStore;
 
             _persistTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
             _persistTimer.Tick += PersistTimer_Tick;
@@ -750,97 +751,12 @@ namespace VAL
 
         private void LoadUiState()
         {
-            var path = GetUiStatePath();
-            try
-            {
-                if (!File.Exists(path))
-                {
-                    _uiState = ControlCentreUiState.Default;
-                    return;
-                }
-
-                var json = File.ReadAllText(path);
-                var loaded = JsonSerializer.Deserialize<ControlCentreUiState>(json, UiStateJsonOptions);
-                _uiState = loaded?.Normalize() ?? ControlCentreUiState.Default;
-            }
-            catch
-            {
-                _uiState = ControlCentreUiState.Default;
-            }
+            _uiState = _uiStateStore.Load();
         }
 
         private void SaveUiState()
         {
-            try
-            {
-                var path = GetUiStatePath();
-                var directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                var json = JsonSerializer.Serialize(_uiState.Normalize(), UiStateJsonOptions);
-                File.WriteAllText(path, json);
-            }
-            catch
-            {
-                ValLog.Warn("MainWindow", "Failed to persist control centre layout state.");
-            }
-        }
-
-        private static string GetUiStatePath()
-        {
-            return Path.Combine(AppContext.BaseDirectory, "State", "controlcentre.ui.json");
-        }
-
-        private sealed class ControlCentreUiState
-        {
-            public int Version { get; set; } = 1;
-            public GeometryState ControlCentre { get; set; } = new(0, 0, 0, 0);
-            public DockGeometryState Dock { get; set; } = new();
-            public bool LayoutMode { get; set; }
-
-            public static ControlCentreUiState Default => new();
-
-            public ControlCentreUiState Normalize()
-            {
-                Version = 1;
-                if (ControlCentre.W <= 0 || ControlCentre.H <= 0)
-                {
-                    ControlCentre = new GeometryState(ControlCentre.X, ControlCentre.Y, 36, 36);
-                }
-
-                Dock.W = Dock.W <= 0 ? 560 : Dock.W;
-                Dock.H = Dock.H <= 0 ? 460 : Dock.H;
-                return this;
-            }
-        }
-
-        private sealed class DockGeometryState
-        {
-            public double X { get; set; } = 72;
-            public double Y { get; set; } = 56;
-            public double W { get; set; } = 560;
-            public double H { get; set; } = 460;
-            public bool IsOpen { get; set; }
-        }
-
-        private struct GeometryState
-        {
-            public GeometryState(double x, double y, double w, double h)
-            {
-                X = x;
-                Y = y;
-                W = w;
-                H = h;
-            }
-
-            public double X { get; set; }
-            public double Y { get; set; }
-            public double W { get; set; }
-            public double H { get; set; }
-            public bool HasPosition => W > 0 && H > 0;
+            _uiStateStore.Save(_uiState);
         }
     }
 }

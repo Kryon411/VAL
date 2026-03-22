@@ -12,6 +12,7 @@ namespace VAL.Host.Services
     {
         private readonly IWebMessageSender _webMessageSender;
         private readonly IPrivacySettingsService _privacySettingsService;
+        private readonly ISessionContext _sessionContext;
         private readonly object _sync = new();
 
         private bool _continuumLoggingEnabled = true;
@@ -20,10 +21,14 @@ namespace VAL.Host.Services
         private bool _portalPrivacyAllowed = true;
         private int _portalCount;
 
-        public DockModelService(IWebMessageSender webMessageSender, IPrivacySettingsService privacySettingsService)
+        public DockModelService(
+            IWebMessageSender webMessageSender,
+            IPrivacySettingsService privacySettingsService,
+            ISessionContext sessionContext)
         {
             _webMessageSender = webMessageSender;
             _privacySettingsService = privacySettingsService;
+            _sessionContext = sessionContext;
 
             ApplyPrivacySnapshot(_privacySettingsService.GetSnapshot());
             _privacySettingsService.SettingsChanged += OnPrivacySettingsChanged;
@@ -36,7 +41,7 @@ namespace VAL.Host.Services
             lock (_sync)
             {
                 if (string.IsNullOrWhiteSpace(resolvedChatId))
-                    resolvedChatId = SessionContext.ActiveChatId;
+                    resolvedChatId = _sessionContext.ActiveChatId;
 
                 model = BuildModel(resolvedChatId);
             }

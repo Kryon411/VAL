@@ -16,14 +16,17 @@ namespace VAL.Host.Services
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
+        private readonly ContinuumHost _continuumHost;
         private readonly object _gate = new();
         private readonly string _settingsPath;
         private PrivacySettingsState _settings;
 
-        public PrivacySettingsService(IAppPaths appPaths)
+        public PrivacySettingsService(IAppPaths appPaths, ContinuumHost continuumHost)
         {
             ArgumentNullException.ThrowIfNull(appPaths);
+            ArgumentNullException.ThrowIfNull(continuumHost);
 
+            _continuumHost = continuumHost;
             _settingsPath = Path.Combine(appPaths.DataRoot, "settings.json");
             _settings = LoadSettings();
 
@@ -123,11 +126,11 @@ namespace VAL.Host.Services
             }
         }
 
-        private static void ApplyContinuumLogging(bool enabled)
+        private void ApplyContinuumLogging(bool enabled)
         {
             try
             {
-                ContinuumHost.ApplyLoggingSetting(enabled, showToast: false);
+                _continuumHost.ApplyLoggingSetting(enabled, showToast: false);
             }
             catch
             {

@@ -4,29 +4,36 @@ namespace VAL.Host.Services
 {
     public sealed class PortalRuntimeStateManager : IPortalRuntimeStateManager
     {
+        private readonly PortalRuntime _portalRuntime;
+
+        public PortalRuntimeStateManager(PortalRuntime portalRuntime)
+        {
+            _portalRuntime = portalRuntime ?? throw new System.ArgumentNullException(nameof(portalRuntime));
+        }
+
         public void SetEnabled(bool enabled)
         {
-            PortalRuntime.SetEnabled(enabled);
+            _portalRuntime.SetEnabled(enabled);
         }
 
         public void SetPrivacyAllowed(bool allowed)
         {
-            PortalRuntime.SetPrivacyAllowed(allowed);
+            _portalRuntime.SetPrivacyAllowed(allowed);
         }
 
         public void ClearStaging()
         {
-            PortalRuntime.ClearStaging();
+            _portalRuntime.ClearStaging();
         }
 
         public void OpenSnipOverlay()
         {
-            PortalRuntime.OpenSnipOverlay();
+            _portalRuntime.OpenSnipOverlay();
         }
 
         public void SendStaged(int max)
         {
-            PortalRuntime.SendStaged(max);
+            _portalRuntime.SendStaged(max);
         }
     }
 }

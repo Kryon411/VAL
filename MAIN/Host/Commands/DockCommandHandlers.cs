@@ -1,25 +1,32 @@
 using System;
 using System.Text.Json;
-using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
 using VAL.Contracts;
 using VAL.Host.Services;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Commands
 {
-    internal static class DockCommandHandlers
+    internal sealed class DockCommandHandlers
     {
-        public static void HandleRequestModel(HostCommand cmd)
+        private readonly IDockModelService _modelService;
+        private readonly IDockUiStateStore _stateStore;
+        private readonly IWebMessageSender _webMessageSender;
+
+        public DockCommandHandlers(
+            IDockModelService modelService,
+            IDockUiStateStore stateStore,
+            IWebMessageSender webMessageSender)
+        {
+            _modelService = modelService ?? throw new ArgumentNullException(nameof(modelService));
+            _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
+            _webMessageSender = webMessageSender ?? throw new ArgumentNullException(nameof(webMessageSender));
+        }
+
+        public void HandleRequestModel(HostCommand cmd)
         {
             try
             {
-                var services = GetServices();
-                if (services == null)
-                    return;
-
-                var modelService = services.GetRequiredService<IDockModelService>();
-                modelService.Publish(cmd.ChatId);
+                _modelService.Publish(cmd.ChatId);
             }
             catch
             {
@@ -27,19 +34,13 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleUiStateGet(HostCommand cmd)
+        public void HandleUiStateGet(HostCommand cmd)
         {
             try
             {
-                var services = GetServices();
-                if (services == null)
-                    return;
-
-                var store = services.GetRequiredService<IDockUiStateStore>();
-                var sender = services.GetRequiredService<IWebMessageSender>();
-                var state = store.Load();
+                var state = _stateStore.Load();
                 var payload = JsonSerializer.SerializeToElement(state);
-                sender.Send(new MessageEnvelope
+                _webMessageSender.Send(new MessageEnvelope
                 {
                     Type = WebMessageTypes.Event,
                     Name = WebCommandNames.DockUiStateGet,
@@ -55,16 +56,11 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleUiStateSet(HostCommand cmd)
+        public void HandleUiStateSet(HostCommand cmd)
         {
             try
             {
-                var services = GetServices();
-                if (services == null)
-                    return;
-
-                var store = services.GetRequiredService<IDockUiStateStore>();
-                var current = store.Load();
+                var current = _stateStore.Load();
 
                 if (cmd.Root.TryGetProperty("isOpen", out var isOpenEl) && (isOpenEl.ValueKind == JsonValueKind.True || isOpenEl.ValueKind == JsonValueKind.False))
                     current.IsOpen = isOpenEl.GetBoolean();
@@ -84,7 +80,7 @@ namespace VAL.Host.Commands
                 if (cmd.Root.TryGetProperty("mode", out var modeEl) && modeEl.ValueKind == JsonValueKind.String)
                     current.Mode = modeEl.GetString() ?? current.Mode;
 
-                store.Save(current);
+                _stateStore.Save(current);
             }
             catch
             {
@@ -104,11 +100,6 @@ namespace VAL.Host.Commands
                 return parsed;
 
             return current;
-        }
-
-        private static IServiceProvider? GetServices()
-        {
-            return (Application.Current as App)?.Services;
         }
     }
 }

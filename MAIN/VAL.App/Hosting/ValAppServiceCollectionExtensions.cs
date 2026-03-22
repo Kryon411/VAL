@@ -8,6 +8,7 @@ namespace VAL.Hosting
     {
         public static IServiceCollection AddValAppShell(this IServiceCollection services)
         {
+            services.AddSingleton<global::VAL.IControlCentreUiStateStore, global::VAL.ControlCentreUiStateStore>();
             services.AddTransient<DiagnosticsViewModel>();
             services.AddTransient<DiagnosticsWindow>();
             services.AddTransient<TruthHealthViewModel>();

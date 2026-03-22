@@ -32,6 +32,7 @@ namespace VAL.Host.Services
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IModuleRuntimeService _moduleRuntimeService;
         private readonly IWebMessageSender _webMessageSender;
+        private readonly Continuum.ContinuumHost _continuumHost;
         private readonly ICommandDispatcher _commandDispatcher;
         private readonly IUiThread _uiThread;
         private readonly IOptions<ValOptions> _valOptions;
@@ -46,6 +47,7 @@ namespace VAL.Host.Services
             IWebViewRuntime webViewRuntime,
             IModuleRuntimeService moduleRuntimeService,
             IWebMessageSender webMessageSender,
+            Continuum.ContinuumHost continuumHost,
             ICommandDispatcher commandDispatcher,
             IUiThread uiThread,
             IOptions<ValOptions> valOptions,
@@ -58,6 +60,7 @@ namespace VAL.Host.Services
             _webViewRuntime = webViewRuntime;
             _moduleRuntimeService = moduleRuntimeService;
             _webMessageSender = webMessageSender;
+            _continuumHost = continuumHost;
             _commandDispatcher = commandDispatcher;
             _uiThread = uiThread;
             _valOptions = valOptions;
@@ -324,7 +327,7 @@ namespace VAL.Host.Services
                 throw new SmokeTestFailureException(40, "Web message sender is not available.");
             }
 
-            result.MessageSenderWired = Continuum.ContinuumHost.PostToWebMessage != null;
+            result.MessageSenderWired = _continuumHost.IsMessageSenderWired;
 
             if (!result.MessageSenderWired)
             {

@@ -8,60 +8,60 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using VAL.Contracts;
+using VAL.Host.Services;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Portal
 {
-    internal static class PortalRuntime
+    public sealed class PortalRuntime
     {
         private const int HOTKEY_ID = 0xB001;
         private const int WM_HOTKEY = 0x0312;
         private const int WM_CLIPBOARDUPDATE = 0x031D;
 
-        private static bool _enabled;
-        private static bool _privacyAllowed = true;
-        private static IntPtr _hwnd = IntPtr.Zero;
-        private static HwndSource? _source;
-        private static bool _clipboardListenerRegistered;
-
-        private static IWebMessageSender? _messageSender;   // host -> webview
-        private static Action? _focusWebView;       // ensure webview focused before paste
-
-        private static uint _lastClipSeq;
-
-        internal static Action<bool, bool, int>? DockModelStateChanged;
+        private readonly IWebMessageSender _messageSender;
+        private readonly IDockModelService _dockModelService;
+        private readonly PortalStaging _staging = new();
+        private bool _enabled;
+        private bool _privacyAllowed = true;
+        private IntPtr _hwnd = IntPtr.Zero;
+        private HwndSource? _source;
+        private bool _clipboardListenerRegistered;
+        private Action? _focusWebView;
+        private uint _lastClipSeq;
 
         // Debounce & dedupe
-        private static long _lastStageTicks;
-        private static string _lastSig = "";
+        private long _lastStageTicks;
+        private string _lastSig = "";
 
 
 // Stronger de-dupe across clipboard churn (Snipping Tool can update clipboard twice for the same pixels).
-private static readonly HashSet<string> _recentSigSet = new();
-private static readonly Queue<string> _recentSigQueue = new();
-private const int RECENT_SIG_MAX = 24;
+        private readonly HashSet<string> _recentSigSet = new();
+        private readonly Queue<string> _recentSigQueue = new();
+        private const int RECENT_SIG_MAX = 24;
 
-private static bool HasRecentSig(string sig)
-{
-    if (string.IsNullOrWhiteSpace(sig)) return false;
-    return _recentSigSet.Contains(sig);
-}
-
-private static void RememberSig(string sig)
-{
-    if (string.IsNullOrWhiteSpace(sig)) return;
-    if (_recentSigSet.Add(sig))
-    {
-        _recentSigQueue.Enqueue(sig);
-        while (_recentSigQueue.Count > RECENT_SIG_MAX)
+        private bool HasRecentSig(string sig)
         {
-            var old = _recentSigQueue.Dequeue();
-            _recentSigSet.Remove(old);
+            if (string.IsNullOrWhiteSpace(sig)) return false;
+            return _recentSigSet.Contains(sig);
         }
-    }
-}
-        private static volatile bool _suppressStage;
-        private static volatile bool _sending;
+
+        private void RememberSig(string sig)
+        {
+            if (string.IsNullOrWhiteSpace(sig)) return;
+            if (_recentSigSet.Add(sig))
+            {
+                _recentSigQueue.Enqueue(sig);
+                while (_recentSigQueue.Count > RECENT_SIG_MAX)
+                {
+                    var old = _recentSigQueue.Dequeue();
+                    _recentSigSet.Remove(old);
+                }
+            }
+        }
+
+        private volatile bool _suppressStage;
+        private volatile bool _sending;
 
         // --- Input constants ---
         private const uint MOD_NOREPEAT = 0x4000;
@@ -72,13 +72,20 @@ private static void RememberSig(string sig)
         private const byte VK_LSHIFT = 0xA0;
         private const uint KEYEVENTF_KEYUP = 0x0002;
 
-        public static void Initialize(IWebMessageSender messageSender, Action focusWebView)
+        public PortalRuntime(
+            IWebMessageSender messageSender,
+            IDockModelService dockModelService)
         {
-            _messageSender = messageSender;
-            _focusWebView = focusWebView;
+            _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
+            _dockModelService = dockModelService ?? throw new ArgumentNullException(nameof(dockModelService));
         }
 
-        public static void AttachWindow(IntPtr hwnd)
+        public void Initialize(Action focusWebView)
+        {
+            _focusWebView = focusWebView ?? throw new ArgumentNullException(nameof(focusWebView));
+        }
+
+        public void AttachWindow(IntPtr hwnd)
         {
             _hwnd = hwnd;
 
@@ -98,7 +105,7 @@ private static void RememberSig(string sig)
         }
 
         // Auto-attach for builds where MainWindow.xaml.cs wiring is incomplete:
-        private static void EnsureAttached()
+        private void EnsureAttached()
         {
             if (_hwnd != IntPtr.Zero) return;
 
@@ -115,7 +122,7 @@ private static void RememberSig(string sig)
             catch { }
         }
 
-        public static void SetEnabled(bool enabled)
+        public void SetEnabled(bool enabled)
         {
             RunOnUI(() =>
             {
@@ -140,7 +147,7 @@ private static void RememberSig(string sig)
                 {
                     UnregisterHotkey();
                     StopClipboardWatch();
-                    PortalStaging.Clear();
+                    _staging.Clear();
                     _lastSig = "";
                     _recentSigSet.Clear();
                     _recentSigQueue.Clear();
@@ -153,7 +160,7 @@ private static void RememberSig(string sig)
             });
         }
 
-        public static void SetPrivacyAllowed(bool allowed)
+        public void SetPrivacyAllowed(bool allowed)
         {
             RunOnUI(() =>
             {
@@ -164,7 +171,7 @@ private static void RememberSig(string sig)
                     _enabled = false;
                     UnregisterHotkey();
                     StopClipboardWatch();
-                    PortalStaging.Clear();
+                    _staging.Clear();
                     _lastSig = "";
                     _recentSigSet.Clear();
                     _recentSigQueue.Clear();
@@ -176,11 +183,11 @@ private static void RememberSig(string sig)
             });
         }
 
-        public static void ClearStaging()
+        public void ClearStaging()
         {
             RunOnUI(() =>
             {
-                PortalStaging.Clear();
+                _staging.Clear();
                 _lastSig = "";
                 _recentSigSet.Clear();
                 _recentSigQueue.Clear();
@@ -190,7 +197,7 @@ private static void RememberSig(string sig)
             });
         }
 
-        public static void OpenSnipOverlay()
+        public void OpenSnipOverlay()
         {
             if (!_enabled || !_privacyAllowed) return;
 
@@ -198,7 +205,7 @@ private static void RememberSig(string sig)
             SendWinShiftS();
         }
 
-        public static void SendStaged(int max)
+        public void SendStaged(int max)
         {
             if (!_enabled || !_privacyAllowed) return;
             if (_sending) { PostDebug("SendStaged ignored: already sending"); return; }
@@ -216,7 +223,7 @@ private static void RememberSig(string sig)
                     _focusWebView?.Invoke();
                     await Task.Delay(120);
 
-                    var items = PortalStaging.Drain(max);
+                    var items = _staging.Drain(max);
                     PostDebug($"SendStaged: draining {items.Length}");
 
                     if (items.Length == 0)
@@ -252,7 +259,7 @@ private static void RememberSig(string sig)
                     }
 
                     // After sending, clear + reset counters.
-                    PortalStaging.Clear();
+                    _staging.Clear();
                     _recentSigSet.Clear();
                     _recentSigQueue.Clear();
                     PostCleared();
@@ -274,7 +281,7 @@ private static void RememberSig(string sig)
             });
         }
 
-        private static void StartClipboardWatch()
+        private void StartClipboardWatch()
         {
             EnsureAttached();
 
@@ -304,7 +311,7 @@ private static void RememberSig(string sig)
             }
         }
 
-        private static void PrimeClipboardState()
+        private void PrimeClipboardState()
         {
             try { _lastClipSeq = GetClipboardSequenceNumber(); } catch { }
 
@@ -325,7 +332,7 @@ private static void RememberSig(string sig)
         }
 
 
-        private static void StopClipboardWatch()
+        private void StopClipboardWatch()
         {
             try
             {
@@ -347,7 +354,7 @@ private static void RememberSig(string sig)
             PostDebug("Clipboard watch stopped");
         }
 
-        private static void ProcessClipboardUpdate()
+        private void ProcessClipboardUpdate()
         {
             if (!_enabled) return;
             if (_suppressStage) return;
@@ -373,7 +380,7 @@ private static void RememberSig(string sig)
 
                 if (HasRecentSig(sig)) return;
 
-                if (PortalStaging.TryAdd(img))
+                if (_staging.TryAdd(img))
                 {
                     _lastStageTicks = now;
                     _lastSig = sig;
@@ -435,15 +442,15 @@ private static void RememberSig(string sig)
             }
         }
 
-        private static void PostCount()
+        private void PostCount()
         {
             try
             {
-                _messageSender?.Send(new MessageEnvelope
+                _messageSender.Send(new MessageEnvelope
                 {
                     Type = WebMessageTypes.Event,
                     Name = "portal.stage.count",
-                    Payload = JsonSerializer.SerializeToElement(new { count = PortalStaging.Count })
+                    Payload = JsonSerializer.SerializeToElement(new { count = _staging.Count })
                 });
             }
             catch { }
@@ -451,11 +458,11 @@ private static void RememberSig(string sig)
             NotifyDockModelState();
         }
 
-        private static void PostEnabledState()
+        private void PostEnabledState()
         {
             try
             {
-                _messageSender?.Send(new MessageEnvelope
+                _messageSender.Send(new MessageEnvelope
                 {
                     Type = WebMessageTypes.Event,
                     Name = WebCommandNames.PortalState,
@@ -467,11 +474,11 @@ private static void RememberSig(string sig)
             NotifyDockModelState();
         }
 
-        private static void PostCleared()
+        private void PostCleared()
         {
             try
             {
-                _messageSender?.Send(new MessageEnvelope
+                _messageSender.Send(new MessageEnvelope
                 {
                     Type = WebMessageTypes.Event,
                     Name = "portal.stage.cleared",
@@ -481,20 +488,20 @@ private static void RememberSig(string sig)
             catch { }
         }
 
-        private static void NotifyDockModelState()
+        private void NotifyDockModelState()
         {
             try
             {
-                DockModelStateChanged?.Invoke(_enabled, _privacyAllowed, PortalStaging.Count);
+                _dockModelService.UpdatePortalState(_enabled, _privacyAllowed, _staging.Count);
             }
             catch { }
         }
 
-        private static void PostDebug(string message)
+        private void PostDebug(string message)
         {
             try
             {
-                _messageSender?.Send(new MessageEnvelope
+                _messageSender.Send(new MessageEnvelope
                 {
                     Type = WebMessageTypes.Log,
                     Name = "portal.debug",
@@ -504,7 +511,7 @@ private static void RememberSig(string sig)
             catch { }
         }
 
-        private static void RegisterHotkey()
+        private void RegisterHotkey()
         {
             EnsureAttached();
 
@@ -544,7 +551,7 @@ private static void RememberSig(string sig)
             }
         }
 
-        private static void UnregisterHotkey()
+        private void UnregisterHotkey()
         {
             if (_hwnd == IntPtr.Zero) return;
 
@@ -556,7 +563,7 @@ private static void RememberSig(string sig)
             catch { }
         }
 
-        private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             if (msg == WM_HOTKEY)
             {

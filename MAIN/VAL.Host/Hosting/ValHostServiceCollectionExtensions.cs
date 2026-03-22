@@ -67,11 +67,21 @@ namespace VAL.Host.Hosting
                 .PostConfigure(options => options.ApplyDefaults())
                 .Validate(options => options.EnabledModules != null, "Module options must include module list.");
 
-            services.AddSingleton(builder.CommandRegistry);
+            services.AddSingleton(sp =>
+            {
+                var registry = builder.CommandRegistry;
+                foreach (var configureRegistry in builder.CommandRegistryConfigurators)
+                {
+                    configureRegistry(sp, registry);
+                }
+
+                return registry;
+            });
             services.AddSingleton(sp =>
                 new HostCommandRouter(
                     sp.GetRequiredService<CommandRegistry>(),
-                    sp.GetService<ICommandDiagnosticsReporter>()));
+                    sp.GetService<ICommandDiagnosticsReporter>(),
+                    sp.GetRequiredService<ISessionContext>()));
 
             services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
             services.AddSingleton<IWebMessageSender, WebMessageSender>();

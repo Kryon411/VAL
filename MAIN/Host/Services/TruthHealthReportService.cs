@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using VAL.Continuum.Pipeline.Truth;
-using VAL.Host;
 using VAL.Host.Logging;
 using VAL.Host.Security;
 using ContinuumTruthHealthReport = VAL.Continuum.Pipeline.Truth.TruthHealthReport;
@@ -14,14 +13,17 @@ namespace VAL.Host.Services
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(20);
         private static readonly RateLimiter RateLimiter = new();
 
+        private readonly ISessionContext _sessionContext;
         private readonly string? _productRootOverride;
 
-        public TruthHealthReportService()
+        public TruthHealthReportService(ISessionContext sessionContext)
         {
+            _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
         }
 
-        internal TruthHealthReportService(string? productRootOverride)
+        internal TruthHealthReportService(ISessionContext sessionContext, string? productRootOverride)
         {
+            _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _productRootOverride = productRootOverride;
         }
 
@@ -32,7 +34,7 @@ namespace VAL.Host.Services
 
         internal TruthHealthSnapshotResult GetCurrentSnapshot()
         {
-            var chatId = TruthSession.CurrentChatId;
+            var chatId = _sessionContext.ActiveChatId;
             var hasChatId = !string.IsNullOrWhiteSpace(chatId) && Guid.TryParse(chatId, out _);
             var productRoot = ResolveProductRoot(chatId);
             var reports = BuildReports(productRoot);

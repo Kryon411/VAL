@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VAL.Contracts;
 using VAL.Host;
+using VAL.Host.Services;
 using VAL.Host.WebMessaging;
 using VAL.Continuum.Pipeline.QuickRefresh;
 using VAL.Continuum.Pipeline.Signal;
@@ -15,36 +16,42 @@ using VAL.Continuum.Pipeline;
 
 namespace VAL.Continuum
 {
-    public static class ContinuumHost
+    public sealed class ContinuumHost
     {
-        /// <summary>
-        /// Host -> Web post hook (wired by MainWindow after WebView is ready).
-        /// ContinuumHost stays decoupled from WebView2 types by using this delegate.
-        /// </summary>
-        public static Action<MessageEnvelope>? PostToWebMessage { get; set; }
+        private readonly IWebMessageSender _messageSender;
+        private readonly IToastHub _toastHub;
+        private readonly IContinuumWriter _writer;
+        private readonly IContinuumInjectInbox _injectQueue;
+        private readonly ISessionContext _sessionContext;
+        private readonly OperationCoordinator _operationCoordinator;
 
         // Best-effort UI context captured from the WebMessageReceived thread (usually UI/Dispatcher).
-        private static SynchronizationContext? _uiCtx;
+        private SynchronizationContext? _uiCtx;
 
-        private static IToastHub? _toastHub;
-        private static IContinuumWriter? _writer;
-        private static IContinuumInjectInbox? _injectQueue;
-
-        public static void Configure(IToastHub? toastHub, IContinuumWriter? writer, IContinuumInjectInbox? injectQueue)
+        public ContinuumHost(
+            IWebMessageSender messageSender,
+            IToastHub toastHub,
+            IContinuumWriter writer,
+            IContinuumInjectInbox injectQueue,
+            ISessionContext sessionContext,
+            OperationCoordinator operationCoordinator)
         {
-            if (toastHub != null)
-                _toastHub = toastHub;
-
-            if (writer != null)
-                _writer = writer;
-
-            if (injectQueue != null)
-                _injectQueue = injectQueue;
+            _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
+            _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
+            _writer = writer ?? throw new ArgumentNullException(nameof(writer));
+            _injectQueue = injectQueue ?? throw new ArgumentNullException(nameof(injectQueue));
+            _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
+            _operationCoordinator = operationCoordinator ?? throw new ArgumentNullException(nameof(operationCoordinator));
         }
 
-        private static IToastHub Toasts => _toastHub ?? throw new InvalidOperationException("ContinuumHost has not been configured.");
-        private static IContinuumWriter Writer => _writer ??= new ContinuumWriter();
-        private static IContinuumInjectInbox InjectQueue => _injectQueue ??= new ContinuumInjectInbox();
+        public bool IsMessageSenderWired => _messageSender != null;
+
+        private Action<MessageEnvelope> PostToWebMessage => _messageSender.Send;
+        private IToastHub Toasts => _toastHub;
+        private IContinuumWriter Writer => _writer;
+        private IContinuumInjectInbox InjectQueue => _injectQueue;
+        private ISessionContext SessionContext => _sessionContext;
+        private OperationCoordinator OperationCoordinator => _operationCoordinator;
 
         // -------------------------
         // Toast Catalog v1 (final)
@@ -112,9 +119,9 @@ namespace VAL.Continuum
         private const string ToastGroup_Chronicle = "chronicle";
 
         // Pulse flush handshake (prevents missing tail turns).
-        private static string? _pendingPulseChatId;
-        private static string? _pendingFlushRequestId;
-        private static DateTime _pendingFlushRequestedUtc = DateTime.MinValue;
+        private string? _pendingPulseChatId;
+        private string? _pendingFlushRequestId;
+        private DateTime _pendingFlushRequestedUtc = DateTime.MinValue;
 
         private const int FlushAckTimeoutMs = 900;
         private const int SignalResponseTimeoutMs = 45000;
@@ -158,74 +165,74 @@ namespace VAL.Continuum
             public bool? enabled { get; set; }
         }
 
-        private static readonly object Sync = new object();
-        private static bool _refreshInFlight;
-        private static DateTime _lastRefreshCompletedUtc = DateTime.MinValue;
-        private static PendingSignalPulse? _pendingSignalPulse;
+        private readonly object Sync = new object();
+        private bool _refreshInFlight;
+        private DateTime _lastRefreshCompletedUtc = DateTime.MinValue;
+        private PendingSignalPulse? _pendingSignalPulse;
 
         // Chronicle (Truth backfill/rebuild) state
-        private static bool _chronicleInFlight;
-        private static string? _chronicleRequestId;
-        private static DateTime _chronicleStartedUtc = DateTime.MinValue;
-        private static ToastReason _chronicleCancelReason = ToastReason.Background;
+        private bool _chronicleInFlight;
+        private string? _chronicleRequestId;
+        private DateTime _chronicleStartedUtc = DateTime.MinValue;
+        private ToastReason _chronicleCancelReason = ToastReason.Background;
 
 
         // Chronicle running flag (toast suppression + sequencing only).
-        private static bool _chronicleRunning;
+        private bool _chronicleRunning;
 
         // New chat ("/" route) prelude guidance should show once per entry.
-        private static bool _preludeAvailableShownForCurrentNewChat;
+        private bool _preludeAvailableShownForCurrentNewChat;
 
         // Prelude prompt: once per new-chat root instance (href-based) to avoid spam on repeated clicks.
-        private static string _lastPreludePromptHref = string.Empty;
+        private string _lastPreludePromptHref = string.Empty;
 
         // Prelude seeding: if user injects Prelude on the New Chat root, the real /c/<uuid>
         // chatId does not exist yet. Carry a one-shot marker across the next session.attach so we can
         // suppress Chronicle prompts for that newly seeded chat.
-        private static bool _pendingPreludeSeedForNextAttach;
-        private static DateTime _pendingPreludeSeedUntilUtc = DateTime.MinValue;
+        private bool _pendingPreludeSeedForNextAttach;
+        private DateTime _pendingPreludeSeedUntilUtc = DateTime.MinValue;
 
 
         // When Pulse opens a new chat automatically, we do NOT want to show the Prelude guidance toast.
-        private static DateTime _suppressPreludeToastUntilUtc = DateTime.MinValue;
+        private DateTime _suppressPreludeToastUntilUtc = DateTime.MinValue;
         private static readonly TimeSpan PreludeToastSuppressWindow = TimeSpan.FromSeconds(25);
 
         private static readonly TimeSpan RefreshCooldown = TimeSpan.FromSeconds(10);
 
-        private static bool _loggingEnabled = true;
+        private bool _loggingEnabled = true;
 
         // Toast intent gating:
         // - Chronicle guidance: shown only after the user has dwelled in the chat for a moment
         //   (prevents spam when bouncing between chats) *and* then interacts with the composer.
-        private static int _toastAttachToken;
-        private static string _toastAttachChatId = string.Empty;
-        private static DateTime _toastAttachUtc = DateTime.MinValue;
+        private int _toastAttachToken;
+        private string _toastAttachChatId = string.Empty;
+        private DateTime _toastAttachUtc = DateTime.MinValue;
 
         // Chronicle prompt gating should be per chat (not global), otherwise baseline math can bleed across chat switches.
         // Baseline is captured on the first composer interaction after attach for a given chatId.
-        private static readonly System.Collections.Generic.Dictionary<string, int> _chronicleBaselineTurnsByChat =
+        private readonly System.Collections.Generic.Dictionary<string, int> _chronicleBaselineTurnsByChat =
             new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
 
         // Chronicle prompt should not spam on rapid chat switching. Track last-shown per chat and only re-show after a window.
-        private static readonly System.Collections.Generic.Dictionary<string, System.DateTime> _chroniclePromptLastShownUtcByChat =
+        private readonly System.Collections.Generic.Dictionary<string, System.DateTime> _chroniclePromptLastShownUtcByChat =
             new System.Collections.Generic.Dictionary<string, System.DateTime>(System.StringComparer.OrdinalIgnoreCase);
 
         private static readonly System.TimeSpan ChroniclePromptReshowWindow = System.TimeSpan.FromMinutes(30);
-        private static bool _toastAttachDwellMet;
-        private static bool _toastAttachChronicleShown;
-        private static int _toastAttachLastCapturedTurns;
+        private bool _toastAttachDwellMet;
+        private bool _toastAttachChronicleShown;
+        private int _toastAttachLastCapturedTurns;
 
         private static readonly TimeSpan ToastAttachDwellWindow = TimeSpan.FromSeconds(2);
 
 
         // Session attach watchdog de-dupe: repeated attach pings may occur while the host is initializing.
-        private static string _lastSessionAttachHandledChatId = string.Empty;
-        private static DateTime _lastSessionAttachHandledUtc = DateTime.MinValue;
+        private string _lastSessionAttachHandledChatId = string.Empty;
+        private DateTime _lastSessionAttachHandledUtc = DateTime.MinValue;
         private static readonly TimeSpan AttachDedupeWindow = TimeSpan.FromSeconds(3);
 
         
 
-        public static void HandleJson(string json)
+        public void HandleJson(string json)
         {
             if (string.IsNullOrWhiteSpace(json))
                 return;
@@ -448,7 +455,7 @@ namespace VAL.Continuum
         // -------------------------
         // Session attach
         // -------------------------
-        private static void HandleSessionAttach(string? chatId)
+        private void HandleSessionAttach(string? chatId)
         {
             var cid = SessionContext.ResolveChatId(chatId);
 
@@ -587,7 +594,7 @@ namespace VAL.Continuum
             });
         }
 
-        private static void SendContractsBootstrap(string? chatId)
+        private void SendContractsBootstrap(string? chatId)
         {
             var post = PostToWebMessage;
             if (post == null)
@@ -604,7 +611,7 @@ namespace VAL.Continuum
 
 
 
-        internal static void ApplyLoggingSetting(bool enable, bool showToast, ToastReason reason = ToastReason.Background)
+        internal void ApplyLoggingSetting(bool enable, bool showToast, ToastReason reason = ToastReason.Background)
         {
             bool showPausedToast = false;
             lock (Sync)
@@ -626,13 +633,13 @@ namespace VAL.Continuum
             }
         }
 
-        private static void HandleToggleLogging(bool enable, ToastReason reason)
+        private void HandleToggleLogging(bool enable, ToastReason reason)
         {
             ApplyLoggingSetting(enable, showToast: true, reason: reason);
         }
 
         
-        private static void HandlePreludePrompt(Msg msg)
+        private void HandlePreludePrompt(Msg msg)
         {
             try
             {
@@ -688,7 +695,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void MaybeShowPreludeAvailableToast()
+        private void MaybeShowPreludeAvailableToast()
         {
             // Passive guidance toast -> honor launch quiet period.
             if (Toasts.IsLaunchQuietPeriodActive)
@@ -714,7 +721,7 @@ namespace VAL.Continuum
                 reason: ToastReason.Background);
         }
 
-        private static void HandleInjectPrelude(string? chatId, ToastReason reason)
+        private void HandleInjectPrelude(string? chatId, ToastReason reason)
         {
             // Manual Prelude injection: drop Context.Prelude.txt into the current composer (no autosend).
             var cid = SessionContext.ResolveChatId(chatId);
@@ -770,7 +777,7 @@ namespace VAL.Continuum
         // -------------------------
         // Pulse
         // -------------------------
-        private static void ToastPulseActionUnavailable(string? chatId, ToastReason reason)
+        private void ToastPulseActionUnavailable(string? chatId, ToastReason reason)
         {
             // ActionUnavailable is shared across the app; for Pulse we keep it in the "pulse" group.
             Toasts.TryShow(
@@ -783,7 +790,7 @@ namespace VAL.Continuum
                 reason: reason);
         }
 
-        private static void ToastOperationInProgress(ToastReason reason)
+        private void ToastOperationInProgress(ToastReason reason)
         {
             Toasts.TryShow(
                 ToastKey.OperationInProgress,
@@ -792,12 +799,12 @@ namespace VAL.Continuum
                 reason: reason);
         }
 
-        private static void ToastOperationCancelled(string groupKey, ToastReason reason)
+        private void ToastOperationCancelled(string groupKey, ToastReason reason)
         {
             Toasts.TryShowOperationCancelled(groupKey, ToastOrigin.Continuum, reason);
         }
 
-        private static bool HasTruthLog(string chatId)
+        private bool HasTruthLog(string chatId)
         {
             try
             {
@@ -810,7 +817,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static bool HasNonTrivialTruthLog(string chatId)
+        private bool HasNonTrivialTruthLog(string chatId)
         {
             try
             {
@@ -823,7 +830,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static bool HasChronicleMarker(string chatId)
+        private bool HasChronicleMarker(string chatId)
         {
             try
             {
@@ -837,7 +844,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void WriteChronicleMarker(string chatId)
+        private void WriteChronicleMarker(string chatId)
         {
             try
             {
@@ -849,7 +856,7 @@ namespace VAL.Continuum
             catch { }
         }
 
-        private static bool IsMeaningfulChatForChronicle(string chatId, int capturedTurns)
+        private bool IsMeaningfulChatForChronicle(string chatId, int capturedTurns)
         {
             // Primary signal (preferred): the client reports how many turns are rendered.
             // This is the correct way to distinguish an older chat with history from a fresh shell.
@@ -895,7 +902,7 @@ namespace VAL.Continuum
         }
 
 
-        private static void HandlePulse(string? chatId, ToastReason reason)
+        private void HandlePulse(string? chatId, ToastReason reason)
         {
             var cid = SessionContext.ResolveChatId(chatId);
 
@@ -967,7 +974,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static bool TryBeginRefresh(string chatId, ToastReason reason)
+        private bool TryBeginRefresh(string chatId, ToastReason reason)
         {
             lock (Sync)
             {
@@ -1006,7 +1013,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void FinishRefresh(string chatId, bool showReadyToast)
+        private void FinishRefresh(string chatId, bool showReadyToast)
         {
             bool endedRefresh = false;
 
@@ -1037,14 +1044,14 @@ namespace VAL.Continuum
             }
         }
 
-        private static void EndRefresh(string chatId)
+        private void EndRefresh(string chatId)
         {
             // JS emits "inject.success" for any injection (Pulse, Prelude, etc.).
             // Only show Pulse completion if a refresh was actually in-flight.
             FinishRefresh(chatId, showReadyToast: true);
         }
 
-        private static void HandleContinuumEvent(Msg msg)
+        private void HandleContinuumEvent(Msg msg)
         {
             var evt = (msg.evt ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(evt))
@@ -1068,7 +1075,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void HandleInjectSuccessEvent(string? chatId, string evt)
+        private void HandleInjectSuccessEvent(string? chatId, string evt)
         {
             var cid = SessionContext.ResolveChatId(chatId);
             if (string.IsNullOrWhiteSpace(cid))
@@ -1131,7 +1138,7 @@ namespace VAL.Continuum
             return !string.IsNullOrWhiteSpace(assistantTurnId);
         }
 
-        private static void HandleSignalReplySettled(Msg msg)
+        private void HandleSignalReplySettled(Msg msg)
         {
             var cid = SessionContext.ResolveChatId(msg.chatId);
             if (string.IsNullOrWhiteSpace(cid))
@@ -1190,7 +1197,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void HandleSignalFailure(string? chatId, string? requestId)
+        private void HandleSignalFailure(string? chatId, string? requestId)
         {
             var cid = SessionContext.ResolveChatId(chatId);
             if (string.IsNullOrWhiteSpace(cid))
@@ -1202,7 +1209,7 @@ namespace VAL.Continuum
             InjectQueue.Enqueue(pending.DeterministicFallbackSeed);
         }
 
-        private static bool HasPendingSignalPulse(string chatId)
+        private bool HasPendingSignalPulse(string chatId)
         {
             lock (Sync)
             {
@@ -1211,7 +1218,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static bool TryGetPendingSignalPulse(string chatId, out PendingSignalPulse pending)
+        private bool TryGetPendingSignalPulse(string chatId, out PendingSignalPulse pending)
         {
             lock (Sync)
             {
@@ -1227,7 +1234,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static bool TryTakePendingSignalPulseForCurrentOperation(string chatId, string? requestId, out PendingSignalPulse pending)
+        private bool TryTakePendingSignalPulseForCurrentOperation(string chatId, string? requestId, out PendingSignalPulse pending)
         {
             pending = null!;
 
@@ -1241,7 +1248,7 @@ namespace VAL.Continuum
             return TryTakePendingSignalPulse(chatId, operationId, requestId, out pending);
         }
 
-        private static bool TryTakePendingSignalPulse(string chatId, long operationId, string? requestId, out PendingSignalPulse pending)
+        private bool TryTakePendingSignalPulse(string chatId, long operationId, string? requestId, out PendingSignalPulse pending)
         {
             lock (Sync)
             {
@@ -1268,7 +1275,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void StartSignalTimeout(PendingSignalPulse pending)
+        private void StartSignalTimeout(PendingSignalPulse pending)
         {
             _ = Task.Run(async () =>
             {
@@ -1295,7 +1302,7 @@ namespace VAL.Continuum
         // -------------------------
         // Pulse preflight: capture flush handshake
         // -------------------------
-        private static bool RequestCaptureFlushAndArmPulse(string chatId)
+        private bool RequestCaptureFlushAndArmPulse(string chatId)
         {
             try
             {
@@ -1378,7 +1385,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void HandleCaptureFlushAck(Msg msg)
+        private void HandleCaptureFlushAck(Msg msg)
         {
             try
             {
@@ -1421,7 +1428,7 @@ namespace VAL.Continuum
             catch { }
         }
 
-        private static void RunPulseNow(string chatId, string reasonTag)
+        private void RunPulseNow(string chatId, string reasonTag)
         {
             try
             {
@@ -1450,7 +1457,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void RunPulseWithSignalFallback(string chatId, CancellationToken token)
+        private void RunPulseWithSignalFallback(string chatId, CancellationToken token)
         {
             var snapshot = QuickRefreshFlow.BuildPulseSnapshot(chatId, token);
             token.ThrowIfCancellationRequested();
@@ -1516,7 +1523,7 @@ namespace VAL.Continuum
             StartSignalTimeout(pending);
         }
 
-        private static void PostToUi(Action act)
+        private void PostToUi(Action act)
         {
             try
             {
@@ -1536,7 +1543,7 @@ namespace VAL.Continuum
         // Chronicle: rebuild Truth.log from the UI (user-invoked recovery tool)
         // -------------------------
                 
-        private static void HandleChronicleComposerInteraction(string? chatId, int capturedTurns, ToastReason reason)
+        private void HandleChronicleComposerInteraction(string? chatId, int capturedTurns, ToastReason reason)
         {
             try
             {
@@ -1680,7 +1687,7 @@ namespace VAL.Continuum
             catch { }
         }
 
-        private static bool IsContinuumSeededChat(string chatId)
+        private bool IsContinuumSeededChat(string chatId)
         {
             try
             {
@@ -1720,7 +1727,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void MaybeShowChronicleSuggested(string chatId)
+        private void MaybeShowChronicleSuggested(string chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return;
             if (chatId.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return;
@@ -1750,7 +1757,7 @@ namespace VAL.Continuum
         }
 
 
-        private static void HandleChronicleCancel(string? chatId, ToastReason reason)
+        private void HandleChronicleCancel(string? chatId, ToastReason reason)
         {
             try
             {
@@ -1786,7 +1793,7 @@ namespace VAL.Continuum
         }
 
 
-        private static void HandleChronicleRebuild(string? chatId, ToastReason reason)
+        private void HandleChronicleRebuild(string? chatId, ToastReason reason)
         {
             var cid = SessionContext.ResolveChatId(chatId);
             if (string.IsNullOrWhiteSpace(cid) || cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase))
@@ -1960,7 +1967,7 @@ namespace VAL.Continuum
             }
         }
 
-        private static void HandleChronicleDone(Msg msg)
+        private void HandleChronicleDone(Msg msg)
         {
             try
             {
@@ -2094,7 +2101,7 @@ namespace VAL.Continuum
         }
 
 
-        private static void TryDeleteDerivedArtifacts(string chatId)
+        private void TryDeleteDerivedArtifacts(string chatId)
         {
             try
             {
@@ -2120,7 +2127,7 @@ namespace VAL.Continuum
             catch { }
         }
 
-        private static void TryAppendChronicleAudit(string chatId, string line)
+        private void TryAppendChronicleAudit(string chatId, string line)
         {
             try
             {
@@ -2131,7 +2138,7 @@ namespace VAL.Continuum
             catch { }
         }
 
-        private static void HandleOpenSessionFolder(string? chatId)
+        private void HandleOpenSessionFolder(string? chatId)
         {
             var cid = SessionContext.ResolveChatId(chatId);
             if (string.IsNullOrWhiteSpace(cid))

@@ -1,11 +1,14 @@
 using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Continuum;
 using VAL.Host.Commands;
 using VAL.Host.Hosting;
+using VAL.Host.Portal;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
 using VAL.Host.Startup;
+using VAL.Host.Abyss;
 using VAL.Hosting;
 
 namespace VAL.Host
@@ -34,42 +37,26 @@ namespace VAL.Host
             ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(crashGuard);
 
-            CommandRegistryFactory.RegisterCommands(
-                builder.CommandRegistry,
-                ContinuumCommandHandlers.HandleContinuumCommand,
-                VoidCommandHandlers.HandleSetEnabled,
-                PortalCommandHandlers.HandleSetEnabled,
-                PortalCommandHandlers.HandleOpenSnip,
-                PortalCommandHandlers.HandleSendStaged,
-                PrivacyCommandHandlers.HandleSetContinuumLogging,
-                PrivacyCommandHandlers.HandleSetPortalCapture,
-                PrivacyCommandHandlers.HandleOpenDataFolder,
-                PrivacyCommandHandlers.HandleWipeData,
-                ToolsCommandHandlers.HandleOpenTruthHealth,
-                ToolsCommandHandlers.HandleOpenDiagnostics,
-                NavigationCommandHandlers.HandleGoChat,
-                NavigationCommandHandlers.HandleGoBack,
-                DockCommandHandlers.HandleRequestModel,
-                DockCommandHandlers.HandleUiStateGet,
-                DockCommandHandlers.HandleUiStateSet,
-                AbyssCommandHandlers.HandleOpenQueryUi,
-                AbyssCommandHandlers.HandleSearch,
-                AbyssCommandHandlers.HandleRetryLast,
-                AbyssCommandHandlers.HandleInjectResult,
-                AbyssCommandHandlers.HandleInjectResults,
-                AbyssCommandHandlers.HandleLast,
-                AbyssCommandHandlers.HandleOpenSource,
-                AbyssCommandHandlers.HandleClearResults,
-                AbyssCommandHandlers.HandleDisregard,
-                AbyssCommandHandlers.HandleGetResults,
-                AbyssCommandHandlers.HandleInjectPrompt,
-                AbyssCommandHandlers.HandleInject);
-
             builder.Services.AddSingleton<ICommandDiagnosticsReporter, CommandDiagnosticsReporter>();
+            builder.Services.AddSingleton<ContinuumHost>();
+            builder.Services.AddSingleton<ContinuumCommandHandlers>();
+            builder.Services.AddSingleton<VoidCommandHandlers>();
+            builder.Services.AddSingleton<PortalCommandHandlers>();
+            builder.Services.AddSingleton<PrivacyCommandHandlers>();
+            builder.Services.AddSingleton<ToolsCommandHandlers>();
+            builder.Services.AddSingleton<NavigationCommandHandlers>();
+            builder.Services.AddSingleton<DockCommandHandlers>();
+            builder.Services.AddSingleton<AbyssRuntime>();
+            builder.Services.AddSingleton<AbyssCommandHandlers>();
+            builder.Services.AddSingleton<CommandRegistryComposer>();
+            builder.CommandRegistryConfigurators.Add((serviceProvider, registry) =>
+                serviceProvider.GetRequiredService<CommandRegistryComposer>().Register(registry));
 
             builder.Services.AddSingleton<IModuleLoader, ModuleLoaderAdapter>();
-            builder.Services.AddSingleton<ISessionContext, SessionContextAdapter>();
-            builder.Services.AddSingleton<IOperationCoordinator, OperationCoordinatorAdapter>();
+            builder.Services.AddSingleton<SessionContext>();
+            builder.Services.AddSingleton<ISessionContext>(sp => sp.GetRequiredService<SessionContext>());
+            builder.Services.AddSingleton<OperationCoordinator>();
+            builder.Services.AddSingleton<IOperationCoordinator>(sp => sp.GetRequiredService<OperationCoordinator>());
             builder.Services.AddSingleton<IToastService, ToastServiceAdapter>();
             builder.Services.AddSingleton<IToastHub, ToastHubAdapter>();
             builder.Services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
@@ -81,6 +68,7 @@ namespace VAL.Host
             builder.Services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();
             builder.Services.AddSingleton<IDockModelService, DockModelService>();
             builder.Services.AddSingleton<IDockUiStateStore, DockUiStateStore>();
+            builder.Services.AddSingleton<PortalRuntime>();
             builder.Services.AddSingleton<IPortalRuntimeStateManager, PortalRuntimeStateManager>();
             builder.Services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
             builder.Services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();

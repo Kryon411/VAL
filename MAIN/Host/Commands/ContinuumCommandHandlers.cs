@@ -4,16 +4,22 @@ using VAL.Host.Logging;
 
 namespace VAL.Host.Commands
 {
-    internal static class ContinuumCommandHandlers
+    internal sealed class ContinuumCommandHandlers
     {
-        private static readonly RateLimiter RateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
+        private readonly ContinuumHost _continuumHost;
+        private readonly RateLimiter _rateLimiter = new();
 
-        public static void HandleContinuumCommand(HostCommand cmd)
+        public ContinuumCommandHandlers(ContinuumHost continuumHost)
+        {
+            _continuumHost = continuumHost ?? throw new ArgumentNullException(nameof(continuumHost));
+        }
+
+        public void HandleContinuumCommand(HostCommand cmd)
         {
             try
             {
-                ContinuumHost.HandleJson(cmd.RawJson);
+                _continuumHost.HandleJson(cmd.RawJson);
             }
             catch (Exception ex)
             {
@@ -21,9 +27,9 @@ namespace VAL.Host.Commands
             }
         }
 
-        private static void LogHandlerFailure(string key, HostCommand cmd, Exception ex)
+        private void LogHandlerFailure(string key, HostCommand cmd, Exception ex)
         {
-            if (!RateLimiter.Allow(key, LogInterval))
+            if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";

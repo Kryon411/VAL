@@ -1,6 +1,4 @@
 using System;
-using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
 using VAL.Contracts;
 using VAL.Host.Logging;
 using VAL.Host.Services;
@@ -8,26 +6,43 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Commands
 {
-    internal static class PrivacyCommandHandlers
+    internal sealed class PrivacyCommandHandlers
     {
-        private static readonly RateLimiter RateLimiter = new();
+        private readonly IPrivacySettingsService _privacySettingsService;
+        private readonly IAppPaths _appPaths;
+        private readonly IProcessLauncher _processLauncher;
+        private readonly IDataWipeService _dataWipeService;
+        private readonly IToastHub _toastHub;
+        private readonly IWebMessageSender _webMessageSender;
+        private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
 
-        public static void HandleSetContinuumLogging(HostCommand cmd)
+        public PrivacyCommandHandlers(
+            IPrivacySettingsService privacySettingsService,
+            IAppPaths appPaths,
+            IProcessLauncher processLauncher,
+            IDataWipeService dataWipeService,
+            IToastHub toastHub,
+            IWebMessageSender webMessageSender)
+        {
+            _privacySettingsService = privacySettingsService ?? throw new ArgumentNullException(nameof(privacySettingsService));
+            _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
+            _processLauncher = processLauncher ?? throw new ArgumentNullException(nameof(processLauncher));
+            _dataWipeService = dataWipeService ?? throw new ArgumentNullException(nameof(dataWipeService));
+            _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
+            _webMessageSender = webMessageSender ?? throw new ArgumentNullException(nameof(webMessageSender));
+        }
+
+        public void HandleSetContinuumLogging(HostCommand cmd)
         {
             try
             {
                 if (!cmd.TryGetBool("enabled", out var enabled))
                     return;
 
-                var services = GetServices();
-                if (services == null)
-                    return;
-
-                var settings = services.GetRequiredService<IPrivacySettingsService>();
-                var updated = settings.UpdateContinuumLogging(enabled);
+                var updated = _privacySettingsService.UpdateContinuumLogging(enabled);
                 if (updated)
-                    SendSettingsSync(services, settings.GetSnapshot());
+                    SendSettingsSync(_privacySettingsService.GetSnapshot());
             }
             catch (Exception ex)
             {
@@ -35,21 +50,16 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleSetPortalCapture(HostCommand cmd)
+        public void HandleSetPortalCapture(HostCommand cmd)
         {
             try
             {
                 if (!cmd.TryGetBool("enabled", out var enabled))
                     return;
 
-                var services = GetServices();
-                if (services == null)
-                    return;
-
-                var settings = services.GetRequiredService<IPrivacySettingsService>();
-                var updated = settings.UpdatePortalCapture(enabled);
+                var updated = _privacySettingsService.UpdatePortalCapture(enabled);
                 if (updated)
-                    SendSettingsSync(services, settings.GetSnapshot());
+                    SendSettingsSync(_privacySettingsService.GetSnapshot());
             }
             catch (Exception ex)
             {
@@ -57,17 +67,11 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleOpenDataFolder(HostCommand cmd)
+        public void HandleOpenDataFolder(HostCommand cmd)
         {
             try
             {
-                var services = GetServices();
-                if (services == null)
-                    return;
-
-                var appPaths = services.GetRequiredService<IAppPaths>();
-                var launcher = services.GetRequiredService<IProcessLauncher>();
-                launcher.OpenFolder(appPaths.DataRoot);
+                _processLauncher.OpenFolder(_appPaths.DataRoot);
             }
             catch (Exception ex)
             {
@@ -75,23 +79,16 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleWipeData(HostCommand cmd)
+        public void HandleWipeData(HostCommand cmd)
         {
             try
             {
-                var services = GetServices();
-                if (services == null)
-                    return;
-
-                var wipeService = services.GetRequiredService<IDataWipeService>();
-                var result = wipeService.WipeData();
-
-                var toastHub = services.GetService<IToastHub>() ?? new ToastHubAdapter();
+                var result = _dataWipeService.WipeData();
                 var reason = ToastHub.ParseReason(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
 
                 if (result.Success)
                 {
-                    toastHub.TryShow(
+                    _toastHub.TryShow(
                         ToastKey.DataWipeCompleted,
                         bypassLaunchQuiet: true,
                         origin: ToastOrigin.HostCommand,
@@ -99,7 +96,7 @@ namespace VAL.Host.Commands
                 }
                 else
                 {
-                    toastHub.TryShow(
+                    _toastHub.TryShow(
                         ToastKey.DataWipePartial,
                         bypassLaunchQuiet: true,
                         origin: ToastOrigin.HostCommand,
@@ -109,9 +106,7 @@ namespace VAL.Host.Commands
             catch (Exception ex)
             {
                 LogCommandFailure("wipe_data", cmd, ex);
-                var services = GetServices();
-                var toastHub = services?.GetService<IToastHub>() ?? new ToastHubAdapter();
-                toastHub.TryShow(
+                _toastHub.TryShow(
                     ToastKey.DataWipePartial,
                     bypassLaunchQuiet: true,
                     origin: ToastOrigin.HostCommand,
@@ -119,11 +114,10 @@ namespace VAL.Host.Commands
             }
         }
 
-        private static void SendSettingsSync(IServiceProvider services, PrivacySettingsSnapshot snapshot)
+        private void SendSettingsSync(PrivacySettingsSnapshot snapshot)
         {
             try
             {
-                var sender = services.GetRequiredService<IWebMessageSender>();
                 var payload = System.Text.Json.JsonSerializer.SerializeToElement(new
                 {
                     version = snapshot.Version,
@@ -131,7 +125,7 @@ namespace VAL.Host.Commands
                     portalCaptureEnabled = snapshot.PortalCaptureEnabled
                 });
 
-                sender.Send(new MessageEnvelope
+                _webMessageSender.Send(new MessageEnvelope
                 {
                     Type = WebMessageTypes.Event,
                     Name = "privacy.settings.sync",
@@ -146,15 +140,10 @@ namespace VAL.Host.Commands
             }
         }
 
-        private static IServiceProvider? GetServices()
-        {
-            return (Application.Current as App)?.Services;
-        }
-
-        private static void LogCommandFailure(string action, HostCommand cmd, Exception ex)
+        private void LogCommandFailure(string action, HostCommand cmd, Exception ex)
         {
             var key = $"cmd.fail.privacy.{action}";
-            if (!RateLimiter.Allow(key, LogInterval))
+            if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";

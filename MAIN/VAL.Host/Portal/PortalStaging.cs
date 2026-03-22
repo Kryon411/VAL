@@ -5,20 +5,20 @@ using System.Windows.Media.Imaging;
 
 namespace VAL.Host.Portal
 {
-    internal static class PortalStaging
+    internal sealed class PortalStaging
     {
         // Bounded in-memory staging buffer (no persistence)
         // Thread-safe because clipboard polling + send loop can overlap.
         private const int MAX = 10;
-        private static readonly object _lock = new();
-        private static readonly List<BitmapSource> _items = new();
+        private readonly object _lock = new();
+        private readonly List<BitmapSource> _items = new();
 
-        public static int Count
+        public int Count
         {
             get { lock (_lock) return _items.Count; }
         }
 
-        public static void Clear()
+        public void Clear()
         {
             lock (_lock) _items.Clear();
         }
@@ -27,7 +27,7 @@ namespace VAL.Host.Portal
         /// Try to add an image to the staging buffer.
         /// Returns false if the buffer is full.
         /// </summary>
-        public static bool TryAdd(BitmapSource img)
+        public bool TryAdd(BitmapSource img)
         {
             if (img == null) return false;
 
@@ -42,7 +42,7 @@ namespace VAL.Host.Portal
         /// <summary>
         /// Drain up to max items (FIFO) and remove them from the staging buffer.
         /// </summary>
-        public static BitmapSource[] Drain(int max)
+        public BitmapSource[] Drain(int max)
         {
             if (max <= 0) return Array.Empty<BitmapSource>();
 

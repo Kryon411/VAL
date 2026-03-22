@@ -1,9 +1,10 @@
 using System;
 using System.Threading;
+using VAL.Host.Services;
 
 namespace VAL.Host
 {
-    internal enum GuardedOperationKind
+    public enum GuardedOperationKind
     {
         Pulse,
         Chronicle
@@ -14,57 +15,57 @@ namespace VAL.Host
     /// Ensures at most one long-running operation is active at a time and
     /// provides a shared cancellation token.
     /// </summary>
-    internal static class OperationCoordinator
+    public sealed class OperationCoordinator : IOperationCoordinator, IDisposable
     {
-        private static readonly object Gate = new object();
-        private static GuardedOperationKind? _currentKind;
-        private static CancellationTokenSource? _cts;
-        private static long _currentOperationId;
+        private readonly object _gate = new object();
+        private GuardedOperationKind? _currentKind;
+        private CancellationTokenSource? _cts;
+        private long _currentOperationId;
 
-        public static bool IsBusy
+        public bool IsBusy
         {
             get
             {
-                lock (Gate)
+                lock (_gate)
                 {
                     return _cts != null;
                 }
             }
         }
 
-        public static GuardedOperationKind? CurrentKind
+        public GuardedOperationKind? CurrentKind
         {
             get
             {
-                lock (Gate)
+                lock (_gate)
                 {
                     return _currentKind;
                 }
             }
         }
 
-        public static bool IsRunning(GuardedOperationKind kind)
+        public bool IsRunning(GuardedOperationKind kind)
         {
-            lock (Gate)
+            lock (_gate)
             {
                 return _cts != null && _currentKind == kind;
             }
         }
 
-        public static long CurrentOperationId
+        public long CurrentOperationId
         {
             get
             {
-                lock (Gate)
+                lock (_gate)
                 {
                     return _cts != null ? _currentOperationId : 0;
                 }
             }
         }
 
-        public static bool TryBegin(GuardedOperationKind kind, out CancellationToken token)
+        public bool TryBegin(GuardedOperationKind kind, out CancellationToken token)
         {
-            lock (Gate)
+            lock (_gate)
             {
                 if (_cts != null)
                 {
@@ -80,9 +81,9 @@ namespace VAL.Host
             }
         }
 
-        public static void End(GuardedOperationKind kind)
+        public void End(GuardedOperationKind kind)
         {
-            lock (Gate)
+            lock (_gate)
             {
                 if (_cts == null)
                     return;
@@ -96,17 +97,17 @@ namespace VAL.Host
             }
         }
 
-        public static void RequestCancel()
+        public void RequestCancel()
         {
-            lock (Gate)
+            lock (_gate)
             {
                 try { _cts?.Cancel(); } catch { }
             }
         }
 
-        public static CancellationToken GetTokenIfRunning(GuardedOperationKind kind)
+        public CancellationToken GetTokenIfRunning(GuardedOperationKind kind)
         {
-            lock (Gate)
+            lock (_gate)
             {
                 if (_cts == null) return CancellationToken.None;
                 if (_currentKind != kind) return CancellationToken.None;
@@ -114,9 +115,9 @@ namespace VAL.Host
             }
         }
 
-        public static bool IsCancellationRequested(GuardedOperationKind kind)
+        public bool IsCancellationRequested(GuardedOperationKind kind)
         {
-            lock (Gate)
+            lock (_gate)
             {
                 if (_cts == null) return false;
                 if (_currentKind != kind) return false;
@@ -124,15 +125,20 @@ namespace VAL.Host
             }
         }
 
-        public static void ForceEndAll()
+        public void ForceEndAll()
         {
-            lock (Gate)
+            lock (_gate)
             {
                 try { _cts?.Dispose(); } catch { }
                 _cts = null;
                 _currentKind = null;
                 _currentOperationId = 0;
             }
+        }
+
+        public void Dispose()
+        {
+            ForceEndAll();
         }
     }
 }

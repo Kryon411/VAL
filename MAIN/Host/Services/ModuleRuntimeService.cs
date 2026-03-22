@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using VAL.Contracts;
 using VAL.Continuum;
-using VAL.Host.Abyss;
 using VAL.Host.WebMessaging;
 using VAL.Host.Startup;
 
@@ -43,8 +42,6 @@ namespace VAL.Host.Services
             _continuumWriter = continuumWriter;
             _injectQueue = injectQueue;
             _startupOptions = startupOptions;
-
-            ContinuumHost.Configure(_toastHub, _continuumWriter, _injectQueue);
         }
 
         public void Start()
@@ -95,8 +92,6 @@ namespace VAL.Host.Services
                 await _moduleLoader.InitializeAsync(core);
                 _modulesInitializedForCore = core;
 
-                ContinuumHost.PostToWebMessage = _webMessageSender.Send;
-                AbyssRuntime.Initialize(_webMessageSender, AbyssToastBridge.Show);
                 SendPrivacySettings();
             }
             catch (System.Exception ex)

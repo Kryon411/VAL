@@ -27,9 +27,10 @@ namespace VAL.Tests.Truth
                 var stamp = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
                 File.WriteAllText(repairPath, $"{stamp} truncated tail repair removed 42 bytes");
 
-                SessionContext.SetActiveChatId(chatId);
+                var sessionContext = new SessionContext();
+                sessionContext.SetActiveChatId(chatId);
 
-                var service = new TruthHealthReportService(root);
+                var service = new TruthHealthReportService(sessionContext, root);
                 var result = service.GetCurrentSnapshot();
 
                 Assert.True(result.HasActiveChat);

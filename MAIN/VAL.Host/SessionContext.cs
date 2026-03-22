@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using VAL.Host.Services;
 
 namespace VAL.Host
 {
@@ -12,13 +13,13 @@ namespace VAL.Host
     ///
     /// This removes duplicated "active chat" tracking across modules.
     /// </summary>
-    public static class SessionContext
+    public sealed class SessionContext : ISessionContext
     {
-        private static readonly object Sync = new object();
+        private readonly object _sync = new object();
 
-        private static string _activeChatId = string.Empty;
-        private static bool _sessionAttached;
-        private static DateTime _lastChatIdUtc = DateTime.MinValue;
+        private string _activeChatId = string.Empty;
+        private bool _sessionAttached;
+        private DateTime _lastChatIdUtc = DateTime.MinValue;
 
         // ---------------------------------
         // Per-chat metadata (best-effort)
@@ -31,15 +32,15 @@ namespace VAL.Host
             public DateTime LastTouchedUtc = DateTime.MinValue;
         }
 
-        private static readonly Dictionary<string, ChatMeta> MetaByChatId =
+        private readonly Dictionary<string, ChatMeta> _metaByChatId =
             new Dictionary<string, ChatMeta>(StringComparer.OrdinalIgnoreCase);
 
-        private static ChatMeta GetOrCreateMetaLocked(string chatId)
+        private ChatMeta GetOrCreateMetaLocked(string chatId)
         {
-            if (!MetaByChatId.TryGetValue(chatId, out var meta))
+            if (!_metaByChatId.TryGetValue(chatId, out var meta))
             {
                 meta = new ChatMeta();
-                MetaByChatId[chatId] = meta;
+                _metaByChatId[chatId] = meta;
             }
 
             meta.LastTouchedUtc = DateTime.UtcNow;
@@ -49,11 +50,11 @@ namespace VAL.Host
         /// <summary>
         /// The most recently observed chatId (best-effort). May be empty early in startup.
         /// </summary>
-        public static string ActiveChatId
+        public string ActiveChatId
         {
             get
             {
-                lock (Sync)
+                lock (_sync)
                 {
                     return _activeChatId;
                 }
@@ -64,22 +65,22 @@ namespace VAL.Host
         /// True once the host has observed any message containing a chatId.
         /// (Used as a coarse readiness gate for long-running operations.)
         /// </summary>
-        public static bool IsSessionAttached
+        public bool IsSessionAttached
         {
             get
             {
-                lock (Sync)
+                lock (_sync)
                 {
                     return _sessionAttached;
                 }
             }
         }
 
-        public static DateTime LastChatIdUtc
+        public DateTime LastChatIdUtc
         {
             get
             {
-                lock (Sync)
+                lock (_sync)
                 {
                     return _lastChatIdUtc;
                 }
@@ -90,7 +91,7 @@ namespace VAL.Host
         /// Observe an inbound WebView message and capture chat context if present.
         /// Safe to call for every message.
         /// </summary>
-        public static void Observe(string? type, string? chatId)
+        public void Observe(string? type, string? chatId)
         {
             // For now, "attached" is intentionally loose: any chatId implies we have a usable session context.
             // (Continuum still applies its own deeper gating for Pulse/Chronicle availability.)
@@ -104,12 +105,12 @@ namespace VAL.Host
             _ = type;
         }
 
-        public static void SetActiveChatId(string chatId)
+        public void SetActiveChatId(string chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 return;
 
-            lock (Sync)
+            lock (_sync)
             {
                 _activeChatId = chatId.Trim();
                 _sessionAttached = true;
@@ -125,13 +126,13 @@ namespace VAL.Host
         /// Ensure a meta record exists for this chat and default Origin to Organic
         /// (unless it has already been classified).
         /// </summary>
-        public static void EnsureInitialized(string? chatId)
+        public void EnsureInitialized(string? chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return;
             var cid = chatId.Trim();
             if (cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return;
 
-            lock (Sync)
+            lock (_sync)
             {
                 var meta = GetOrCreateMetaLocked(cid);
                 if (meta.Origin == ChatOrigin.Unknown)
@@ -139,25 +140,25 @@ namespace VAL.Host
             }
         }
 
-        public static ChatOrigin GetOrigin(string? chatId)
+        public ChatOrigin GetOrigin(string? chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return ChatOrigin.Unknown;
             var cid = chatId.Trim();
             if (cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return ChatOrigin.Unknown;
 
-            lock (Sync)
+            lock (_sync)
             {
-                return MetaByChatId.TryGetValue(cid, out var meta) ? meta.Origin : ChatOrigin.Unknown;
+                return _metaByChatId.TryGetValue(cid, out var meta) ? meta.Origin : ChatOrigin.Unknown;
             }
         }
 
-        public static void SetOrigin(string? chatId, ChatOrigin origin)
+        private void SetOrigin(string? chatId, ChatOrigin origin)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return;
             var cid = chatId.Trim();
             if (cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return;
 
-            lock (Sync)
+            lock (_sync)
             {
                 var meta = GetOrCreateMetaLocked(cid);
                 meta.Origin = origin;
@@ -166,47 +167,47 @@ namespace VAL.Host
             }
         }
 
-        public static bool HasEssenceInjection(string? chatId)
+        public bool HasEssenceInjection(string? chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return false;
             var cid = chatId.Trim();
             if (cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return false;
 
-            lock (Sync)
+            lock (_sync)
             {
-                return MetaByChatId.TryGetValue(cid, out var meta) && meta.HasEssenceInjection;
+                return _metaByChatId.TryGetValue(cid, out var meta) && meta.HasEssenceInjection;
             }
         }
 
-        public static void MarkContinuumSeeded(string? chatId)
+        public void MarkContinuumSeeded(string? chatId)
         {
             SetOrigin(chatId, ChatOrigin.ContinuumSeeded);
         }
 
-        public static void MarkChronicleRebuilt(string? chatId)
+        public void MarkChronicleRebuilt(string? chatId)
         {
             SetOrigin(chatId, ChatOrigin.ChronicleRebuilt);
         }
 
-        public static bool WasMissingTruthLogAtAttach(string? chatId)
+        public bool WasMissingTruthLogAtAttach(string? chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return false;
             var cid = chatId.Trim();
             if (cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return false;
 
-            lock (Sync)
+            lock (_sync)
             {
-                return MetaByChatId.TryGetValue(cid, out var meta) && meta.WasMissingTruthLogAtAttach;
+                return _metaByChatId.TryGetValue(cid, out var meta) && meta.WasMissingTruthLogAtAttach;
             }
         }
 
-        public static void SetMissingTruthLogAtAttach(string? chatId, bool missing)
+        public void SetMissingTruthLogAtAttach(string? chatId, bool missing)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return;
             var cid = chatId.Trim();
             if (cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return;
 
-            lock (Sync)
+            lock (_sync)
             {
                 var meta = GetOrCreateMetaLocked(cid);
                 meta.WasMissingTruthLogAtAttach = missing;
@@ -216,7 +217,7 @@ namespace VAL.Host
         /// <summary>
         /// Returns chatId if provided; otherwise falls back to ActiveChatId.
         /// </summary>
-        public static string ResolveChatId(string? chatId)
+        public string ResolveChatId(string? chatId)
         {
             if (!string.IsNullOrWhiteSpace(chatId))
                 return chatId!.Trim();
@@ -227,7 +228,7 @@ namespace VAL.Host
         /// <summary>
         /// Returns false for the synthetic "session-*" placeholder chat IDs.
         /// </summary>
-        public static bool IsValidChatId(string? chatId)
+        public bool IsValidChatId(string? chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 return false;

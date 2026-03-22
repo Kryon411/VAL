@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading;
 using VAL.Contracts;
 using VAL.Host.Security;
+using VAL.Host.Services;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Commands
@@ -24,11 +25,16 @@ namespace VAL.Host.Commands
 
         private readonly CommandRegistry _commandRegistry;
         private readonly ICommandDiagnosticsReporter? _diagnosticsReporter;
+        private readonly ISessionContext _sessionContext;
 
-        public HostCommandRouter(CommandRegistry commandRegistry, ICommandDiagnosticsReporter? diagnosticsReporter = null)
+        public HostCommandRouter(
+            CommandRegistry commandRegistry,
+            ICommandDiagnosticsReporter? diagnosticsReporter = null,
+            ISessionContext? sessionContext = null)
         {
             _commandRegistry = commandRegistry ?? throw new ArgumentNullException(nameof(commandRegistry));
             _diagnosticsReporter = diagnosticsReporter;
+            _sessionContext = sessionContext ?? new SessionContext();
         }
 
         public HostCommandExecutionResult HandleWebMessage(WebMessageEnvelope webMessage)
@@ -68,7 +74,7 @@ namespace VAL.Host.Commands
             }
 
             // Central session tracking.
-            SessionContext.Observe(commandName, parsedEnvelope.ChatId);
+            _sessionContext.Observe(commandName, parsedEnvelope.ChatId);
 
             var payload = parsedEnvelope.Payload;
             if (payload.HasValue && payload.Value.ValueKind == JsonValueKind.Object)

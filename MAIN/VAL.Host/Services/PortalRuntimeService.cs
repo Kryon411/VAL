@@ -1,6 +1,5 @@
 using System;
 using VAL.Host.Portal;
-using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Services
 {
@@ -8,31 +7,23 @@ namespace VAL.Host.Services
     {
         private const string FocusScript = "(()=>{try{const selectors=['form textarea','textarea[placeholder]','div[contenteditable=\\\"true\\\"][role=\\\"textbox\\\"]','div.ProseMirror[contenteditable=\\\"true\\\"]','div[contenteditable=\\\"true\\\"][data-slate-editor=\\\"true\\\"]'];for(const s of selectors){  const el=document.querySelector(s);  if(el){ try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true; }}// fallback: find any visible contenteditable in the bottom composer regionconst cands=[...document.querySelectorAll('div[contenteditable=\\\"true\\\"]')].filter(e=>{  const r=e.getBoundingClientRect();  return r.width>100 && r.height>20 && r.bottom> (window.innerHeight*0.55);});if(cands.length){  const el=cands[cands.length-1];  try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true;}}catch(e){} return false;})()";
 
-        private readonly IWebMessageSender _webMessageSender;
+        private readonly PortalRuntime _portalRuntime;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IPrivacySettingsService _privacySettingsService;
         private readonly IPortalRuntimeStateManager _portalRuntimeStateManager;
-        private readonly IDockModelService _dockModelService;
         private bool _initialized;
 
         public PortalRuntimeService(
-            IWebMessageSender webMessageSender,
+            PortalRuntime portalRuntime,
             IWebViewRuntime webViewRuntime,
             IPrivacySettingsService privacySettingsService,
-            IPortalRuntimeStateManager portalRuntimeStateManager,
-            IDockModelService dockModelService)
+            IPortalRuntimeStateManager portalRuntimeStateManager)
         {
-            _webMessageSender = webMessageSender;
+            _portalRuntime = portalRuntime;
             _webViewRuntime = webViewRuntime;
             _privacySettingsService = privacySettingsService;
             _portalRuntimeStateManager = portalRuntimeStateManager;
-            _dockModelService = dockModelService;
             _privacySettingsService.SettingsChanged += OnPrivacySettingsChanged;
-
-            PortalRuntime.DockModelStateChanged = (enabled, privacyAllowed, count) =>
-            {
-                _dockModelService.UpdatePortalState(enabled, privacyAllowed, count);
-            };
         }
 
         public void Initialize(Action focusControl)
@@ -42,9 +33,8 @@ namespace VAL.Host.Services
 
             try
             {
-                PortalRuntime.Initialize(
-                    messageSender: _webMessageSender,
-                    focusWebView: () =>
+                _portalRuntime.Initialize(
+                    () =>
                     {
                         try
                         {
@@ -75,7 +65,7 @@ namespace VAL.Host.Services
 
             try
             {
-                PortalRuntime.AttachWindow(hwnd);
+                _portalRuntime.AttachWindow(hwnd);
             }
             catch
             {

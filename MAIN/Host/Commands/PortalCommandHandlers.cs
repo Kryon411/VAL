@@ -1,24 +1,27 @@
 using System;
-using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
 using VAL.Host.Logging;
 using VAL.Host.Services;
 
 namespace VAL.Host.Commands
 {
-    internal static class PortalCommandHandlers
+    internal sealed class PortalCommandHandlers
     {
-        private static readonly RateLimiter RateLimiter = new();
+        private readonly IPortalRuntimeStateManager _runtimeStateManager;
+        private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
 
-        public static void HandleSetEnabled(HostCommand cmd)
+        public PortalCommandHandlers(IPortalRuntimeStateManager runtimeStateManager)
+        {
+            _runtimeStateManager = runtimeStateManager ?? throw new ArgumentNullException(nameof(runtimeStateManager));
+        }
+
+        public void HandleSetEnabled(HostCommand cmd)
         {
             try
             {
                 if (cmd.TryGetBool("enabled", out var en))
                 {
-                    var runtime = GetRuntime() ?? new PortalRuntimeStateManager();
-                    runtime.SetEnabled(en);
+                    _runtimeStateManager.SetEnabled(en);
                 }
             }
             catch (Exception ex)
@@ -27,12 +30,11 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleOpenSnip(HostCommand cmd)
+        public void HandleOpenSnip(HostCommand cmd)
         {
             try
             {
-                var runtime = GetRuntime() ?? new PortalRuntimeStateManager();
-                runtime.OpenSnipOverlay();
+                _runtimeStateManager.OpenSnipOverlay();
             }
             catch (Exception ex)
             {
@@ -40,14 +42,13 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleSendStaged(HostCommand cmd)
+        public void HandleSendStaged(HostCommand cmd)
         {
             try
             {
                 int max = 10;
                 if (cmd.TryGetInt("max", out var m)) max = m;
-                var runtime = GetRuntime() ?? new PortalRuntimeStateManager();
-                runtime.SendStaged(max);
+                _runtimeStateManager.SendStaged(max);
             }
             catch (Exception ex)
             {
@@ -55,20 +56,15 @@ namespace VAL.Host.Commands
             }
         }
 
-        private static void LogCommandFailure(string action, HostCommand cmd, Exception ex)
+        private void LogCommandFailure(string action, HostCommand cmd, Exception ex)
         {
             var key = $"cmd.fail.portal.{action}";
-            if (!RateLimiter.Allow(key, LogInterval))
+            if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";
             ValLog.Warn(nameof(PortalCommandHandlers),
                 $"Portal command failed ({action}) for {cmd.Type} (source: {sourceHost}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
-        }
-
-        private static IPortalRuntimeStateManager? GetRuntime()
-        {
-            return (Application.Current as App)?.Services.GetService<IPortalRuntimeStateManager>();
         }
     }
 }

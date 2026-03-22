@@ -10,37 +10,54 @@ using System.Threading;
 using System.Threading.Tasks;
 using VAL.Contracts;
 using VAL.Continuum.Pipeline.Truth;
+using VAL.Host;
 using VAL.Host.Security;
+using VAL.Host.Services;
 using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Abyss
 {
-    internal static class AbyssRuntime
+    internal enum AbyssToastKind
     {
-        private static readonly object Gate = new();
+        NoQuery,
+        Searching,
+        NoTruthLogs,
+        NoMatches,
+        Matches,
+        ResultsWritten,
+        Injected,
+        NoSelection,
+        ActionUnavailable
+    }
+
+    public sealed class AbyssRuntime : IDisposable
+    {
+        private readonly object _gate = new();
         private static readonly int[] DefaultInjectIndices = { 1 };
         private static readonly string[] SnippetLineSeparators = { "\r\n", "\n" };
-        private static IWebMessageSender? _messageSender;
-        private static Action<AbyssToastRequest>? _toastSink;
-        private static List<AbyssSearchResult> _lastResults = new();
-        private static string? _lastQuery;
-        private static string? _lastQueryOriginal;
-        private static string? _lastGeneratedUtc;
-        private static CancellationTokenSource? _searchCts;
+        private readonly IWebMessageSender _messageSender;
+        private readonly IToastHub _toastHub;
+        private readonly ISessionContext _sessionContext;
+        private List<AbyssSearchResult> _lastResults = new();
+        private string? _lastQuery;
+        private string? _lastQueryOriginal;
+        private string? _lastGeneratedUtc;
+        private CancellationTokenSource? _searchCts;
 
-        public static void Initialize(IWebMessageSender messageSender, Action<AbyssToastRequest>? toastSink = null)
+        public AbyssRuntime(IWebMessageSender messageSender, IToastHub toastHub, ISessionContext sessionContext)
         {
-            _messageSender = messageSender;
-            _toastSink = toastSink;
+            _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
+            _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
+            _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
         }
 
-        public static void InjectPrompt(string? chatId)
+        public void InjectPrompt(string? chatId)
         {
             var prompt = "Abyss query: <keywords>";
             SendInjectText(prompt, chatId);
         }
 
-        public static void Search(string? chatId, string query, int maxResults, string? queryOriginal = null, IReadOnlyCollection<string>? excludeFingerprints = null)
+        public void Search(string? chatId, string query, int maxResults, string? queryOriginal = null, IReadOnlyCollection<string>? excludeFingerprints = null)
         {
             if (string.IsNullOrWhiteSpace(query))
             {
@@ -72,7 +89,7 @@ namespace VAL.Host.Abyss
                     var results = AbyssSearch.Search(memoryRoot, query, maxResults, token, excludeFingerprints);
                     token.ThrowIfCancellationRequested();
 
-                    lock (Gate)
+                    lock (_gate)
                     {
                         _lastResults = results;
                     }
@@ -99,12 +116,12 @@ namespace VAL.Host.Abyss
             }, token);
         }
 
-        public static void RetryLast(string? chatId, IReadOnlyCollection<string>? excludeFingerprints, int maxResults)
+        public void RetryLast(string? chatId, IReadOnlyCollection<string>? excludeFingerprints, int maxResults)
         {
             string? query;
             string? queryOriginal;
 
-            lock (Gate)
+            lock (_gate)
             {
                 query = _lastQuery;
                 queryOriginal = _lastQueryOriginal;
@@ -119,7 +136,7 @@ namespace VAL.Host.Abyss
             Search(chatId, query, maxResults, queryOriginal, excludeFingerprints);
         }
 
-        public static void FetchLast(string? chatId, int count, bool inject)
+        public void FetchLast(string? chatId, int count, bool inject)
         {
             ShowToast(AbyssToastKind.Searching, chatId);
 
@@ -138,10 +155,10 @@ namespace VAL.Host.Abyss
                 var exchanges = AbyssSearch.GetLastFromMostRecent(memoryRoot, count);
                 var results = exchanges.Select(ex => new AbyssSearchResult { Exchange = ex, Score = 0 }).ToList();
 
-                lock (Gate)
-                {
-                    _lastResults = results;
-                }
+                    lock (_gate)
+                    {
+                        _lastResults = results;
+                    }
 
                 if (results.Count == 0)
                 {
@@ -166,7 +183,7 @@ namespace VAL.Host.Abyss
             });
         }
 
-        public static void InjectResults(IReadOnlyList<int> indices, string? chatId = null)
+        public void InjectResults(IReadOnlyList<int> indices, string? chatId = null)
         {
             if (indices == null || indices.Count == 0)
             {
@@ -184,10 +201,10 @@ namespace VAL.Host.Abyss
             InjectResult(null, first, chatId);
         }
 
-        public static void InjectResult(string? id, int? index, string? chatId = null)
+        public void InjectResult(string? id, int? index, string? chatId = null)
         {
             List<AbyssSearchResult> snapshot;
-            lock (Gate)
+            lock (_gate)
             {
                 snapshot = _lastResults.ToList();
             }
@@ -232,11 +249,8 @@ namespace VAL.Host.Abyss
             ShowToast(AbyssToastKind.Injected, chatId, "Abyss: injected result");
         }
 
-        public static void EmitResults(string? chatId)
+        public void EmitResults(string? chatId)
         {
-            if (_messageSender == null)
-                return;
-
             var payload = BuildResultsPayload();
             if (payload == null)
                 return;
@@ -244,12 +258,12 @@ namespace VAL.Host.Abyss
             SendEnvelope(WebMessageTypes.Event, "abyss.results", payload);
         }
 
-        public static void ClearResults(string? chatId)
+        public void ClearResults(string? chatId)
         {
             ClearLastResults();
         }
 
-        public static void OpenSource(string? chatId)
+        public void OpenSource(string? chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 return;
@@ -279,12 +293,9 @@ namespace VAL.Host.Abyss
             ShowToast(AbyssToastKind.ActionUnavailable, chatId, bypassLaunchQuiet: true);
         }
 
-        private static void SendInjectText(string text, string? chatId)
+        private void SendInjectText(string text, string? chatId)
         {
             if (string.IsNullOrWhiteSpace(text))
-                return;
-
-            if (_messageSender == null)
                 return;
 
             SendEnvelope(WebMessageTypes.Command, WebCommandNames.ContinuumInjectText, new { chatId = chatId, text = text }, chatId);
@@ -307,14 +318,14 @@ namespace VAL.Host.Abyss
             return sb.ToString().Trim();
         }
 
-        private static object? BuildResultsPayload()
+        private object? BuildResultsPayload()
         {
             List<AbyssSearchResult> snapshot;
             string? query;
             string? queryOriginal;
             string? generatedUtc;
 
-            lock (Gate)
+            lock (_gate)
             {
                 snapshot = _lastResults.ToList();
                 query = _lastQuery;
@@ -415,9 +426,9 @@ namespace VAL.Host.Abyss
                 : $"L{startLine}–L{endLine}";
         }
 
-        private static void TrackQuery(string queryUsed, string? queryOriginal)
+        private void TrackQuery(string queryUsed, string? queryOriginal)
         {
-            lock (Gate)
+            lock (_gate)
             {
                 _lastQuery = queryUsed;
                 _lastQueryOriginal = queryOriginal ?? queryUsed;
@@ -425,9 +436,9 @@ namespace VAL.Host.Abyss
             }
         }
 
-        private static CancellationToken BeginSearchCancellation()
+        private CancellationToken BeginSearchCancellation()
         {
-            lock (Gate)
+            lock (_gate)
             {
                 _searchCts?.Cancel();
                 _searchCts?.Dispose();
@@ -436,7 +447,7 @@ namespace VAL.Host.Abyss
             }
         }
 
-        private static string? WriteResultsFile(string? chatId, string query, IReadOnlyList<AbyssSearchResult> results)
+        private string? WriteResultsFile(string? chatId, string query, IReadOnlyList<AbyssSearchResult> results)
         {
             var dir = ResolveSessionDir(chatId, results);
             if (string.IsNullOrWhiteSpace(dir))
@@ -490,28 +501,54 @@ namespace VAL.Host.Abyss
             return excerpt.Substring(0, maxChars).TrimEnd() + "…";
         }
 
-        private static void ClearLastResults()
+        private void ClearLastResults()
         {
-            lock (Gate)
+            lock (_gate)
             {
                 _lastResults = new List<AbyssSearchResult>();
             }
         }
 
-        private static void ShowToast(
+        private void ShowToast(
             AbyssToastKind kind,
             string? chatId = null,
             string? titleOverride = null,
             bool bypassLaunchQuiet = false)
         {
-            _toastSink?.Invoke(new AbyssToastRequest(kind, chatId, titleOverride, bypassLaunchQuiet));
+            switch (kind)
+            {
+                case AbyssToastKind.NoQuery:
+                    _toastHub.TryShow(ToastKey.AbyssNoQuery, chatId: chatId);
+                    break;
+                case AbyssToastKind.Searching:
+                    _toastHub.TryShow(ToastKey.AbyssSearching, chatId: chatId);
+                    break;
+                case AbyssToastKind.NoTruthLogs:
+                    _toastHub.TryShow(ToastKey.AbyssNoTruthLogs, chatId: chatId);
+                    break;
+                case AbyssToastKind.NoMatches:
+                    _toastHub.TryShow(ToastKey.AbyssNoMatches, chatId: chatId);
+                    break;
+                case AbyssToastKind.Matches:
+                    _toastHub.TryShow(ToastKey.AbyssMatches, chatId: chatId, titleOverride: titleOverride);
+                    break;
+                case AbyssToastKind.ResultsWritten:
+                    _toastHub.TryShow(ToastKey.AbyssResultsWritten, chatId: chatId);
+                    break;
+                case AbyssToastKind.Injected:
+                    _toastHub.TryShow(ToastKey.AbyssInjected, chatId: chatId, titleOverride: titleOverride);
+                    break;
+                case AbyssToastKind.NoSelection:
+                    _toastHub.TryShow(ToastKey.AbyssNoSelection, chatId: chatId);
+                    break;
+                case AbyssToastKind.ActionUnavailable:
+                    _toastHub.TryShow(ToastKey.ActionUnavailable, chatId: chatId, bypassLaunchQuiet: bypassLaunchQuiet);
+                    break;
+            }
         }
 
-        private static void SendEnvelope(string type, string name, object payload, string? chatId = null)
+        private void SendEnvelope(string type, string name, object payload, string? chatId = null)
         {
-            if (_messageSender == null)
-                return;
-
             try
             {
                 _messageSender.Send(new MessageEnvelope
@@ -560,12 +597,12 @@ namespace VAL.Host.Abyss
                 : $"{role}@{start}-{end}";
         }
 
-        private static string? ResolveSessionDir(string? chatId, IReadOnlyList<AbyssSearchResult> results)
+        private string? ResolveSessionDir(string? chatId, IReadOnlyList<AbyssSearchResult> results)
         {
             try
             {
-                var resolved = SessionContext.ResolveChatId(chatId);
-                if (SessionContext.IsValidChatId(resolved))
+                var resolved = _sessionContext.ResolveChatId(chatId);
+                if (_sessionContext.IsValidChatId(resolved))
                     return TruthStorage.EnsureChatDir(resolved);
             }
             catch { }
@@ -620,6 +657,16 @@ namespace VAL.Host.Abyss
             }
 
             return bundleDir;
+        }
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                try { _searchCts?.Cancel(); } catch { }
+                try { _searchCts?.Dispose(); } catch { }
+                _searchCts = null;
+            }
         }
     }
 }

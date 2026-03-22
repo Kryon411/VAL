@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using VAL.Contracts;
 using VAL.Host.Commands;
 using VAL.Host.Hosting;
 using VAL.Host.Services;
@@ -12,6 +15,8 @@ namespace VAL.Tests.Hosting
 {
     public sealed class ValHostServiceCollectionExtensionsTests
     {
+        private static readonly Uri TestSourceUri = new("https://chatgpt.com");
+
         [Fact]
         public void AddValHostBuildsServiceProviderWithoutThrowing()
         {
@@ -58,6 +63,50 @@ namespace VAL.Tests.Hosting
             Assert.Same(startupOptions, provider.GetRequiredService<StartupOptions>());
             Assert.Same(smokeSettings, provider.GetRequiredService<SmokeTestSettings>());
             Assert.NotNull(provider.GetRequiredService<SmokeTestState>());
+        }
+
+        [Fact]
+        public void AddValHostAppliesDeferredCommandRegistryConfigurators()
+        {
+            var services = new ServiceCollection();
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["VAL:DataRoot"] = "./data",
+                    ["WebView:StartUrl"] = "https://chatgpt.com",
+                })
+                .Build();
+
+            services.AddValHost(configuration, builder =>
+            {
+                builder.CommandRegistryConfigurators.Add((_, registry) =>
+                {
+                    registry.Register(new CommandSpec("cmd.deferred", "Tests", Array.Empty<string>(), _ => { }));
+                });
+            });
+
+            using var provider = services.BuildServiceProvider(validateScopes: true);
+            var registry = provider.GetRequiredService<CommandRegistry>();
+
+            using var doc = JsonDocument.Parse("{}");
+            var command = CreateHostCommand("cmd.deferred", doc.RootElement);
+
+            var result = registry.Dispatch(command);
+
+            Assert.Equal(CommandDispatchStatus.Accepted, result.Status);
+            Assert.True(result.IsAccepted);
+        }
+
+        private static HostCommand CreateHostCommand(string type, JsonElement root)
+        {
+            var created = Activator.CreateInstance(
+                typeof(HostCommand),
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[] { type, "{}", null, TestSourceUri, root },
+                culture: null);
+
+            return Assert.IsType<HostCommand>(created);
         }
     }
 }

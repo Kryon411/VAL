@@ -6,13 +6,19 @@ using VAL.Host.Logging;
 
 namespace VAL.Host.Commands
 {
-    internal static class AbyssCommandHandlers
+    internal sealed class AbyssCommandHandlers
     {
-        private static readonly RateLimiter RateLimiter = new();
+        private readonly AbyssRuntime _abyssRuntime;
+        private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
         private static readonly char[] IndexSeparators = { ',', ';', ' ' };
 
-        public static void HandleSearch(HostCommand cmd)
+        public AbyssCommandHandlers(AbyssRuntime abyssRuntime)
+        {
+            _abyssRuntime = abyssRuntime ?? throw new ArgumentNullException(nameof(abyssRuntime));
+        }
+
+        public void HandleSearch(HostCommand cmd)
         {
             try
             {
@@ -28,7 +34,7 @@ namespace VAL.Host.Commands
 
                 var exclude = ParseStringList(cmd, "excludeFingerprints");
 
-                AbyssRuntime.Search(cmd.ChatId, query ?? string.Empty, max, queryOriginal, exclude);
+                _abyssRuntime.Search(cmd.ChatId, query ?? string.Empty, max, queryOriginal, exclude);
             }
             catch (Exception ex)
             {
@@ -36,12 +42,12 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleOpenQueryUi(HostCommand cmd)
+        public void HandleOpenQueryUi(HostCommand cmd)
         {
             // No-op: UI-only command handled client-side.
         }
 
-        public static void HandleRetryLast(HostCommand cmd)
+        public void HandleRetryLast(HostCommand cmd)
         {
             try
             {
@@ -50,7 +56,7 @@ namespace VAL.Host.Commands
                     max = parsed;
 
                 var exclude = ParseStringList(cmd, "excludeFingerprints");
-                AbyssRuntime.RetryLast(cmd.ChatId, exclude, max);
+                _abyssRuntime.RetryLast(cmd.ChatId, exclude, max);
             }
             catch (Exception ex)
             {
@@ -58,12 +64,12 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleInjectResults(HostCommand cmd)
+        public void HandleInjectResults(HostCommand cmd)
         {
             try
             {
                 var indices = ParseIndices(cmd);
-                AbyssRuntime.InjectResults(indices, cmd.ChatId);
+                _abyssRuntime.InjectResults(indices, cmd.ChatId);
             }
             catch (Exception ex)
             {
@@ -71,7 +77,7 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleInjectResult(HostCommand cmd)
+        public void HandleInjectResult(HostCommand cmd)
         {
             try
             {
@@ -83,7 +89,7 @@ namespace VAL.Host.Commands
                 if (cmd.TryGetInt("index", out var parsed))
                     index = parsed;
 
-                AbyssRuntime.InjectResult(id, index, cmd.ChatId);
+                _abyssRuntime.InjectResult(id, index, cmd.ChatId);
             }
             catch (Exception ex)
             {
@@ -91,12 +97,12 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleOpenSource(HostCommand cmd)
+        public void HandleOpenSource(HostCommand cmd)
         {
             try
             {
                 cmd.TryGetString("chatId", out var chatId);
-                AbyssRuntime.OpenSource(chatId ?? cmd.ChatId);
+                _abyssRuntime.OpenSource(chatId ?? cmd.ChatId);
             }
             catch (Exception ex)
             {
@@ -104,11 +110,11 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleGetResults(HostCommand cmd)
+        public void HandleGetResults(HostCommand cmd)
         {
             try
             {
-                AbyssRuntime.EmitResults(cmd.ChatId);
+                _abyssRuntime.EmitResults(cmd.ChatId);
             }
             catch (Exception ex)
             {
@@ -116,11 +122,11 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleClearResults(HostCommand cmd)
+        public void HandleClearResults(HostCommand cmd)
         {
             try
             {
-                AbyssRuntime.ClearResults(cmd.ChatId);
+                _abyssRuntime.ClearResults(cmd.ChatId);
             }
             catch (Exception ex)
             {
@@ -128,16 +134,16 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleDisregard(HostCommand cmd)
+        public void HandleDisregard(HostCommand cmd)
         {
             // No-op: client maintains snippet-level disregard state.
         }
 
-        public static void HandleInjectPrompt(HostCommand cmd)
+        public void HandleInjectPrompt(HostCommand cmd)
         {
             try
             {
-                AbyssRuntime.InjectPrompt(cmd.ChatId);
+                _abyssRuntime.InjectPrompt(cmd.ChatId);
             }
             catch (Exception ex)
             {
@@ -145,12 +151,12 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleInject(HostCommand cmd)
+        public void HandleInject(HostCommand cmd)
         {
             try
             {
                 var indices = ParseIndices(cmd);
-                AbyssRuntime.InjectResults(indices, cmd.ChatId);
+                _abyssRuntime.InjectResults(indices, cmd.ChatId);
             }
             catch (Exception ex)
             {
@@ -158,7 +164,7 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleLast(HostCommand cmd)
+        public void HandleLast(HostCommand cmd)
         {
             try
             {
@@ -170,7 +176,7 @@ namespace VAL.Host.Commands
                 if (cmd.TryGetBool("inject", out var parsedBool))
                     inject = parsedBool;
 
-                AbyssRuntime.FetchLast(cmd.ChatId, count, inject);
+                _abyssRuntime.FetchLast(cmd.ChatId, count, inject);
             }
             catch (Exception ex)
             {
@@ -178,7 +184,7 @@ namespace VAL.Host.Commands
             }
         }
 
-        private static List<int> ParseIndices(HostCommand cmd)
+        private List<int> ParseIndices(HostCommand cmd)
         {
             var indices = new List<int>();
 
@@ -215,7 +221,7 @@ namespace VAL.Host.Commands
             return indices;
         }
 
-        private static List<string> ParseStringList(HostCommand cmd, string field)
+        private List<string> ParseStringList(HostCommand cmd, string field)
         {
             var list = new List<string>();
 
@@ -274,10 +280,10 @@ namespace VAL.Host.Commands
             return list;
         }
 
-        private static void LogCommandFailure(string action, HostCommand cmd, Exception ex)
+        private void LogCommandFailure(string action, HostCommand cmd, Exception ex)
         {
             var key = $"cmd.fail.abyss.{action}";
-            if (!RateLimiter.Allow(key, LogInterval))
+            if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";

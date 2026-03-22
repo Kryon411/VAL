@@ -1,7 +1,5 @@
 using System;
 using System.Threading;
-using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
 using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Logging;
@@ -9,23 +7,30 @@ using VAL.Host.Services;
 
 namespace VAL.Host.Commands
 {
-    internal static class ToolsCommandHandlers
+    internal sealed class ToolsCommandHandlers
     {
-        private static readonly RateLimiter RateLimiter = new();
+        private readonly IUiThread _uiThread;
+        private readonly ITruthHealthWindowService _truthHealthWindowService;
+        private readonly IDiagnosticsWindowService _diagnosticsWindowService;
+        private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
         private static int _diagnosticsFailureToastShown;
 
-        public static void HandleOpenTruthHealth(HostCommand cmd)
+        public ToolsCommandHandlers(
+            IUiThread uiThread,
+            ITruthHealthWindowService truthHealthWindowService,
+            IDiagnosticsWindowService diagnosticsWindowService)
+        {
+            _uiThread = uiThread ?? throw new ArgumentNullException(nameof(uiThread));
+            _truthHealthWindowService = truthHealthWindowService ?? throw new ArgumentNullException(nameof(truthHealthWindowService));
+            _diagnosticsWindowService = diagnosticsWindowService ?? throw new ArgumentNullException(nameof(diagnosticsWindowService));
+        }
+
+        public void HandleOpenTruthHealth(HostCommand cmd)
         {
             try
             {
-                var services = GetServices();
-                if (services == null)
-                    return;
-
-                var uiThread = services.GetRequiredService<IUiThread>();
-                var truthHealth = services.GetRequiredService<ITruthHealthWindowService>();
-                uiThread.Invoke(truthHealth.ShowTruthHealth);
+                _uiThread.Invoke(_truthHealthWindowService.ShowTruthHealth);
             }
             catch (Exception ex)
             {
@@ -33,21 +38,12 @@ namespace VAL.Host.Commands
             }
         }
 
-        public static void HandleOpenDiagnostics(HostCommand cmd)
+        public void HandleOpenDiagnostics(HostCommand cmd)
         {
             try
             {
                 ValLog.Info(nameof(ToolsCommandHandlers), "Tools: Diagnostics requested");
-                var services = GetServices();
-                if (services == null)
-                {
-                    ReportDiagnosticsFailure(cmd, null, "services_unavailable");
-                    return;
-                }
-
-                var uiThread = services.GetRequiredService<IUiThread>();
-                var diagnostics = services.GetRequiredService<IDiagnosticsWindowService>();
-                uiThread.Invoke(diagnostics.ShowDiagnostics);
+                _uiThread.Invoke(_diagnosticsWindowService.ShowDiagnostics);
             }
             catch (Exception ex)
             {
@@ -55,15 +51,10 @@ namespace VAL.Host.Commands
             }
         }
 
-        private static IServiceProvider? GetServices()
-        {
-            return (Application.Current as App)?.Services;
-        }
-
-        private static void LogCommandFailure(string action, HostCommand cmd, Exception ex)
+        private void LogCommandFailure(string action, HostCommand cmd, Exception ex)
         {
             var key = $"cmd.fail.tools.{action}";
-            if (!RateLimiter.Allow(key, LogInterval))
+            if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";

@@ -9,6 +9,7 @@ namespace VAL.Host.Services
     public sealed class AppPaths : IAppPaths
     {
         public string ContentRoot { get; }
+        public string StateRoot { get; }
         public string DataRoot { get; }
         public string LogsRoot { get; }
         public string ModulesRoot { get; }
@@ -22,6 +23,7 @@ namespace VAL.Host.Services
             ContentRoot = ResolveContentRoot(warnings);
             var defaultDataRoot = ValOptions.DefaultDataRoot;
             var defaultModulesRoot = Path.Combine(ContentRoot, "Modules");
+            StateRoot = Path.Combine(ContentRoot, "State");
 
             DataRoot = NormalizePath(config.DataRoot, defaultDataRoot, "DataRoot", warnings, defaultDataRoot);
             LogsRoot = NormalizePath(config.LogsPath, Path.Combine(DataRoot, ValOptions.DefaultLogsPath), "LogsPath", warnings, DataRoot);
@@ -32,6 +34,7 @@ namespace VAL.Host.Services
             ValLog.Configure(logFile, config.EnableVerboseLogging);
 
             ValLog.Verbose(nameof(AppPaths), $"Resolved ContentRoot: {ContentRoot}");
+            ValLog.Verbose(nameof(AppPaths), $"Resolved StateRoot: {StateRoot}");
             ValLog.Verbose(nameof(AppPaths), $"Resolved DataRoot: {DataRoot}");
             ValLog.Verbose(nameof(AppPaths), $"Resolved LogsRoot: {LogsRoot}");
             ValLog.Verbose(nameof(AppPaths), $"Resolved ProfileRoot: {ProfileRoot}");

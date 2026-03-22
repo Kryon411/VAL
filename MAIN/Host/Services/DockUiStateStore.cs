@@ -4,7 +4,6 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using VAL.Continuum.Pipeline.Common;
 using VAL.Host.Json;
 
 namespace VAL.Host.Services
@@ -17,18 +16,12 @@ namespace VAL.Host.Services
 
     public sealed class DockUiStateStore : IDockUiStateStore
     {
-        private readonly string _productRoot;
+        private readonly string _stateRoot;
 
-        public DockUiStateStore(string? productRoot = null)
+        public DockUiStateStore(IAppPaths appPaths)
         {
-            _productRoot = string.IsNullOrWhiteSpace(productRoot)
-                ? ContinuumContext.ResolveProductRoot()
-                : productRoot;
-
-            if (string.IsNullOrWhiteSpace(_productRoot))
-            {
-                _productRoot = AppContext.BaseDirectory;
-            }
+            ArgumentNullException.ThrowIfNull(appPaths);
+            _stateRoot = appPaths.StateRoot;
         }
 
         public DockUiState Load()
@@ -99,7 +92,7 @@ namespace VAL.Host.Services
 
         private string ResolveStatePath()
         {
-            return Path.Combine(_productRoot, "State", "dock.ui.json");
+            return Path.Combine(_stateRoot, "dock.ui.json");
         }
 
         private static void TryDelete(string? path)
