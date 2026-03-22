@@ -119,6 +119,12 @@ namespace VAL.Continuum.Pipeline.Signal
             if (string.IsNullOrWhiteSpace(whereWeLeftOffBody))
                 return false;
 
+            if (!HasRequiredStandaloneAnchor(whereWeLeftOffBody, "USER:") ||
+                !HasRequiredStandaloneAnchor(whereWeLeftOffBody, "ASSISTANT:"))
+            {
+                return false;
+            }
+
             if (!TryParseExchange(whereWeLeftOffBody, requireAnchors: true, out var whereWeLeftOff))
                 return false;
 
@@ -336,6 +342,15 @@ namespace VAL.Continuum.Pipeline.Signal
             }
 
             return -1;
+        }
+
+        private static bool HasRequiredStandaloneAnchor(string body, string label)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+                return false;
+
+            var lines = NormalizeSectionBody(body).Split('\n');
+            return FindStandaloneLabelLine(lines, label) >= 0;
         }
 
         private static string ReadLabeledBlock(string[] lines, int labelIndex, int nextLabelIndex, string label)

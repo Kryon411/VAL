@@ -42,6 +42,22 @@ namespace VAL.Tests.Continuum
         }
 
         [Fact]
+        public void TryParseRejectsAssistantOutsideWhereWeLeftOff()
+        {
+            var malformed = BuildValidSignalPacket()
+                .Replace(
+                    "\nASSISTANT:\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n",
+                    "\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n")
+                .Replace(
+                    "OPEN LOOPS\n- Add the Signal stage without widening scope.",
+                    "OPEN LOOPS\nASSISTANT:\n- Elsewhere anchors must not satisfy WWLO.");
+
+            var ok = SignalPacket.TryParse(malformed, out _);
+
+            Assert.False(ok);
+        }
+
+        [Fact]
         public void TryParseRejectsConversationalPreface()
         {
             var malformed = "Here you go.\n\n" + BuildValidSignalPacket();
