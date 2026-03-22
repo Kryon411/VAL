@@ -24,5 +24,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VAL.Host\VAL.Host.csproj" />
+    <ProjectReference Include="..\VAL.Abyss\VAL.Abyss.csproj" />
+    <ProjectReference Include="..\VAL.Continuum\VAL.Continuum.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Host\**\*.cs" Link="Host\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

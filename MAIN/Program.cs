@@ -10,6 +10,7 @@ using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Startup;
+using VAL.Hosting;
 
 namespace VAL
 {
@@ -46,7 +47,7 @@ namespace VAL
                     })
                     .ConfigureServices((context, services) =>
                     {
-                        services.AddValHost(context.Configuration, startupOptions, smokeSettings, crashGuard);
+                        services.AddValDesktopApp(context.Configuration, startupOptions, smokeSettings, crashGuard);
                     })
                     .Build();
 

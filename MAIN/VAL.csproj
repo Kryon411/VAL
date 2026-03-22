@@ -33,6 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="Host\**\*.cs" />
     <Compile Remove="VAL.Tests\**\*.cs" />
     <Compile Remove="VAL.App\**\*.cs" />
     <Compile Remove="VAL.Abyss\**\*.cs" />

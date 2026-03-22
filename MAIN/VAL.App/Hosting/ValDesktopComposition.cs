@@ -2,20 +2,20 @@ using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VAL.Continuum;
+using VAL.Host;
+using VAL.Host.Abyss;
 using VAL.Host.Commands;
 using VAL.Host.Hosting;
 using VAL.Host.Portal;
 using VAL.Host.Services;
 using VAL.Host.Services.Adapters;
 using VAL.Host.Startup;
-using VAL.Host.Abyss;
-using VAL.Hosting;
 
-namespace VAL.Host
+namespace VAL.Hosting
 {
-    public static class ValHostComposition
+    public static class ValDesktopComposition
     {
-        public static IServiceCollection AddValHost(
+        public static IServiceCollection AddValDesktopApp(
             this IServiceCollection services,
             IConfiguration configuration,
             StartupOptions startupOptions,
@@ -27,10 +27,10 @@ namespace VAL.Host
                 configuration,
                 startupOptions,
                 smokeSettings,
-                builder => ConfigureCurrentApp(builder, crashGuard));
+                builder => ConfigureDesktopApp(builder, crashGuard));
         }
 
-        public static void ConfigureCurrentApp(
+        public static void ConfigureDesktopApp(
             ValHostBuilder builder,
             StartupCrashGuard crashGuard)
         {
