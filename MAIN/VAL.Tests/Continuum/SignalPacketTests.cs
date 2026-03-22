@@ -32,9 +32,11 @@ namespace VAL.Tests.Continuum
         [Fact]
         public void TryParseRejectsMissingWhereWeLeftOffAssistant()
         {
-            var malformed = BuildValidSignalPacket().Replace(
+            var malformed = NormalizeNewlines(BuildValidSignalPacket()).Replace(
                 "\nASSISTANT:\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n",
                 "\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n");
+
+            Assert.NotEqual(NormalizeNewlines(BuildValidSignalPacket()), malformed);
 
             var ok = SignalPacket.TryParse(malformed, out _);
 
@@ -44,13 +46,15 @@ namespace VAL.Tests.Continuum
         [Fact]
         public void TryParseRejectsAssistantOutsideWhereWeLeftOff()
         {
-            var malformed = BuildValidSignalPacket()
+            var malformed = NormalizeNewlines(BuildValidSignalPacket())
                 .Replace(
                     "\nASSISTANT:\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n",
                     "\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n")
                 .Replace(
                     "OPEN LOOPS\n- Add the Signal stage without widening scope.",
                     "OPEN LOOPS\nASSISTANT:\n- Elsewhere anchors must not satisfy WWLO.");
+
+            Assert.NotEqual(NormalizeNewlines(BuildValidSignalPacket()), malformed);
 
             var ok = SignalPacket.TryParse(malformed, out _);
 
@@ -195,5 +199,8 @@ ASSISTANT:
 CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)
 - ";
         }
+
+        private static string NormalizeNewlines(string text)
+            => (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
     }
 }
