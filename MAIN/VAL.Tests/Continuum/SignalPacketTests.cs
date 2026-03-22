@@ -33,8 +33,8 @@ namespace VAL.Tests.Continuum
         public void TryParseRejectsMissingWhereWeLeftOffAssistant()
         {
             var malformed = BuildValidSignalPacket().Replace(
-                "ASSISTANT:\nImplement Pulse vNext with a narrow Signal stage and safe fallback.",
-                "ASSISTANT:");
+                "\nASSISTANT:\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n",
+                "\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n");
 
             var ok = SignalPacket.TryParse(malformed, out _);
 

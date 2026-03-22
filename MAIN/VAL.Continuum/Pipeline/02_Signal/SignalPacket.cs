@@ -289,9 +289,9 @@ namespace VAL.Continuum.Pipeline.Signal
                 return false;
 
             var lines = normalized.Split('\n');
-            int sourceIndex = FindLabelLine(lines, "Source:");
-            int userIndex = FindLabelLine(lines, "USER:");
-            int assistantIndex = FindLabelLine(lines, "ASSISTANT:");
+            int sourceIndex = FindSourceLine(lines);
+            int userIndex = FindStandaloneLabelLine(lines, "USER:");
+            int assistantIndex = FindStandaloneLabelLine(lines, "ASSISTANT:");
 
             if (sourceIndex < 0 || userIndex < 0 || assistantIndex < 0)
                 return false;
@@ -316,11 +316,22 @@ namespace VAL.Continuum.Pipeline.Signal
             return true;
         }
 
-        private static int FindLabelLine(string[] lines, string label)
+        private static int FindSourceLine(string[] lines)
         {
             for (int i = 0; i < lines.Length; i++)
             {
-                if (lines[i].StartsWith(label, StringComparison.Ordinal))
+                if (lines[i].StartsWith("Source:", StringComparison.Ordinal))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private static int FindStandaloneLabelLine(string[] lines, string label)
+        {
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (string.Equals(lines[i].Trim(), label, StringComparison.Ordinal))
                     return i;
             }
 
