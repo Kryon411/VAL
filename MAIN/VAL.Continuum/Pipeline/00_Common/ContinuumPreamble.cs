@@ -81,6 +81,21 @@ namespace VAL.Continuum.Pipeline
             }
         }
 
+        internal static string BuildPulseContinuityPreamble()
+        {
+            return
+@"The following is a guide and carried context from a previous chat.
+
+Use this frozen snapshot to resume the work without redoing prior analysis.
+
+On the first assistant reply after injection:
+- If WHERE WE LEFT OFF contains an unanswered USER instruction, answer it directly.
+- Otherwise acknowledge readiness in one short line and wait.
+
+Treat WHERE WE LEFT OFF as the authoritative continuation anchor.
+Treat PREVIOUS CHAT SUMMARY, OPEN LOOPS, CRITICAL CONTEXT, and TRUTH WALKBACK HIGHLIGHTS as supporting context.";
+        }
+
         public static string LoadPulsePacketTemplate() => LoadPulsePacketTemplate(string.Empty);
 
         public static string LoadPulsePacketTemplate(string chatId)

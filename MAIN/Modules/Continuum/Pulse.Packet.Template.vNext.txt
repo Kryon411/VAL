@@ -1,55 +1,11 @@
-The following is a guide and carried context from a previous chat.
+Final Pulse packet rendering is now authored locally by Continuum.
 
-Use this authoritative snapshot of the preceding discussion to determine:
-- what is active
-- what is in scope
-- where work should resume
+Source of truth:
+- VAL.Continuum/Pipeline/00_Common/PulsePacketComposer.cs
 
-Do not recreate, summarize, reinterpret, or advance earlier material unless explicitly instructed.
-
-PRIME DIRECTIVE (READ FIRST)
-On the first assistant reply after injection:
-- If WHERE WE LEFT OFF contains an unanswered USER instruction, answer it directly.
-- Otherwise acknowledge readiness in one short line and wait.
-
-CURRENT STATE
-Status:
-Thread mode:
-Active objective:
-Next expected assistant action:
-Last stable checkpoint:
-
-TAIL CHECK
-Recent turns operationally relevant:
-Tail summary:
-Tail decision:
-
-WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)
-Source:
-USER:
-ASSISTANT:
-
-HOW TO PROCEED
-- Begin from WHERE WE LEFT OFF.
-- Treat the WWLO USER line as the active prompt to answer in this chat.
-- If that section contains a direct unresolved instruction, answer it.
-- Do not restate or quote WWLO.
-- If there is no unresolved instruction, acknowledge continuity in one short line and wait.
-- Treat all other sections as reference only.
-
-OPEN LOOPS
-- 
-
-CRITICAL CONTEXT
-- 
-
-ARTIFACTS AND REFERENCES
-- 
-
-ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)
-Source:
-USER:
-ASSISTANT:
-
-CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)
-- 
+Stable final section order:
+- PREVIOUS CHAT SUMMARY
+- WHERE WE LEFT OFF
+- OPEN LOOPS
+- CRITICAL CONTEXT
+- TRUTH WALKBACK HIGHLIGHTS

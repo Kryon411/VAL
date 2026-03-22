@@ -6,65 +6,21 @@ namespace VAL.Tests.Continuum
     public sealed class SignalPacketTests
     {
         [Fact]
-        public void TryParseAcceptsValidPacket()
+        public void TryParseAcceptsValidSemanticSummary()
         {
-            var ok = SignalPacket.TryParse(BuildValidSignalPacket(), out var packet);
+            var ok = SignalPacket.TryParse(BuildValidSignalSummary(), out var summary);
 
             Assert.True(ok);
-            Assert.NotNull(packet);
-            Assert.Equal("Resolved implementation plan; ready for coding.", packet.CurrentState.Split('\n')[0].Substring("Status:".Length).Trim());
-            Assert.Equal("User requested Pulse vNext implementation in fresh worktree.", packet.WhereWeLeftOff.User);
-            Assert.Equal("Implement Pulse vNext with a narrow Signal stage and safe fallback.", packet.WhereWeLeftOff.Assistant);
-        }
-
-        [Fact]
-        public void TryParseRejectsMissingCurrentStateValue()
-        {
-            var malformed = BuildValidSignalPacket().Replace(
-                "Active objective: Implement Pulse vNext",
-                "Active objective:");
-
-            var ok = SignalPacket.TryParse(malformed, out _);
-
-            Assert.False(ok);
-        }
-
-        [Fact]
-        public void TryParseRejectsMissingWhereWeLeftOffAssistant()
-        {
-            var malformed = NormalizeNewlines(BuildValidSignalPacket()).Replace(
-                "\nASSISTANT:\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n",
-                "\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n");
-
-            Assert.NotEqual(NormalizeNewlines(BuildValidSignalPacket()), malformed);
-
-            var ok = SignalPacket.TryParse(malformed, out _);
-
-            Assert.False(ok);
-        }
-
-        [Fact]
-        public void TryParseRejectsAssistantOutsideWhereWeLeftOff()
-        {
-            var malformed = NormalizeNewlines(BuildValidSignalPacket())
-                .Replace(
-                    "\nASSISTANT:\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n",
-                    "\nImplement Pulse vNext with a narrow Signal stage and safe fallback.\n")
-                .Replace(
-                    "OPEN LOOPS\n- Add the Signal stage without widening scope.",
-                    "OPEN LOOPS\nASSISTANT:\n- Elsewhere anchors must not satisfy WWLO.");
-
-            Assert.NotEqual(NormalizeNewlines(BuildValidSignalPacket()), malformed);
-
-            var ok = SignalPacket.TryParse(malformed, out _);
-
-            Assert.False(ok);
+            Assert.NotNull(summary);
+            Assert.Equal("Continuum now owns final Pulse packet composition.", summary.PreviousChatSummary[0]);
+            Assert.Equal("Rewire ContinuumHost to carry the frozen snapshot through Signal.", summary.OpenLoops[0]);
+            Assert.Equal("Keep deterministic fallback intact if Signal fails.", summary.CriticalContext[0]);
         }
 
         [Fact]
         public void TryParseRejectsConversationalPreface()
         {
-            var malformed = "Here you go.\n\n" + BuildValidSignalPacket();
+            var malformed = "Here you go.\n\n" + BuildValidSignalSummary();
 
             var ok = SignalPacket.TryParse(malformed, out _);
 
@@ -72,135 +28,56 @@ namespace VAL.Tests.Continuum
         }
 
         [Fact]
-        public void TryRenderPulsePacketUsesTemplateAndPreservesAnchors()
+        public void TryParseRejectsLegacyFullHandoffShape()
         {
-            var ok = SignalPacket.TryParse(BuildValidSignalPacket(), out var packet);
-            Assert.True(ok);
-
-            var rendered = SignalPacket.TryRenderPulsePacket(BuildTemplate(), packet, out var pulsePacket);
-
-            Assert.True(rendered);
-            Assert.Contains("PRIME DIRECTIVE (READ FIRST)", pulsePacket);
-            Assert.Contains("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", pulsePacket);
-            Assert.Contains("USER:\nUser requested Pulse vNext implementation in fresh worktree.", pulsePacket);
-            Assert.Contains("ASSISTANT:\nImplement Pulse vNext with a narrow Signal stage and safe fallback.", pulsePacket);
-            Assert.Contains("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)", pulsePacket);
-        }
-
-        private static string BuildValidSignalPacket()
-        {
-            return
+            var malformed =
 @"VAL Pulse Handoff
 
 CURRENT STATE
-Status: Resolved implementation plan; ready for coding.
-Thread mode: Coding
-Active objective: Implement Pulse vNext
-Next expected assistant action: Make the approved code changes.
-Last stable checkpoint: Fresh worktree created from synced Playground baseline.
-
-TAIL CHECK
-Recent turns operationally relevant: yes
-Tail summary: Planning approved and implementation requested.
-Tail decision: Resume from the approved Pulse vNext plan.
-
-WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)
-Source: Current chat
-USER:
-User requested Pulse vNext implementation in fresh worktree.
-ASSISTANT:
-Implement Pulse vNext with a narrow Signal stage and safe fallback.
-
-HOW TO PROCEED
-- Begin from WHERE WE LEFT OFF.
-- Treat the WWLO USER line as the active prompt if it is unresolved.
-- If WWLO contains an unanswered direct instruction, answer it directly.
-- Otherwise acknowledge readiness in one short line and wait.
-- Treat all lower sections as reference only.
+Status: Legacy
 
 OPEN LOOPS
-- Add the Signal stage without widening scope.
-
-CRITICAL CONTEXT
-- Preserve the legacy Pulse builder as fallback.
-
-ARTIFACTS AND REFERENCES
-- MAIN/Modules/Continuum/Signal.Prompt.v1.txt
-
-ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)
-Source: Planning chat
-USER:
-Pulse vNext planning is approved.
-ASSISTANT:
-Implementation can proceed within the approved boundary.
-
-CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)
-- Phase 7 and warning cleanup are complete.
+- This should not parse.
 
 End of Pulse Handoff";
+
+            var ok = SignalPacket.TryParse(malformed, out _);
+
+            Assert.False(ok);
         }
 
-        private static string BuildTemplate()
+        [Fact]
+        public void TryParseRejectsNonBulletSectionBody()
         {
-            return
-@"The following is a guide and carried context from a previous chat.
-
-Use this authoritative snapshot of the preceding discussion to determine:
-- what is active
-- what is in scope
-- where work should resume
-
-Do not recreate, summarize, reinterpret, or advance earlier material unless explicitly instructed.
-
-PRIME DIRECTIVE (READ FIRST)
-On the first assistant reply after injection:
-- If WHERE WE LEFT OFF contains an unanswered USER instruction, answer it directly.
-- Otherwise acknowledge readiness in one short line and wait.
-
-CURRENT STATE
-Status:
-Thread mode:
-Active objective:
-Next expected assistant action:
-Last stable checkpoint:
-
-TAIL CHECK
-Recent turns operationally relevant:
-Tail summary:
-Tail decision:
-
-WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)
-Source:
-USER:
-ASSISTANT:
-
-HOW TO PROCEED
-- Begin from WHERE WE LEFT OFF.
-- Treat the WWLO USER line as the active prompt to answer in this chat.
-- If that section contains a direct unresolved instruction, answer it.
-- Do not restate or quote WWLO.
-- If there is no unresolved instruction, acknowledge continuity in one short line and wait.
-- Treat all other sections as reference only.
+            var malformed =
+@"PREVIOUS CHAT SUMMARY
+Continuum owns the final packet.
 
 OPEN LOOPS
-- 
+- Rewire the host.
 
 CRITICAL CONTEXT
-- 
+- Keep fallback deterministic.";
 
-ARTIFACTS AND REFERENCES
-- 
+            var ok = SignalPacket.TryParse(malformed, out _);
 
-ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)
-Source:
-USER:
-ASSISTANT:
-
-CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)
-- ";
+            Assert.False(ok);
         }
 
-        private static string NormalizeNewlines(string text)
-            => (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+        private static string BuildValidSignalSummary()
+        {
+            return
+@"PREVIOUS CHAT SUMMARY
+- Continuum now owns final Pulse packet composition.
+- Signal is narrowed to semantic summary output only.
+
+OPEN LOOPS
+- Rewire ContinuumHost to carry the frozen snapshot through Signal.
+- Remove the old assistant-authored handoff path.
+
+CRITICAL CONTEXT
+- Keep deterministic fallback intact if Signal fails.
+- Keep WWLO deterministic and separate from Truth Walkback.";
+        }
     }
 }

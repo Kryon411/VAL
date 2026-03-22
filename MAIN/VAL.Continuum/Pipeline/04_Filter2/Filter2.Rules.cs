@@ -23,5 +23,12 @@ namespace VAL.Continuum.Pipeline.Filter2
 
         // WWLO prefers uncut text only when safely bounded.
         public const int WhereWeLeftOffMaxTextChars = 6_000;
+
+        // Keep supporting walkback compact so the final Pulse packet is materially smaller than the nested vNext handoff.
+        public const int TruthWalkbackMaxExchanges = 4;
+
+        // Deterministic open-loop / critical-context extraction should stay compact and readable.
+        public const int DeterministicFactMaxItems = 8;
+        public const int DeterministicFactMaxChars = 280;
     }
 }

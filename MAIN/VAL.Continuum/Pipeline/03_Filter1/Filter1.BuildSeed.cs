@@ -70,6 +70,25 @@ namespace VAL.Continuum.Pipeline.Filter1
             };
         }
 
+        public static string RenderSeedLog(IReadOnlyList<SeedExchange> exchanges)
+        {
+            if (exchanges == null || exchanges.Count == 0)
+                return string.Empty;
+
+            var sb = new StringBuilder();
+            foreach (var ex in exchanges)
+            {
+                if (ex == null)
+                    continue;
+
+                AppendSeedExchange(sb, ex);
+                sb.AppendLine();
+                sb.AppendLine();
+            }
+
+            return sb.ToString().Trim();
+        }
+
         
         private static List<SeedExchange> PairIntoExchanges(IReadOnlyList<TruthMessage> messages)
         {

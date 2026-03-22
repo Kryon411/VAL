@@ -8,392 +8,394 @@ using VAL.Continuum.Pipeline.Filter1;
 namespace VAL.Continuum.Pipeline.Filter2
 {
     /// <summary>
-    /// Filter 2: packs Seed exchanges into a single RestructuredSeed text blob.
-    ///
-    /// Output shape:
-    /// - WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE): last complete exchange
-    /// - HOW TO PROCEED
-    /// - ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE): remaining pinned exchanges, most recent first
-    /// - CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE): older exchanges in reverse order (newest -> oldest), budgeted to ~28k chars
+    /// Filter 2: turns the filtered Seed exchanges into deterministic sections that Continuum can
+    /// render locally. WWLO stays authoritative and deterministic; semantic sections remain optional.
     /// </summary>
     public static class Filter2Restructure
     {
-        private static readonly string[] HowToProceedLines =
+        private static readonly Regex FileReferenceRegex =
+            new(@"(?:[A-Za-z]:\\[^\r\n`""]+?\.(?:cs|js|txt|md|json|toml|csproj)|MAIN[\\/][^\r\n`""]+?\.(?:cs|js|txt|md|json|toml|csproj))",
+                RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        private static readonly Regex NumberedListRegex =
+            new(@"^\d+[\.\)]\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        private static readonly string[] ConstraintKeywords =
         {
-            "Proceed from \"WHERE WE LEFT OFF\".",
-            "First assistant reply after injection: if WWLO is already answered, acknowledge readiness in one short line and wait.",
-            "If WWLO contains a direct instruction, answer it.",
-            "Do not restate, quote, or announce WWLO; answer it directly.",
-            "Otherwise acknowledge continuity and wait."
+            "preserve",
+            "keep",
+            "do not",
+            "must",
+            "fallback",
+            "deterministic",
+            "plain-text",
+            "plain text",
+            "stable heading",
+            "stable headings",
+            "freeze",
+            "exclude",
+            "do not let",
+            "authoritative",
+            "runtime",
+            "testing plan",
+            "acceptance criteria"
         };
-        private static readonly string[] ParagraphSeparators = { "\n\n" };
+
+        internal static DeterministicPulseSections BuildSections(PulseSnapshot snapshot)
+        {
+            ArgumentNullException.ThrowIfNull(snapshot);
+
+            var exchanges = snapshot.Filter1Exchanges ?? Array.Empty<Filter1BuildSeed.SeedExchange>();
+            if (exchanges.Count == 0)
+                return new DeterministicPulseSections();
+
+            int total = exchanges.Count;
+            int pin = Math.Min(Filter2Rules.WhereWeLeftOffCount, total);
+            var pinnedTail = exchanges.Skip(total - pin).ToList();
+            var lastExchange = pinnedTail.Count > 0 ? pinnedTail[pinnedTail.Count - 1] : null;
+
+            return new DeterministicPulseSections
+            {
+                WhereWeLeftOff = lastExchange != null ? BuildWhereWeLeftOff(lastExchange) : PulseExchangeBlock.Empty,
+                TruthWalkbackHighlights = BuildTruthWalkbackHighlights(exchanges, pinnedTail),
+                OpenLoopFacts = BuildOpenLoopFacts(exchanges),
+                CriticalFacts = BuildCriticalFacts(exchanges),
+                ArtifactsAndReferences = BuildArtifactsAndReferences(exchanges)
+            };
+        }
 
         public static string BuildRestructuredSeed(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
             if (exchanges == null || exchanges.Count == 0)
                 return string.Empty;
 
-            int total = exchanges.Count;
-            int pin = Math.Min(Filter2Rules.WhereWeLeftOffCount, total);
+            var snapshot = new PulseSnapshot
+            {
+                Filter1Exchanges = exchanges,
+                FrozenBoundaryLineIndex = InferFrozenBoundaryLineIndex(exchanges)
+            };
 
-            var pinnedTail = exchanges.Skip(total - pin).ToList();
-            var lastExchange = pinnedTail.Count > 0 ? pinnedTail[pinnedTail.Count - 1] : null;
+            return RenderDeterministicSections(BuildSections(snapshot));
+        }
+
+        internal static string RenderDeterministicSections(DeterministicPulseSections sections)
+        {
+            sections ??= new DeterministicPulseSections();
 
             var sb = new StringBuilder();
+            AppendExchangeSection(sb, "WHERE WE LEFT OFF", sections.WhereWeLeftOff);
+            AppendBulletSection(sb, "OPEN LOOP FACTS", sections.OpenLoopFacts);
+            AppendBulletSection(sb, "CRITICAL FACTS", sections.CriticalFacts);
+            AppendBulletSection(sb, "ARTIFACTS AND REFERENCES", sections.ArtifactsAndReferences);
+            AppendWalkbackSection(sb, sections.TruthWalkbackHighlights);
+            return sb.ToString().Trim();
+        }
 
-            var wwloBody = lastExchange != null
-                ? FormatExchangeWhereWeLeftOff(lastExchange)
-                : string.Empty;
-            AppendSection(sb, "WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", wwloBody);
-
-            var howToProceedBody = string.Join("\n", HowToProceedLines);
-            AppendSection(sb, "HOW TO PROCEED", howToProceedBody);
-
-            var activeThreadBody = new StringBuilder();
-            // Render the remaining pinned tail (most recent first), excluding the last exchange used above.
-            for (int i = pinnedTail.Count - 2; i >= 0; i--)
+        private static PulseExchangeBlock BuildWhereWeLeftOff(Filter1BuildSeed.SeedExchange exchange)
+        {
+            return new PulseExchangeBlock
             {
-                if (activeThreadBody.Length > 0)
+                Source = BuildSource(exchange),
+                User = NormalizeSpeakerText(SelectWwloText(exchange.UserTextUncut, exchange.UserText), emptyFallback: "[USER: empty]"),
+                Assistant = NormalizeSpeakerText(SelectWwloText(exchange.AssistantTextUncut, exchange.AssistantText), emptyFallback: "[ASSISTANT: empty]")
+            };
+        }
+
+        private static IReadOnlyList<PulseExchangeBlock> BuildTruthWalkbackHighlights(
+            IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges,
+            IReadOnlyList<Filter1BuildSeed.SeedExchange> pinnedTail)
+        {
+            var highlights = new List<PulseExchangeBlock>();
+
+            if (pinnedTail != null)
+            {
+                for (int i = pinnedTail.Count - 2; i >= 0; i--)
                 {
-                    activeThreadBody.Append("\n\n");
+                    AddHighlight(highlights, pinnedTail[i]);
                 }
-                activeThreadBody.Append(FormatExchange(pinnedTail[i], sanitizeAssistant: false));
             }
-            AppendSection(sb, "ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)", activeThreadBody.ToString());
 
-            // Reference-only context; downstream logic should not treat this section as authoritative.
-            var fillerTitle = "CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)";
-            var fillerBody = new StringBuilder();
-            int budget = Filter2Rules.BudgetChars;
-            int overflowLimit = Filter2Rules.OverflowFinishExchangeMaxChars;
-            int used = sb.Length + GetSectionHeaderLength(sb, fillerTitle) + GetSectionFooterLength();
-            bool addedFiller = false;
-
-            // Start adding older exchanges newest -> oldest (excluding the pinned tail).
-            for (int i = total - pin - 1; i >= 0; i--)
+            int cutoff = Math.Max(0, exchanges.Count - (pinnedTail?.Count ?? 0));
+            for (int i = cutoff - 1; i >= 0 && highlights.Count < Filter2Rules.TruthWalkbackMaxExchanges; i--)
             {
-                var block = FormatExchange(exchanges[i], sanitizeAssistant: false);
-                var prefix = fillerBody.Length > 0 ? "\n\n" : string.Empty;
-                var blockWithGap = prefix + block;
+                AddHighlight(highlights, exchanges[i]);
+            }
 
-                if (used + blockWithGap.Length <= budget)
-                {
-                    fillerBody.Append(blockWithGap);
-                    used += blockWithGap.Length;
-                    addedFiller = true;
+            return highlights;
+        }
+
+        private static IReadOnlyList<string> BuildOpenLoopFacts(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
+        {
+            var facts = new List<string>();
+
+            for (int i = exchanges.Count - 1; i >= 0 && facts.Count < Filter2Rules.DeterministicFactMaxItems; i--)
+            {
+                var exchange = exchanges[i];
+                if (exchange == null)
                     continue;
-                }
 
-                // If we haven't crossed budget yet, allow ONE whole exchange as overflow.
-                if (used < budget)
-                {
-                    if (blockWithGap.Length <= overflowLimit)
-                    {
-                        fillerBody.Append(blockWithGap);
-                        used += blockWithGap.Length;
-                        addedFiller = true;
-                    }
-                }
-
-                break;
+                AddRange(facts, ExtractOpenLoopCandidates(SelectPreferredText(exchange.UserTextUncut, exchange.UserText)));
             }
 
-            if (!addedFiller)
+            if (facts.Count == 0 && exchanges.Count > 0)
             {
-                fillerBody.Append("(no reference-only exchanges captured)");
+                var latest = exchanges[exchanges.Count - 1];
+                var user = BuildSnippet(SelectPreferredText(latest.UserTextUncut, latest.UserText));
+                if (!string.IsNullOrWhiteSpace(user))
+                    facts.Add($"Latest user request: {user}");
             }
 
-            AppendSection(sb, fillerTitle, fillerBody.ToString());
-
-            return sb.ToString();
+            return DeduplicateFacts(facts);
         }
 
-        
-        private static string FormatExchangeWhereWeLeftOff(Filter1BuildSeed.SeedExchange ex)
+        private static IReadOnlyList<string> BuildCriticalFacts(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
-            var sb = new StringBuilder();
+            var facts = new List<string>();
 
-            sb.AppendLine(FormatSourceLine(ex));
-            var user = SelectWwloText(ex.UserTextUncut, ex.UserText);
-            var userOut = !string.IsNullOrWhiteSpace(user) ? user.Trim() : "[USER: empty]";
-            sb.AppendLine(FormattableString.Invariant($"USER: {userOut}"));
-
-            var assistant = SelectWwloText(ex.AssistantTextUncut, ex.AssistantText);
-            AppendAssistantBlock(sb, assistant, sanitizeAssistant: false);
-            return sb.ToString().TrimEnd();
-        }
-
-        private static string SelectWwloText(string uncut, string sliced)
-        {
-            var candidate = uncut ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(candidate))
-                return sliced ?? string.Empty;
-
-            const int MaxWwloUncutChars = Filter2Rules.WhereWeLeftOffMaxTextChars;
-            return candidate.Length <= MaxWwloUncutChars ? candidate : (sliced ?? string.Empty);
-        }
-
-        private static string SanitizeAssistantForWwlo(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return text ?? string.Empty;
-
-            // If the assistant explicitly anchored a state sentence, do not strip those lines.
-            bool HasAnchorTag(string line)
+            for (int i = exchanges.Count - 1; i >= 0 && facts.Count < Filter2Rules.DeterministicFactMaxItems; i--)
             {
-                var t = line.Trim();
-                return t.EndsWith("(goal)", StringComparison.OrdinalIgnoreCase)
-                    || t.EndsWith("(checkpoint)", StringComparison.OrdinalIgnoreCase)
-                    || t.EndsWith("(milestone)", StringComparison.OrdinalIgnoreCase);
+                var exchange = exchanges[i];
+                if (exchange == null)
+                    continue;
+
+                AddRange(facts, ExtractConstraintCandidates(SelectPreferredText(exchange.UserTextUncut, exchange.UserText)));
+                AddRange(facts, ExtractConstraintCandidates(SelectPreferredText(exchange.AssistantTextUncut, exchange.AssistantText)));
             }
 
-            var lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
-            int listy = 0;
+            if (facts.Count == 0)
+                facts.Add("Resume from WHERE WE LEFT OFF before using Truth Walkback Highlights.");
+
+            return DeduplicateFacts(facts);
+        }
+
+        private static IReadOnlyList<string> BuildArtifactsAndReferences(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
+        {
+            var refs = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = exchanges.Count - 1; i >= 0 && refs.Count < Filter2Rules.DeterministicFactMaxItems; i--)
+            {
+                var exchange = exchanges[i];
+                if (exchange == null)
+                    continue;
+
+                CaptureFileReferences(seen, refs, exchange.UserTextUncut);
+                CaptureFileReferences(seen, refs, exchange.AssistantTextUncut);
+                CaptureFileReferences(seen, refs, exchange.UserText);
+                CaptureFileReferences(seen, refs, exchange.AssistantText);
+            }
+
+            return refs;
+        }
+
+        private static void AddHighlight(ICollection<PulseExchangeBlock> highlights, Filter1BuildSeed.SeedExchange exchange)
+        {
+            if (highlights == null || exchange == null)
+                return;
+
+            if (highlights.Count >= Filter2Rules.TruthWalkbackMaxExchanges)
+                return;
+
+            highlights.Add(new PulseExchangeBlock
+            {
+                Source = BuildSource(exchange),
+                User = NormalizeSpeakerText(exchange.UserText, "[USER: empty]"),
+                Assistant = NormalizeSpeakerText(exchange.AssistantText, "[ASSISTANT: empty]")
+            });
+        }
+
+        private static IEnumerable<string> ExtractOpenLoopCandidates(string text)
+        {
+            var candidates = new List<string>();
+            var lines = Normalize(text).Split('\n');
+
             for (int i = 0; i < lines.Length; i++)
             {
-                var t = lines[i].TrimStart();
-                if (HasAnchorTag(lines[i])) continue;
+                var line = NormalizeFactLine(lines[i]);
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
 
-                if (t.StartsWith('-') ||
-                    t.StartsWith('*') ||
-                    t.StartsWith('•') ||
-                    Regex.IsMatch(t, @"^\d+[\.\)]\s+"))
+                if (LooksLikeHeading(line))
+                    continue;
+
+                if (LooksLikeFileReference(line))
+                    continue;
+
+                if (TryExtractLabeledValue(line, "Task:", out var task))
                 {
-                    listy++;
+                    candidates.Add(task);
+                    continue;
+                }
+
+                if (line.StartsWith("- ", StringComparison.Ordinal) || NumberedListRegex.IsMatch(line))
+                {
+                    var bullet = StripBullet(line);
+                    if (!string.IsNullOrWhiteSpace(bullet) && !LooksLikeFileReference(bullet))
+                        candidates.Add(bullet);
                 }
             }
 
-            // Also detect common procedural prompts that should not lead a handoff.
-            int procedural = 0;
-            foreach (var l in lines)
-            {
-                var t = l.Trim();
-                if (HasAnchorTag(t)) continue;
+            return candidates;
+        }
 
-                if (t.Contains("do these", StringComparison.OrdinalIgnoreCase) ||
-                    t.Contains("checks in order", StringComparison.OrdinalIgnoreCase) ||
-                    t.Contains("tell me which", StringComparison.OrdinalIgnoreCase) ||
-                    t.Contains("report back", StringComparison.OrdinalIgnoreCase) ||
-                    t.Contains("answer just this", StringComparison.OrdinalIgnoreCase))
-                {
-                    procedural++;
-                }
-            }
+        private static IEnumerable<string> ExtractConstraintCandidates(string text)
+        {
+            var candidates = new List<string>();
+            var lines = Normalize(text).Split('\n');
 
-            bool looksLikeChecklist = listy >= 3 || procedural >= 2;
-
-            if (!looksLikeChecklist)
-            {
-                return text.Trim();
-            }
-
-            // Remove list blocks (numbered/bulleted) while preserving anchored lines.
-            var kept = new List<string>(lines.Length);
             for (int i = 0; i < lines.Length; i++)
             {
-                var raw = lines[i];
-                var t = raw.TrimStart();
+                var line = NormalizeFactLine(lines[i]);
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
 
-                if (HasAnchorTag(raw))
+                if (LooksLikeHeading(line))
+                    continue;
+
+                if (LooksLikeFileReference(line))
+                    continue;
+
+                if (ContainsConstraintKeyword(line))
                 {
-                    kept.Add(raw);
+                    candidates.Add(StripBullet(line));
                     continue;
                 }
 
-                bool isListy = t.StartsWith('-') ||
-                               t.StartsWith('*') ||
-                               t.StartsWith('•') ||
-                               Regex.IsMatch(t, @"^\d+[\.\)]\s+");
-
-                if (isListy) continue;
-
-                // Drop common "ops prompt" lines that are only relevant at runtime.
-                var tt = raw.Trim();
-                if (tt.Contains("do these", StringComparison.OrdinalIgnoreCase) ||
-                    tt.Contains("checks in order", StringComparison.OrdinalIgnoreCase) ||
-                    tt.Contains("tell me which", StringComparison.OrdinalIgnoreCase) ||
-                    tt.Contains("report back", StringComparison.OrdinalIgnoreCase) ||
-                    tt.Contains("answer just this", StringComparison.OrdinalIgnoreCase))
+                if (TryExtractLabeledValue(line, "Important context:", out var important))
                 {
+                    candidates.Add(important);
+                }
+            }
+
+            return candidates;
+        }
+
+        private static void CaptureFileReferences(HashSet<string> seen, ICollection<string> refs, string text)
+        {
+            if (refs == null || seen == null)
+                return;
+
+            var normalized = Normalize(text);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return;
+
+            foreach (Match match in FileReferenceRegex.Matches(normalized))
+            {
+                if (!match.Success)
                     continue;
-                }
 
-                kept.Add(raw);
+                var path = match.Value.Trim();
+                if (string.IsNullOrWhiteSpace(path))
+                    continue;
+
+                if (!seen.Add(path))
+                    continue;
+
+                refs.Add(path);
+                if (refs.Count >= Filter2Rules.DeterministicFactMaxItems)
+                    return;
             }
-
-            // Collapse excessive blank lines
-            var collapsed = new List<string>(kept.Count);
-            bool lastBlank = false;
-            foreach (var l in kept)
-            {
-                bool blank = string.IsNullOrWhiteSpace(l);
-                if (blank)
-                {
-                    if (!lastBlank) collapsed.Add(string.Empty);
-                    lastBlank = true;
-                }
-                else
-                {
-                    collapsed.Add(l.TrimEnd());
-                    lastBlank = false;
-                }
-            }
-
-            var result = string.Join("\n", collapsed).Trim();
-
-            // If we stripped too much, fall back to a conservative head+tail extraction.
-            if (result.Length < 40 && text.Length > 80)
-            {
-                // Keep first 2 paragraphs and last paragraph.
-                var paras = text.Split(ParagraphSeparators, StringSplitOptions.None)
-                    .Select(p => p.Trim())
-                    .Where(p => p.Length > 0)
-                    .ToList();
-                if (paras.Count <= 3) return text.Trim();
-
-                var take = new List<string>();
-                take.Add(paras[0]);
-                take.Add(paras[1]);
-                take.Add(paras[paras.Count - 1]);
-                result = string.Join("\n\n", take).Trim();
-            }
-
-            return result;
         }
 
-        private static string FormatExchange(Filter1BuildSeed.SeedExchange ex, bool sanitizeAssistant)
+        private static IReadOnlyList<string> DeduplicateFacts(IReadOnlyList<string> facts)
         {
-            var sb = new StringBuilder();
+            if (facts == null || facts.Count == 0)
+                return Array.Empty<string>();
 
-            sb.AppendLine(FormatSourceLine(ex));
-            var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : string.Empty;
-            var user = !string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]";
-            sb.AppendLine(FormattableString.Invariant($"USER: {user}"));
-            AppendAssistantBlock(sb, assistant, sanitizeAssistant);
+            var unique = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            return sb.ToString().TrimEnd();
+            for (int i = 0; i < facts.Count; i++)
+            {
+                var fact = NormalizeFactLine(facts[i]);
+                if (string.IsNullOrWhiteSpace(fact))
+                    continue;
+
+                if (fact.Length > Filter2Rules.DeterministicFactMaxChars)
+                    fact = fact.Substring(0, Filter2Rules.DeterministicFactMaxChars - 4).TrimEnd() + " ...";
+
+                if (!seen.Add(fact))
+                    continue;
+
+                unique.Add(fact);
+                if (unique.Count >= Filter2Rules.DeterministicFactMaxItems)
+                    break;
+            }
+
+            return unique;
         }
 
-        private static string FormatSourceLine(Filter1BuildSeed.SeedExchange ex)
-            => FormattableString.Invariant($"Source: Truth {FormatTruthRange(ex.UserLineIndex, ex.AssistantLineIndex)}");
-
-        private static void AppendSection(StringBuilder sb, string title, string bodyText)
+        private static void AppendWalkbackSection(StringBuilder sb, IReadOnlyList<PulseExchangeBlock> walkbackHighlights)
         {
-            AppendHeading(sb, title, sb);
-
-            if (!string.IsNullOrEmpty(bodyText))
+            if (walkbackHighlights == null || walkbackHighlights.Count == 0)
             {
-                sb.Append(bodyText.TrimEnd('\r', '\n'));
+                AppendBulletSection(sb, "TRUTH WALKBACK HIGHLIGHTS", new[] { "None." });
+                return;
+            }
+
+            AppendHeading(sb, "TRUTH WALKBACK HIGHLIGHTS");
+            for (int i = 0; i < walkbackHighlights.Count; i++)
+            {
+                if (i > 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine();
+                }
+
+                sb.Append(RenderExchange(walkbackHighlights[i]));
+            }
+        }
+
+        private static void AppendExchangeSection(StringBuilder sb, string heading, PulseExchangeBlock exchange)
+        {
+            AppendHeading(sb, heading);
+            sb.Append(RenderExchange(exchange));
+        }
+
+        private static void AppendBulletSection(StringBuilder sb, string heading, IReadOnlyList<string> bullets)
+        {
+            AppendHeading(sb, heading);
+            if (bullets == null || bullets.Count == 0)
+            {
+                sb.Append("- None.");
+                return;
+            }
+
+            for (int i = 0; i < bullets.Count; i++)
+            {
+                if (i > 0)
+                    sb.AppendLine();
+
+                sb.Append("- ").Append(NormalizeFactLine(bullets[i]));
+            }
+        }
+
+        private static void AppendHeading(StringBuilder sb, string heading)
+        {
+            if (sb.Length > 0)
+            {
+                sb.AppendLine();
                 sb.AppendLine();
             }
+
+            sb.AppendLine(heading);
         }
 
-        private static int GetSectionHeaderLength(StringBuilder sb, string title)
+        private static string RenderExchange(PulseExchangeBlock exchange)
         {
-            var header = new StringBuilder();
-            AppendHeading(header, title, sb);
-            return header.Length;
+            exchange ??= PulseExchangeBlock.Empty;
+
+            var sb = new StringBuilder();
+            sb.Append("Source: ").AppendLine(string.IsNullOrWhiteSpace(exchange.Source) ? "Unknown" : exchange.Source.Trim());
+            sb.AppendLine("USER:");
+            sb.AppendLine(string.IsNullOrWhiteSpace(exchange.User) ? "[USER: empty]" : Normalize(exchange.User));
+            sb.AppendLine("ASSISTANT:");
+            sb.Append(Normalize(string.IsNullOrWhiteSpace(exchange.Assistant) ? "[ASSISTANT: empty]" : exchange.Assistant));
+            return sb.ToString().TrimEnd();
         }
 
-        private static int GetSectionFooterLength()
-            => Environment.NewLine.Length;
-
-        private static void AppendHeading(StringBuilder target, string title, StringBuilder context)
-    {
-        // Markdown-first headings: render cleanly in ChatGPT after ProseMirror injection,
-        // while remaining readable as plain text on disk.
-        // IMPORTANT: keep the HR line isolated with blank lines so Markdown parses reliably.
-        target.AppendLine();
-        target.AppendLine("---");
-        target.AppendLine();
-        target.Append("## ").AppendLine(title);
-        target.AppendLine();
-    }
-
-        private static void EnsureHeadingGap(StringBuilder target, StringBuilder context)
-        {
-            if (context.Length == 0)
-            {
-                target.AppendLine();
-                return;
-            }
-
-            int trailingBreaks = CountTrailingLineBreaks(context);
-            if (ReferenceEquals(target, context) && trailingBreaks > 2)
-            {
-                TrimTrailingLineBreaks(target, 2);
-                trailingBreaks = 2;
-            }
-            else if (trailingBreaks > 2)
-            {
-                trailingBreaks = 2;
-            }
-
-            if (trailingBreaks == 0)
-            {
-                target.AppendLine();
-                target.AppendLine();
-                return;
-            }
-
-            if (trailingBreaks == 1)
-            {
-                target.AppendLine();
-            }
-        }
-
-        private static int CountTrailingLineBreaks(StringBuilder sb)
-        {
-            int count = 0;
-            int index = sb.Length - 1;
-            while (index >= 0)
-            {
-                char ch = sb[index];
-                if (ch == '\n')
-                {
-                    count++;
-                    index--;
-                    if (index >= 0 && sb[index] == '\r')
-                    {
-                        index--;
-                    }
-                    continue;
-                }
-
-                if (ch == '\r')
-                {
-                    count++;
-                    index--;
-                    continue;
-                }
-
-                break;
-            }
-
-            return count;
-        }
-
-        private static void TrimTrailingLineBreaks(StringBuilder sb, int keepCount)
-        {
-            int trailing = CountTrailingLineBreaks(sb);
-            while (trailing > keepCount && sb.Length > 0)
-            {
-                char ch = sb[sb.Length - 1];
-                if (ch == '\n')
-                {
-                    sb.Length -= 1;
-                    if (sb.Length > 0 && sb[sb.Length - 1] == '\r')
-                    {
-                        sb.Length -= 1;
-                    }
-                }
-                else if (ch == '\r')
-                {
-                    sb.Length -= 1;
-                }
-
-                trailing--;
-            }
-        }
+        private static string BuildSource(Filter1BuildSeed.SeedExchange exchange)
+            => $"Truth {FormatTruthRange(exchange.UserLineIndex, exchange.AssistantLineIndex)}";
 
         private static string FormatTruthRange(int userLineIndex, int assistantLineIndex)
         {
@@ -413,42 +415,151 @@ namespace VAL.Continuum.Pipeline.Filter2
             }
 
             if (min == int.MaxValue || max == int.MinValue)
-            {
-                return "?–?";
-            }
+                return "?-?";
 
-            return $"{min}\u2013{max}";
+            return $"{min}-{max}";
         }
 
-        private static void AppendAssistantBlock(StringBuilder sb, string assistantText, bool sanitizeAssistant)
+        private static string SelectWwloText(string uncut, string sliced)
         {
-            sb.AppendLine("ASSISTANT:");
-            sb.AppendLine(NormalizeAssistantContent(assistantText, sanitizeAssistant));
+            var candidate = Normalize(uncut);
+            if (string.IsNullOrWhiteSpace(candidate))
+                return Normalize(sliced);
+
+            return candidate.Length <= Filter2Rules.WhereWeLeftOffMaxTextChars
+                ? candidate
+                : Normalize(sliced);
         }
 
-        private static string NormalizeAssistantContent(string assistantText, bool sanitizeAssistant)
+        private static string SelectPreferredText(string uncut, string sliced)
         {
-            var raw = assistantText ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(raw))
+            var preferred = Normalize(uncut);
+            if (!string.IsNullOrWhiteSpace(preferred))
+                return preferred;
+
+            return Normalize(sliced);
+        }
+
+        private static string NormalizeSpeakerText(string text, string emptyFallback)
+        {
+            var normalized = Normalize(text);
+            return string.IsNullOrWhiteSpace(normalized) ? emptyFallback : normalized;
+        }
+
+        private static string BuildSnippet(string text)
+        {
+            var normalized = Normalize(text);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return string.Empty;
+
+            var line = normalized.Split('\n').FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) ?? normalized;
+            if (line.Length <= Filter2Rules.DeterministicFactMaxChars)
+                return line;
+
+            return line.Substring(0, Filter2Rules.DeterministicFactMaxChars - 4).TrimEnd() + " ...";
+        }
+
+        private static string Normalize(string text)
+            => (text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+
+        private static string NormalizeFactLine(string text)
+        {
+            var normalized = Normalize(text);
+            if (normalized.StartsWith("- ", StringComparison.Ordinal))
+                normalized = normalized.Substring(2).Trim();
+            else if (NumberedListRegex.IsMatch(normalized))
+                normalized = NumberedListRegex.Replace(normalized, string.Empty).Trim();
+
+            return normalized;
+        }
+
+        private static bool TryExtractLabeledValue(string line, string label, out string value)
+        {
+            value = string.Empty;
+            if (string.IsNullOrWhiteSpace(line) || string.IsNullOrWhiteSpace(label))
+                return false;
+
+            if (!line.StartsWith(label, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            value = line.Substring(label.Length).Trim();
+            return !string.IsNullOrWhiteSpace(value);
+        }
+
+        private static bool LooksLikeHeading(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return false;
+
+            return line.EndsWith(":", StringComparison.Ordinal) &&
+                   !line.Contains("\\", StringComparison.Ordinal) &&
+                   !line.Contains("/", StringComparison.Ordinal);
+        }
+
+        private static bool LooksLikeFileReference(string line)
+            => !string.IsNullOrWhiteSpace(line) && FileReferenceRegex.IsMatch(line);
+
+        private static bool ContainsConstraintKeyword(string line)
+        {
+            for (int i = 0; i < ConstraintKeywords.Length; i++)
             {
-                return "[ASSISTANT: empty]";
+                if (line.IndexOf(ConstraintKeywords[i], StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
             }
 
-            var match = Regex.Match(raw, @"^\s*Reasoned for (?:\d+h )?\d+m \d+s(?:\r?\n)?", RegexOptions.CultureInvariant);
-            var remainder = match.Success ? raw.Substring(match.Length) : raw;
+            return false;
+        }
 
-            var content = remainder;
-            if (sanitizeAssistant)
+        private static string StripBullet(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return string.Empty;
+
+            var normalized = Normalize(line);
+            if (normalized.StartsWith("- ", StringComparison.Ordinal))
+                return normalized.Substring(2).Trim();
+
+            if (NumberedListRegex.IsMatch(normalized))
+                return NumberedListRegex.Replace(normalized, string.Empty).Trim();
+
+            return normalized;
+        }
+
+        private static void AddRange(ICollection<string> target, IEnumerable<string> values)
+        {
+            if (target == null || values == null)
+                return;
+
+            foreach (var value in values)
             {
-                content = SanitizeAssistantForWwlo(content);
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                target.Add(value);
+                if (target.Count >= Filter2Rules.DeterministicFactMaxItems)
+                    return;
+            }
+        }
+
+        private static int InferFrozenBoundaryLineIndex(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
+        {
+            var max = -1;
+            if (exchanges == null)
+                return max;
+
+            foreach (var exchange in exchanges)
+            {
+                if (exchange == null)
+                    continue;
+
+                if (exchange.UserLineIndex > max)
+                    max = exchange.UserLineIndex;
+
+                if (exchange.AssistantLineIndex > max)
+                    max = exchange.AssistantLineIndex;
             }
 
-            if (string.IsNullOrWhiteSpace(content))
-            {
-                return "[ASSISTANT: empty]";
-            }
-
-            return content;
+            return max;
         }
     }
 }

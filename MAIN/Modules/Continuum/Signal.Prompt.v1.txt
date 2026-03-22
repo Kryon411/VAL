@@ -1,67 +1,26 @@
-Prepare a VAL Pulse handoff for a new chat.
+CONTINUUM SIGNAL INPUT (EXCLUDE FROM CONTINUITY)
 
+Prepare a compact semantic handoff summary from the frozen Continuum snapshot below.
+
+Use only the supplied frozen snapshot.
+Do not rely on earlier live chat context.
 Do not continue the work.
 Do not solve anything new.
 Do not speculate.
 Do not be conversational.
-Summarize only.
-
-Your job is to identify the true continuation state of this thread for a clean chat-to-chat handoff.
-
-Critical rules:
-- Prefer the last meaningful operational exchange over the most recent filler turns.
-- If the latest turns are wind-down, gratitude, off-topic talk, or thread-closing chatter, do not use them as the main anchor.
-- Clearly distinguish what is resolved, what is unresolved, and what the next assistant reply in the new chat should do.
-- Preserve critical constraints, files, paths, branches, versions, checkpoints, and validation state.
-- Keep the output clean, plain-text, and readable in a chat window.
-- Do not use markdown emphasis.
-- Do not use code fences.
-- Use the exact section titles and labels below.
-- Output only the handoff packet.
+Do not quote long blocks verbatim.
+Keep the output compact, plain-text, and bullet-based.
+Do not include packet wrappers, nested handoff structure, WWLO, Truth Walkback, artifacts, or any extra sections.
+If a section has nothing useful to report, write "- None."
+Output only the three sections below.
 
 Output exactly:
 
-VAL Pulse Handoff
-
-CURRENT STATE
-Status:
-Thread mode:
-Active objective:
-Next expected assistant action:
-Last stable checkpoint:
-
-TAIL CHECK
-Recent turns operationally relevant:
-Tail summary:
-Tail decision:
-
-WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)
-Source:
-USER:
-ASSISTANT:
-
-HOW TO PROCEED
-- Begin from WHERE WE LEFT OFF.
-- Treat the WWLO USER line as the active prompt if it is unresolved.
-- If WWLO contains an unanswered direct instruction, answer it directly.
-- Otherwise acknowledge readiness in one short line and wait.
-- Treat all lower sections as reference only.
+PREVIOUS CHAT SUMMARY
+- 
 
 OPEN LOOPS
 - 
 
 CRITICAL CONTEXT
 - 
-
-ARTIFACTS AND REFERENCES
-- 
-
-ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)
-Source:
-USER:
-ASSISTANT:
-
-CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)
-- 
-
-End of Pulse Handoff

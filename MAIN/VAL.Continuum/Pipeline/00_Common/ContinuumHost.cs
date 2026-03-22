@@ -123,8 +123,10 @@ namespace VAL.Continuum
         {
             public long OperationId { get; init; }
             public string ChatId { get; init; } = string.Empty;
-            public string PulseTemplateText { get; init; } = string.Empty;
-            public EssenceInjectController.InjectSeed LegacyFallbackSeed { get; init; } = new();
+            public PulseSnapshot Snapshot { get; init; } = new();
+            public DeterministicPulseSections DeterministicSections { get; init; } = new();
+            public string DeterministicFallbackPacket { get; init; } = string.Empty;
+            public EssenceInjectController.InjectSeed DeterministicFallbackSeed { get; init; } = new();
         }
 
         private sealed class Msg
@@ -1132,14 +1134,14 @@ namespace VAL.Continuum
                 return;
             }
 
-            if (!SignalPacket.TryParse(signalReply, out var parsedPacket))
+            if (!SignalPacket.TryParse(signalReply, out var signalSummary))
             {
                 HandleSignalFailure(cid);
                 return;
             }
 
-            if (!SignalPacket.TryRenderPulsePacket(pending.PulseTemplateText, parsedPacket, out var renderedPulsePacket) ||
-                string.IsNullOrWhiteSpace(renderedPulsePacket))
+            var renderedPulsePacket = PulsePacketComposer.Compose(pending.Snapshot, pending.DeterministicSections, signalSummary);
+            if (string.IsNullOrWhiteSpace(renderedPulsePacket))
             {
                 HandleSignalFailure(cid);
                 return;
@@ -1151,7 +1153,7 @@ namespace VAL.Continuum
             try
             {
                 var token = OperationCoordinator.GetTokenIfRunning(GuardedOperationKind.Pulse);
-                var seed = QuickRefreshFlow.CreatePulseSeed(cid, renderedPulsePacket, "Signal", token);
+                var seed = QuickRefreshFlow.CreatePulseSeed(cid, renderedPulsePacket, "PulsePacketComposer", token);
                 InjectQueue.Enqueue(seed);
             }
             catch (OperationCanceledException)
@@ -1161,7 +1163,7 @@ namespace VAL.Continuum
             }
             catch
             {
-                InjectQueue.Enqueue(pending.LegacyFallbackSeed);
+                InjectQueue.Enqueue(pending.DeterministicFallbackSeed);
             }
         }
 
@@ -1174,7 +1176,7 @@ namespace VAL.Continuum
             if (!TryTakePendingSignalPulseForCurrentOperation(cid, out var pending))
                 return;
 
-            InjectQueue.Enqueue(pending.LegacyFallbackSeed);
+            InjectQueue.Enqueue(pending.DeterministicFallbackSeed);
         }
 
         private static bool HasPendingSignalPulse(string chatId)
@@ -1251,7 +1253,7 @@ namespace VAL.Continuum
                             return;
 
                         if (TryTakePendingSignalPulse(pending.ChatId, pending.OperationId, out var timedOutPending))
-                            InjectQueue.Enqueue(timedOutPending.LegacyFallbackSeed);
+                            InjectQueue.Enqueue(timedOutPending.DeterministicFallbackSeed);
                     });
                 }
                 catch { }
@@ -1418,23 +1420,35 @@ namespace VAL.Continuum
 
         private static void RunPulseWithSignalFallback(string chatId, CancellationToken token)
         {
-            var legacyFallbackSeed = QuickRefreshFlow.BuildLegacyPulseSeed(chatId, token);
+            var snapshot = QuickRefreshFlow.BuildPulseSnapshot(chatId, token);
+            token.ThrowIfCancellationRequested();
+
+            var deterministicSections = QuickRefreshFlow.BuildDeterministicPulseSections(chatId, snapshot, token);
+            token.ThrowIfCancellationRequested();
+
+            var deterministicFallbackPacket = QuickRefreshFlow.BuildDeterministicPulsePacket(snapshot, deterministicSections, token);
+            var deterministicFallbackSeed = QuickRefreshFlow.CreatePulseSeed(chatId, deterministicFallbackPacket, "PulsePacketComposer", token);
 
             token.ThrowIfCancellationRequested();
 
             var signalPrompt = (ContinuumPreamble.LoadSignalPrompt(chatId) ?? string.Empty).Trim();
-            var pulseTemplate = (ContinuumPreamble.LoadPulsePacketTemplate(chatId) ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(signalPrompt) || string.IsNullOrWhiteSpace(pulseTemplate))
+            if (string.IsNullOrWhiteSpace(signalPrompt))
             {
-                InjectQueue.Enqueue(legacyFallbackSeed);
+                InjectQueue.Enqueue(deterministicFallbackSeed);
+                return;
+            }
+
+            var signalInput = SignalInputBuilder.Build(signalPrompt, snapshot, deterministicSections);
+            if (string.IsNullOrWhiteSpace(signalInput))
+            {
+                InjectQueue.Enqueue(deterministicFallbackSeed);
                 return;
             }
 
             var operationId = OperationCoordinator.CurrentOperationId;
             if (operationId <= 0)
             {
-                InjectQueue.Enqueue(legacyFallbackSeed);
+                InjectQueue.Enqueue(deterministicFallbackSeed);
                 return;
             }
 
@@ -1442,8 +1456,10 @@ namespace VAL.Continuum
             {
                 OperationId = operationId,
                 ChatId = chatId,
-                PulseTemplateText = pulseTemplate,
-                LegacyFallbackSeed = legacyFallbackSeed
+                Snapshot = snapshot,
+                DeterministicSections = deterministicSections,
+                DeterministicFallbackPacket = deterministicFallbackPacket,
+                DeterministicFallbackSeed = deterministicFallbackSeed
             };
 
             lock (Sync)
@@ -1455,10 +1471,10 @@ namespace VAL.Continuum
             {
                 ChatId = chatId,
                 Mode = "Signal",
-                EssenceText = signalPrompt,
+                EssenceText = signalInput,
                 OpenNewChat = false,
                 AutoSend = true,
-                SourceFileName = "Signal",
+                SourceFileName = "SignalInputBuilder",
                 EssenceFileName = "Signal.Prompt.v1.txt"
             });
 

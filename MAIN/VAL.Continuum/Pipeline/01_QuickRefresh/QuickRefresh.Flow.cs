@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Threading;
 using VAL.Continuum.Pipeline;
-using VAL.Continuum.Pipeline.Essence;
 using VAL.Continuum.Pipeline.Filter1;
 using VAL.Continuum.Pipeline.Filter2;
 using VAL.Continuum.Pipeline.Truth;
@@ -34,8 +33,59 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
 
             token.ThrowIfCancellationRequested();
 
-            var injectText = BuildLegacyPulsePacketText(chatId, token);
-            return CreatePulseSeed(chatId, injectText, "RestructuredSeed", token);
+            var snapshot = BuildPulseSnapshot(chatId, token);
+            var deterministicSections = BuildDeterministicPulseSections(chatId, snapshot, token);
+            var pulsePacket = BuildDeterministicPulsePacket(snapshot, deterministicSections, token);
+            return CreatePulseSeed(chatId, pulsePacket, "PulsePacketComposer", token);
+        }
+
+        internal static PulseSnapshot BuildPulseSnapshot(string chatId, CancellationToken token)
+        {
+            if (string.IsNullOrWhiteSpace(chatId))
+                throw new ArgumentNullException(nameof(chatId));
+
+            token.ThrowIfCancellationRequested();
+
+            var truth = TruthNormalize.BuildView(chatId);
+            token.ThrowIfCancellationRequested();
+
+            if (truth.Messages == null || truth.Messages.Count == 0)
+                throw new InvalidOperationException("No Truth messages available for this chat.");
+
+            var snapshot = PulseSnapshot.Freeze(chatId, truth, frozenBoundaryLineIndex: -1);
+            if (snapshot.Filter1Exchanges == null || snapshot.Filter1Exchanges.Count == 0)
+                throw new InvalidOperationException("Filter1 produced no pre-Pulse exchanges.");
+
+            TryWriteAuditText(chatId, "Seed.log", snapshot.SeedLogText);
+            return snapshot;
+        }
+
+        internal static DeterministicPulseSections BuildDeterministicPulseSections(string chatId, PulseSnapshot snapshot, CancellationToken token)
+        {
+            if (string.IsNullOrWhiteSpace(chatId))
+                throw new ArgumentNullException(nameof(chatId));
+
+            ArgumentNullException.ThrowIfNull(snapshot);
+            token.ThrowIfCancellationRequested();
+
+            var sections = Filter2Restructure.BuildSections(snapshot);
+            var auditText = Filter2Restructure.RenderDeterministicSections(sections);
+            TryWriteAuditText(chatId, "RestructuredSeed.log", auditText);
+            return sections;
+        }
+
+        internal static string BuildDeterministicPulsePacket(PulseSnapshot snapshot, DeterministicPulseSections deterministicSections, CancellationToken token)
+        {
+            ArgumentNullException.ThrowIfNull(snapshot);
+            ArgumentNullException.ThrowIfNull(deterministicSections);
+
+            token.ThrowIfCancellationRequested();
+
+            var pulsePacket = PulsePacketComposer.Compose(snapshot, deterministicSections, signalSummary: null);
+            if (string.IsNullOrWhiteSpace(pulsePacket))
+                throw new InvalidOperationException("Pulse packet composer returned no content.");
+
+            return pulsePacket;
         }
 
         public static EssenceInjectController.InjectSeed CreatePulseSeed(
@@ -69,47 +119,6 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
                 SourceFileName = sourceFileName ?? string.Empty,
                 EssenceFileName = essencePath
             };
-        }
-
-        private static string BuildLegacyPulsePacketText(string chatId, CancellationToken token)
-        {
-            token.ThrowIfCancellationRequested();
-
-            // 1) Lossless Truth view (structural only)
-            var truth = TruthNormalize.BuildView(chatId);
-
-            token.ThrowIfCancellationRequested();
-
-            if (truth.Messages == null || truth.Messages.Count == 0)
-                throw new InvalidOperationException("No Truth messages available for this chat.");
-
-            // 2) Filter 1: Truth -> Seed.log (filtered + sliced)
-            var seed = Filter1BuildSeed.BuildSeed(truth);
-            if (string.IsNullOrWhiteSpace(seed.SeedLogText))
-                throw new InvalidOperationException("Filter1 produced an empty Seed.log.");
-
-            TryWriteAuditText(chatId, "Seed.log", seed.SeedLogText);
-
-            token.ThrowIfCancellationRequested();
-
-            // 3) Filter 2: Seed.log -> RestructuredSeed (reverse-order pack, budgeted)
-            var restructured = Filter2Restructure.BuildRestructuredSeed(seed.Exchanges);
-            if (string.IsNullOrWhiteSpace(restructured))
-                throw new InvalidOperationException("Filter2 produced an empty RestructuredSeed.");
-
-            TryWriteAuditText(chatId, "RestructuredSeed.log", restructured);
-
-            token.ThrowIfCancellationRequested();
-
-            // 4) Essence-M (Pulse) - keep existing mechanical cleaning + layout
-            var essenceText = EssenceBuild.BuildEssenceM(chatId, restructured);
-            if (string.IsNullOrWhiteSpace(essenceText))
-                throw new InvalidOperationException("Essence-M builder returned no content.");
-
-            token.ThrowIfCancellationRequested();
-
-            // 5) Load Context.txt preamble and inject it into the Essence text for the final seed payload.
-            return ContinuumPreamble.InjectIntoEssence(essenceText, chatId);
         }
 
         private static string NormalizePulseText(string pulseText)
