@@ -1,13 +1,10 @@
 try { console.log("[VAL Continuum] script loaded"); } catch (_) {}
-/* Continuum.Client.js — v3.1.31 (fast seed inject on New Chat root)
- * Fix for 20s+ delays:
- *  - On openNewChat, ChatGPT often lands on "/" (no /c/<uuid> yet). Our previous injector waited for a chatId change,
- *    which cannot happen until after the first send. That forced long fallback timeouts.
- *
- * New behavior:
- *  - For openNewChat seeds, inject as soon as the composer is ready on:
- *      (a) a different chatId than origin, OR
- *      (b) the New Chat root page (no chatId, typically "/")
+/* Continuum.Client.js — v3.1.33
+ * Pulse new-chat sequencing:
+ *  - On openNewChat, inject only after navigation has moved away from the origin chat
+ *    and the destination composer passes explicit readiness checks.
+ *  - Root-route injection remains supported, but only when the blank new-chat shell is
+ *    actually ready (blank composer, low turn count, stable target).
  *  - Truth logging remains chatId-gated (no Truth lines on root).
  *  - Emits: refresh.inject.fast_root when we inject on root without chatId.
  */
@@ -15,7 +12,10 @@ try {
 (function () {
   "use strict";
 
-  const CONTINUUM_VERSION = "3.1.32";
+  const CONTINUUM_VERSION = "3.1.33";
+  const INJECT_READY_STABILIZE_MS = 120;
+  const NEW_CHAT_TURN_LIMIT = 1;
+  const NEW_CHAT_RETRY_INTERVAL_MS = 20000;
 
   function hasBridge() {
     return !!(window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === "function");
@@ -662,11 +662,89 @@ try {
 }
 
 
-  function injectIntoComposer(text) {
-    const c = composerReady();
+  function isComposerBlank(composer) {
+    try {
+      if (!composer || !composer.el) return false;
+      if (composer.kind === "prosemirror") {
+        return ((composer.el.textContent || "").trim().length === 0);
+      }
+      return (((composer.el.value || "") + "").trim().length === 0);
+    } catch (_) {}
+    return false;
+  }
+
+  function isElementVisible(el) {
+    try {
+      if (!el || !el.isConnected || !document.contains(el)) return false;
+      const rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+      if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+      const style = getComputedStyle(el);
+      if (!style) return true;
+      if (style.display === "none" || style.visibility === "hidden") return false;
+      return rect.bottom > 0 && rect.top < (window.innerHeight || document.documentElement.clientHeight || 0);
+    } catch (_) {}
+    return false;
+  }
+
+  function getConversationTurnCount() {
+    try {
+      const els = document.querySelectorAll(TURN_SELECTOR);
+      return els ? els.length : 0;
+    } catch (_) { return 0; }
+  }
+
+  function getNewChatInjectionTarget(seed) {
+    try {
+      const currentId = getChatIdFromLocation();
+      const originId = seed.originChatId || null;
+      const movedToNewChatId = !!(currentId && originId && currentId !== originId);
+      const onRoot = !currentId && isLikelyNewChatRoot();
+
+      if (!movedToNewChatId && !onRoot) {
+        return { ready: false, waitEvt: "refresh.inject.waiting_for_chat", currentId, originId };
+      }
+
+      const composer = composerReady();
+      if (!composer || !composer.el) {
+        return { ready: false, waitEvt: "refresh.inject.waiting_for_composer", currentId, originId };
+      }
+
+      if (!isElementVisible(composer.el)) {
+        return { ready: false, waitEvt: "refresh.inject.waiting_for_visible_composer", currentId, originId };
+      }
+
+      if (!isComposerBlank(composer)) {
+        return { ready: false, waitEvt: "refresh.inject.waiting_for_blank_composer", currentId, originId };
+      }
+
+      if (getConversationTurnCount() > NEW_CHAT_TURN_LIMIT) {
+        return { ready: false, waitEvt: "refresh.inject.waiting_for_blank_shell", currentId, originId };
+      }
+
+      if (movedToNewChatId && state.hostAttachedChatId !== currentId) {
+        return { ready: false, waitEvt: "refresh.inject.waiting_for_attach", currentId, originId };
+      }
+
+      return {
+        ready: true,
+        composer,
+        currentId,
+        originId,
+        label: currentId ? "new_chat" : "new_chat_root",
+        signature: (currentId || "root") + "|" + (composer.kind || "unknown")
+      };
+    } catch (_) {}
+
+    return { ready: false, waitEvt: "refresh.inject.waiting_for_chat", currentId: null, originId: seed && seed.originChatId ? seed.originChatId : null };
+  }
+
+  function injectIntoComposer(text, composerTarget) {
+    const c = composerTarget || composerReady();
     if (!c) return false;
 
     try {
+      if (!c.el || !c.el.isConnected || !document.contains(c.el)) return false;
+      try { c.el.focus(); } catch (_) {}
       if (c.kind === "prosemirror") {
         // Preserve paragraphs/line-breaks so the injected Essence-M remains readable in the composer.
         const html = _plainTextToProseHtml(text);
@@ -954,43 +1032,64 @@ try {
       const now = Date.now();
       const started = seed.requestedAt || now;
       const mode = seed.mode || "Quick";
+      let injectionTarget = null;
 
       if (seed.requireNewChat) {
-        const currentId = state.chatId;
-        const originId = seed.originChatId || null;
+        injectionTarget = getNewChatInjectionTarget(seed);
 
-        const movedToNewChatId = currentId && originId && currentId !== originId;
-        const onRoot = !currentId && isLikelyNewChatRoot();
+        if (!injectionTarget.ready) {
+          seed.readySignature = null;
+          seed.readyAt = 0;
+          throttleInjectorStatus(injectionTarget.waitEvt || "refresh.inject.waiting_for_chat");
 
-        if (!movedToNewChatId && !onRoot) {
-          throttleInjectorStatus("refresh.inject.waiting_for_chat");
-          if ((now - started) >= 20000) {
-            seed.requireNewChat = false;
-            seed.fallback = true;
-            post({ type: "continuum.event", chatId: currentId || originId || "unknown", evt: "refresh.inject.timeout_fallback:new_chat" });
+          if ((now - started) >= NEW_CHAT_RETRY_INTERVAL_MS) {
+            seed.requestedAt = now;
+            post({
+              type: "continuum.event",
+              chatId: injectionTarget.currentId || injectionTarget.originId || "unknown",
+              evt: "refresh.inject.retrying_new_chat"
+            });
+            requestNewChatNavigation();
           }
+
           return false;
         }
-      }
 
-      if (!composerReady()) {
+        const readySignature = injectionTarget.signature || ((injectionTarget.currentId || "root") + "|" + injectionTarget.label);
+        if (seed.readySignature !== readySignature) {
+          seed.readySignature = readySignature;
+          seed.readyAt = now;
+          throttleInjectorStatus("refresh.inject.stabilizing_new_chat");
+          return false;
+        }
+
+        if ((now - (seed.readyAt || now)) < INJECT_READY_STABILIZE_MS) {
+          throttleInjectorStatus("refresh.inject.stabilizing_new_chat");
+          return false;
+        }
+      } else if (!composerReady()) {
         throttleInjectorStatus("refresh.inject.waiting_for_composer");
         return false;
       }
 
-      if (!injectIntoComposer(seed.essence)) return false;
+      const composerTarget = injectionTarget && injectionTarget.composer ? injectionTarget.composer : null;
+      if (!injectIntoComposer(seed.essence, composerTarget)) {
+        seed.readySignature = null;
+        seed.readyAt = 0;
+        return false;
+      }
 
       const originId = seed.originChatId || null;
-      const currentId = state.chatId;
+      const currentId = injectionTarget && Object.prototype.hasOwnProperty.call(injectionTarget, "currentId")
+        ? injectionTarget.currentId
+        : state.chatId;
 
       let label = "current_chat";
-      if (seed.requireNewChat) {
-        label = currentId ? "new_chat" : "new_chat_root";
+      if (injectionTarget && injectionTarget.ready) {
+        label = injectionTarget.label || (currentId ? "new_chat" : "new_chat_root");
         if (!currentId) post({ type: "continuum.event", chatId: originId || "unknown", evt: "refresh.inject.fast_root" });
       } else if (originId && currentId && currentId !== originId) {
         label = "new_chat";
-      } else if (seed.fallback) {
-        label = "current_chat_fallback";
       }
 
       post({ type: "continuum.event", chatId: currentId || originId || "unknown", evt: "rehydrate.seed_inserted:" + mode + ":" + label });
@@ -1530,7 +1629,8 @@ function handleHostMessage(event) {
         requireNewChat: openNewChat,
         originChatId: getChatIdFromLocation(),
         requestedAt: Date.now(),
-        fallback: false,
+        readySignature: null,
+        readyAt: 0,
         autoSend: msg.autoSend === true
       };
 

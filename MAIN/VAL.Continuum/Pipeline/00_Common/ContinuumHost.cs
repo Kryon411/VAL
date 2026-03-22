@@ -1071,16 +1071,15 @@ namespace VAL.Continuum
             if (string.IsNullOrWhiteSpace(cid))
                 return;
 
-            var parts = evt.Split(':');
-            if (parts.Length >= 3)
+            if (TryParseRefreshInjectSuccess(evt, out var mode, out var label))
             {
-                var mode = (parts[1] ?? string.Empty).Trim();
                 if (mode.Equals("Signal", StringComparison.OrdinalIgnoreCase))
                     return;
 
                 if (mode.Equals("Pulse", StringComparison.OrdinalIgnoreCase))
                 {
-                    EndRefresh(cid);
+                    if (IsPulseCompletionTarget(label))
+                        EndRefresh(cid);
                     return;
                 }
             }
@@ -1089,6 +1088,29 @@ namespace VAL.Continuum
                 return;
 
             EndRefresh(cid);
+        }
+
+        internal static bool TryParseRefreshInjectSuccess(string evt, out string mode, out string label)
+        {
+            mode = string.Empty;
+            label = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(evt))
+                return false;
+
+            var parts = evt.Split(':');
+            if (parts.Length < 3)
+                return false;
+
+            mode = (parts[1] ?? string.Empty).Trim();
+            label = (parts[2] ?? string.Empty).Trim();
+            return !string.IsNullOrWhiteSpace(mode);
+        }
+
+        internal static bool IsPulseCompletionTarget(string label)
+        {
+            return label.Equals("new_chat", StringComparison.OrdinalIgnoreCase) ||
+                   label.Equals("new_chat_root", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void HandleSignalAssistantSettled(Msg msg)
