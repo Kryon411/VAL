@@ -23,7 +23,7 @@ namespace VAL.Host.Commands
             if (_lastEnabledState != enabled)
             {
                 _lastEnabledState = enabled;
-                var reason = ToastHub.ParseReason(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
+                var reason = ToastReasonParser.Parse(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
 
                 if (enabled)
                     _toastHub.TryShow(ToastKey.VoidEnabled, origin: ToastOrigin.HostCommand, reason: reason);

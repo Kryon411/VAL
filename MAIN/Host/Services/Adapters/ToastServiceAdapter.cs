@@ -7,7 +7,7 @@ namespace VAL.Host.Services.Adapters
     {
         public void Initialize(Window hostWindow)
         {
-            ToastHub.Initialize(hostWindow);
+            ToastManager.Initialize(hostWindow);
         }
     }
 }

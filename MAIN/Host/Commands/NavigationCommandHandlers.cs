@@ -34,7 +34,7 @@ namespace VAL.Host.Commands
             if (wentBack)
                 return;
 
-            var reason = ToastHub.ParseReason(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
+            var reason = ToastReasonParser.Parse(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
             _toastHub.TryShow(ToastKey.NavigationNoHistory, origin: ToastOrigin.HostCommand, reason: reason);
         }
     }

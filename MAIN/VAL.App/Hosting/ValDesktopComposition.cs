@@ -58,7 +58,8 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<OperationCoordinator>();
             builder.Services.AddSingleton<IOperationCoordinator>(sp => sp.GetRequiredService<OperationCoordinator>());
             builder.Services.AddSingleton<IToastService, ToastServiceAdapter>();
-            builder.Services.AddSingleton<IToastHub, ToastHubAdapter>();
+            builder.Services.AddSingleton<ToastHubService>();
+            builder.Services.AddSingleton<IToastHub>(sp => sp.GetRequiredService<ToastHubService>());
             builder.Services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
             builder.Services.AddSingleton<ICrashHandler, CrashHandler>();
             builder.Services.AddSingleton<IPrivacySettingsService, PrivacySettingsService>();

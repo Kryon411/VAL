@@ -84,7 +84,7 @@ namespace VAL.Host.Commands
             try
             {
                 var result = _dataWipeService.WipeData();
-                var reason = ToastHub.ParseReason(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
+                var reason = ToastReasonParser.Parse(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
 
                 if (result.Success)
                 {
