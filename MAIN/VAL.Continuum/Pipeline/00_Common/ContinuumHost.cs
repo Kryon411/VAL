@@ -8,6 +8,7 @@ using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.WebMessaging;
 using VAL.Continuum.Pipeline.QuickRefresh;
+using VAL.Continuum.Pipeline.Signal;
 using VAL.Continuum.Pipeline.Truth;
 using VAL.Continuum.Pipeline.Inject;
 using VAL.Continuum.Pipeline;
@@ -116,6 +117,15 @@ namespace VAL.Continuum
         private static DateTime _pendingFlushRequestedUtc = DateTime.MinValue;
 
         private const int FlushAckTimeoutMs = 900;
+        private const int SignalResponseTimeoutMs = 45000;
+
+        private sealed class PendingSignalPulse
+        {
+            public long OperationId { get; init; }
+            public string ChatId { get; init; } = string.Empty;
+            public string PulseTemplateText { get; init; } = string.Empty;
+            public EssenceInjectController.InjectSeed LegacyFallbackSeed { get; init; } = new();
+        }
 
         private sealed class Msg
         {
@@ -148,6 +158,7 @@ namespace VAL.Continuum
         private static readonly object Sync = new object();
         private static bool _refreshInFlight;
         private static DateTime _lastRefreshCompletedUtc = DateTime.MinValue;
+        private static PendingSignalPulse? _pendingSignalPulse;
 
         // Chronicle (Truth backfill/rebuild) state
         private static bool _chronicleInFlight;
@@ -417,8 +428,14 @@ namespace VAL.Continuum
                 return;
             }
 
+            if (type.Equals(WebCommandNames.ContinuumEvent, StringComparison.OrdinalIgnoreCase))
+            {
+                HandleContinuumEvent(msg);
+                return;
+            }
+
             if (type.Equals(WebCommandNames.InjectSuccess, StringComparison.OrdinalIgnoreCase) ||
-                (type.Equals(WebCommandNames.ContinuumEvent, StringComparison.OrdinalIgnoreCase) && (msg.evt ?? "").StartsWith("refresh.inject.success", StringComparison.OrdinalIgnoreCase)))
+                type.Equals("refresh.inject.success", StringComparison.OrdinalIgnoreCase))
             {
                 EndRefresh(SessionContext.ResolveChatId(msg.chatId));
                 return;
@@ -860,12 +877,15 @@ namespace VAL.Continuum
                 text.Contains("CONTEXT BLOCK — READ ONLY", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("WHERE WE LEFT OFF -- LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("CONTEXT FILLER (REFERENCE ONLY -- DO NOT ADVANCE FROM HERE)", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)", StringComparison.OrdinalIgnoreCase);
 
             bool hasAuthoritativeSeed =
                 text.Contains("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("WHERE WE LEFT OFF -- LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase);
 
             return hasAuthoritativeSeed || hasContext;
@@ -993,6 +1013,7 @@ namespace VAL.Continuum
                 {
                     _refreshInFlight = false;
                     _lastRefreshCompletedUtc = DateTime.UtcNow;
+                    _pendingSignalPulse = null;
                     endedRefresh = true;
                 }
             }
@@ -1018,6 +1039,201 @@ namespace VAL.Continuum
             // JS emits "inject.success" for any injection (Pulse, Prelude, etc.).
             // Only show Pulse completion if a refresh was actually in-flight.
             FinishRefresh(chatId, showReadyToast: true);
+        }
+
+        private static void HandleContinuumEvent(Msg msg)
+        {
+            var evt = (msg.evt ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(evt))
+                return;
+
+            if (evt.StartsWith("assistant.settled:", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleSignalAssistantSettled(msg);
+                return;
+            }
+
+            if (evt.StartsWith("signal.send.failed:", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleSignalFailure(msg.chatId);
+                return;
+            }
+
+            if (evt.StartsWith("refresh.inject.success", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleInjectSuccessEvent(msg.chatId, evt);
+            }
+        }
+
+        private static void HandleInjectSuccessEvent(string? chatId, string evt)
+        {
+            var cid = SessionContext.ResolveChatId(chatId);
+            if (string.IsNullOrWhiteSpace(cid))
+                return;
+
+            var parts = evt.Split(':');
+            if (parts.Length >= 3)
+            {
+                var mode = (parts[1] ?? string.Empty).Trim();
+                if (mode.Equals("Signal", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                if (mode.Equals("Pulse", StringComparison.OrdinalIgnoreCase))
+                {
+                    EndRefresh(cid);
+                    return;
+                }
+            }
+
+            if (HasPendingSignalPulse(cid))
+                return;
+
+            EndRefresh(cid);
+        }
+
+        private static void HandleSignalAssistantSettled(Msg msg)
+        {
+            var cid = SessionContext.ResolveChatId(msg.chatId);
+            if (string.IsNullOrWhiteSpace(cid))
+                return;
+
+            if (!TryGetPendingSignalPulse(cid, out var pending))
+                return;
+
+            if (OperationCoordinator.CurrentOperationId != pending.OperationId)
+                return;
+
+            var signalReply = msg.text ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(signalReply))
+            {
+                HandleSignalFailure(cid);
+                return;
+            }
+
+            if (!SignalPacket.TryParse(signalReply, out var parsedPacket))
+            {
+                HandleSignalFailure(cid);
+                return;
+            }
+
+            if (!SignalPacket.TryRenderPulsePacket(pending.PulseTemplateText, parsedPacket, out var renderedPulsePacket) ||
+                string.IsNullOrWhiteSpace(renderedPulsePacket))
+            {
+                HandleSignalFailure(cid);
+                return;
+            }
+
+            if (!TryTakePendingSignalPulse(cid, pending.OperationId, out pending))
+                return;
+
+            try
+            {
+                var token = OperationCoordinator.GetTokenIfRunning(GuardedOperationKind.Pulse);
+                var seed = QuickRefreshFlow.CreatePulseSeed(cid, renderedPulsePacket, "Signal", token);
+                InjectQueue.Enqueue(seed);
+            }
+            catch (OperationCanceledException)
+            {
+                FinishRefresh(cid, showReadyToast: false);
+                ToastOperationCancelled("pulse", ToastReason.Background);
+            }
+            catch
+            {
+                InjectQueue.Enqueue(pending.LegacyFallbackSeed);
+            }
+        }
+
+        private static void HandleSignalFailure(string? chatId)
+        {
+            var cid = SessionContext.ResolveChatId(chatId);
+            if (string.IsNullOrWhiteSpace(cid))
+                return;
+
+            if (!TryTakePendingSignalPulseForCurrentOperation(cid, out var pending))
+                return;
+
+            InjectQueue.Enqueue(pending.LegacyFallbackSeed);
+        }
+
+        private static bool HasPendingSignalPulse(string chatId)
+        {
+            lock (Sync)
+            {
+                return _pendingSignalPulse != null &&
+                    _pendingSignalPulse.ChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private static bool TryGetPendingSignalPulse(string chatId, out PendingSignalPulse pending)
+        {
+            lock (Sync)
+            {
+                if (_pendingSignalPulse == null ||
+                    !_pendingSignalPulse.ChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase))
+                {
+                    pending = null!;
+                    return false;
+                }
+
+                pending = _pendingSignalPulse;
+                return true;
+            }
+        }
+
+        private static bool TryTakePendingSignalPulseForCurrentOperation(string chatId, out PendingSignalPulse pending)
+        {
+            pending = null!;
+
+            if (!OperationCoordinator.IsRunning(GuardedOperationKind.Pulse))
+                return false;
+
+            var operationId = OperationCoordinator.CurrentOperationId;
+            if (operationId <= 0)
+                return false;
+
+            return TryTakePendingSignalPulse(chatId, operationId, out pending);
+        }
+
+        private static bool TryTakePendingSignalPulse(string chatId, long operationId, out PendingSignalPulse pending)
+        {
+            lock (Sync)
+            {
+                if (_pendingSignalPulse == null ||
+                    _pendingSignalPulse.OperationId != operationId ||
+                    !_pendingSignalPulse.ChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase))
+                {
+                    pending = null!;
+                    return false;
+                }
+
+                pending = _pendingSignalPulse;
+                _pendingSignalPulse = null;
+                return true;
+            }
+        }
+
+        private static void StartSignalTimeout(PendingSignalPulse pending)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(SignalResponseTimeoutMs).ConfigureAwait(false);
+
+                    PostToUi(() =>
+                    {
+                        if (!OperationCoordinator.IsRunning(GuardedOperationKind.Pulse))
+                            return;
+
+                        if (OperationCoordinator.CurrentOperationId != pending.OperationId)
+                            return;
+
+                        if (TryTakePendingSignalPulse(pending.ChatId, pending.OperationId, out var timedOutPending))
+                            InjectQueue.Enqueue(timedOutPending.LegacyFallbackSeed);
+                    });
+                }
+                catch { }
+            });
         }
 
         // -------------------------
@@ -1161,7 +1377,7 @@ namespace VAL.Continuum
                 }
 
                 var token = OperationCoordinator.GetTokenIfRunning(GuardedOperationKind.Pulse);
-                QuickRefreshEntry.Run(chatId, token);
+                RunPulseWithSignalFallback(chatId, token);
             }
             catch (OperationCanceledException)
             {
@@ -1176,6 +1392,55 @@ namespace VAL.Continuum
                 // Clear refresh state (no "ready" toast on failure).
                 FinishRefresh(chatId, showReadyToast: false);
             }
+        }
+
+        private static void RunPulseWithSignalFallback(string chatId, CancellationToken token)
+        {
+            var legacyFallbackSeed = QuickRefreshFlow.BuildLegacyPulseSeed(chatId, token);
+
+            token.ThrowIfCancellationRequested();
+
+            var signalPrompt = (ContinuumPreamble.LoadSignalPrompt(chatId) ?? string.Empty).Trim();
+            var pulseTemplate = (ContinuumPreamble.LoadPulsePacketTemplate(chatId) ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(signalPrompt) || string.IsNullOrWhiteSpace(pulseTemplate))
+            {
+                InjectQueue.Enqueue(legacyFallbackSeed);
+                return;
+            }
+
+            var operationId = OperationCoordinator.CurrentOperationId;
+            if (operationId <= 0)
+            {
+                InjectQueue.Enqueue(legacyFallbackSeed);
+                return;
+            }
+
+            var pending = new PendingSignalPulse
+            {
+                OperationId = operationId,
+                ChatId = chatId,
+                PulseTemplateText = pulseTemplate,
+                LegacyFallbackSeed = legacyFallbackSeed
+            };
+
+            lock (Sync)
+            {
+                _pendingSignalPulse = pending;
+            }
+
+            InjectQueue.Enqueue(new EssenceInjectController.InjectSeed
+            {
+                ChatId = chatId,
+                Mode = "Signal",
+                EssenceText = signalPrompt,
+                OpenNewChat = false,
+                AutoSend = true,
+                SourceFileName = "Signal",
+                EssenceFileName = "Signal.Prompt.v1.txt"
+            });
+
+            StartSignalTimeout(pending);
         }
 
         private static void PostToUi(Action act)

@@ -55,11 +55,39 @@ namespace VAL.Continuum.Pipeline
         {
             try
             {
-                var path = FindPreludePath();
-                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-                    return string.Empty;
+                return LoadContinuumText("Context.Prelude.txt");
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
 
-                return File.ReadAllText(path);
+        // ----------------------
+        // Signal / Pulse vNext assets
+        // ----------------------
+
+        public static string LoadSignalPrompt() => LoadSignalPrompt(string.Empty);
+
+        public static string LoadSignalPrompt(string chatId)
+        {
+            try
+            {
+                return LoadContinuumText("Signal.Prompt.v1.txt");
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        public static string LoadPulsePacketTemplate() => LoadPulsePacketTemplate(string.Empty);
+
+        public static string LoadPulsePacketTemplate(string chatId)
+        {
+            try
+            {
+                return LoadContinuumText("Pulse.Packet.Template.vNext.txt");
             }
             catch
             {
@@ -316,6 +344,30 @@ namespace VAL.Continuum.Pipeline
 
         private static string? FindPreludePath()
         {
+            return FindContinuumModulePath("Context.Prelude.txt");
+        }
+
+        private static string? FindContextPathFrom(string startDir)
+        {
+            return FindContinuumModulePathFrom(startDir, "Context.txt");
+        }
+
+        private static string? FindPreludePathFrom(string startDir)
+        {
+            return FindContinuumModulePathFrom(startDir, "Context.Prelude.txt");
+        }
+
+        private static string LoadContinuumText(string fileName)
+        {
+            var path = FindContinuumModulePath(fileName);
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return string.Empty;
+
+            return File.ReadAllText(path);
+        }
+
+        private static string? FindContinuumModulePath(string fileName)
+        {
             try
             {
                 var starts = new[]
@@ -326,7 +378,7 @@ namespace VAL.Continuum.Pipeline
 
                 for (int i = 0; i < starts.Length; i++)
                 {
-                    var found = FindPreludePathFrom(starts[i]);
+                    var found = FindContinuumModulePathFrom(starts[i], fileName);
                     if (!string.IsNullOrWhiteSpace(found))
                         return found;
                 }
@@ -336,7 +388,7 @@ namespace VAL.Continuum.Pipeline
             return null;
         }
 
-        private static string? FindContextPathFrom(string startDir)
+        private static string? FindContinuumModulePathFrom(string startDir, string fileName)
         {
             try
             {
@@ -345,38 +397,12 @@ namespace VAL.Continuum.Pipeline
                 {
                     if (string.IsNullOrWhiteSpace(dir)) break;
 
-                    // <root>\Modules\Continuum\Context.txt
-                    var p1 = Path.Combine(dir, "Modules", "Continuum", "Context.txt");
+                    // <root>\Modules\Continuum\<file>
+                    var p1 = Path.Combine(dir, "Modules", "Continuum", fileName);
                     if (File.Exists(p1)) return p1;
 
-                    // <root>\MAIN\Modules\Continuum\Context.txt
-                    var p2 = Path.Combine(dir, "MAIN", "Modules", "Continuum", "Context.txt");
-                    if (File.Exists(p2)) return p2;
-
-                    var parent = Directory.GetParent(dir);
-                    dir = parent != null ? parent.FullName : string.Empty;
-                }
-            }
-            catch { }
-
-            return null;
-        }
-
-        private static string? FindPreludePathFrom(string startDir)
-        {
-            try
-            {
-                var dir = startDir;
-                for (int i = 0; i < 10; i++)
-                {
-                    if (string.IsNullOrWhiteSpace(dir)) break;
-
-                    // <root>\Modules\Continuum\Context.Prelude.txt
-                    var p1 = Path.Combine(dir, "Modules", "Continuum", "Context.Prelude.txt");
-                    if (File.Exists(p1)) return p1;
-
-                    // <root>\MAIN\Modules\Continuum\Context.Prelude.txt
-                    var p2 = Path.Combine(dir, "MAIN", "Modules", "Continuum", "Context.Prelude.txt");
+                    // <root>\MAIN\Modules\Continuum\<file>
+                    var p2 = Path.Combine(dir, "MAIN", "Modules", "Continuum", fileName);
                     if (File.Exists(p2)) return p2;
 
                     var parent = Directory.GetParent(dir);

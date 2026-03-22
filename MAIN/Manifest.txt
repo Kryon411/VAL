@@ -74,6 +74,8 @@ MAIN/Modules/Continuum/Client/Continuum.Client.js
 MAIN/Modules/Continuum/Client/Continuum.Client.module.json
 MAIN/Modules/Continuum/Context.Prelude.txt
 MAIN/Modules/Continuum/Context.txt
+MAIN/Modules/Continuum/Pulse.Packet.Template.vNext.txt
+MAIN/Modules/Continuum/Signal.Prompt.v1.txt
 MAIN/Modules/Continuum/Continuum.Pipeline.Map.txt
 MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumContext.cs
 MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumHost.cs

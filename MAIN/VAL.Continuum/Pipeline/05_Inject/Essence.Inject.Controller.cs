@@ -15,6 +15,7 @@ namespace VAL.Continuum.Pipeline.Inject
             public string EssenceText { get; set; } = string.Empty;
 
             public bool OpenNewChat { get; set; } = true;
+            public bool AutoSend { get; set; }
 
             public string SourceFileName { get; set; } = string.Empty;
             public string EssenceFileName { get; set; } = string.Empty;

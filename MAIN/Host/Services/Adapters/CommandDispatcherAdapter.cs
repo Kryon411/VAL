@@ -32,7 +32,8 @@ namespace VAL.Host.Services.Adapters
                 text = seed.EssenceText,
                 sourceFile = seed.SourceFileName,
                 essenceFile = seed.EssenceFileName,
-                openNewChat = seed.OpenNewChat
+                openNewChat = seed.OpenNewChat,
+                autoSend = seed.AutoSend
             });
 
             return new MessageEnvelope

@@ -22,6 +22,57 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
 
+            var injectSeed = BuildLegacyPulseSeed(chatId, token);
+            token.ThrowIfCancellationRequested();
+            EssenceInjectInbox.Enqueue(injectSeed);
+        }
+
+        public static EssenceInjectController.InjectSeed BuildLegacyPulseSeed(string chatId, CancellationToken token)
+        {
+            if (string.IsNullOrWhiteSpace(chatId))
+                throw new ArgumentNullException(nameof(chatId));
+
+            token.ThrowIfCancellationRequested();
+
+            var injectText = BuildLegacyPulsePacketText(chatId, token);
+            return CreatePulseSeed(chatId, injectText, "RestructuredSeed", token);
+        }
+
+        public static EssenceInjectController.InjectSeed CreatePulseSeed(
+            string chatId,
+            string pulseText,
+            string sourceFileName,
+            CancellationToken token)
+        {
+            if (string.IsNullOrWhiteSpace(chatId))
+                throw new ArgumentNullException(nameof(chatId));
+
+            var normalizedPulseText = NormalizePulseText(pulseText);
+            if (string.IsNullOrWhiteSpace(normalizedPulseText))
+                throw new InvalidOperationException("Pulse seed text is empty.");
+
+            token.ThrowIfCancellationRequested();
+
+            const string essenceFileName = "Essence-M.Pulse.txt";
+            string essencePath = TryWriteEssenceToContinuumStorage(chatId, normalizedPulseText, out var storedName)
+                ? storedName
+                : essenceFileName;
+
+            token.ThrowIfCancellationRequested();
+
+            return new EssenceInjectController.InjectSeed
+            {
+                ChatId = chatId,
+                Mode = "Pulse",
+                EssenceText = normalizedPulseText,
+                OpenNewChat = true,
+                SourceFileName = sourceFileName ?? string.Empty,
+                EssenceFileName = essencePath
+            };
+        }
+
+        private static string BuildLegacyPulsePacketText(string chatId, CancellationToken token)
+        {
             token.ThrowIfCancellationRequested();
 
             // 1) Lossless Truth view (structural only)
@@ -57,34 +108,16 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
 
             token.ThrowIfCancellationRequested();
 
-            // 3b) Load Context.txt preamble and inject it into the Essence text for the final seed payload
-            var injectText = ContinuumPreamble.InjectIntoEssence(essenceText, chatId);
+            // 5) Load Context.txt preamble and inject it into the Essence text for the final seed payload.
+            return ContinuumPreamble.InjectIntoEssence(essenceText, chatId);
+        }
 
-            token.ThrowIfCancellationRequested();
-
-            // 4) Persist Essence-M (audit / reuse)
-            //    Keep path stable with existing Continuum storage conventions.
-            //    This uses existing storage if present; otherwise falls back to writing beside Truth.log.
-            string essenceFileName = "Essence-M.Pulse.txt";
-            string essencePath = TryWriteEssenceToContinuumStorage(chatId, injectText, out var storedName)
-                ? storedName
-                : essenceFileName;
-
-            token.ThrowIfCancellationRequested();
-
-            // 5) Queue seed for sealed injector (MainWindow timer posts into WebView)
-            var injectSeed = new EssenceInjectController.InjectSeed
-            {
-                ChatId = chatId,
-                Mode = "Pulse",
-                EssenceText = injectText,
-                OpenNewChat = true,
-                SourceFileName = "RestructuredSeed",
-                EssenceFileName = essencePath
-            };
-
-            token.ThrowIfCancellationRequested();
-            EssenceInjectInbox.Enqueue(injectSeed);
+        private static string NormalizePulseText(string pulseText)
+        {
+            return (pulseText ?? string.Empty)
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n')
+                .Trim();
         }
 
         /// <summary>

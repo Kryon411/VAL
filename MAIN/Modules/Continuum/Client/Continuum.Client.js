@@ -429,10 +429,12 @@ try {
       const text = extractTurnText(turnEl, role);
       if (!text) return false;
 
-      if (role === "assistant")
-        post({ type: "continuum.event", chatId: state.chatId, evt: `assistant.settled:${id}` });
+      const logged = logTruthLine(role, id, text);
+      if (logged && role === "assistant") {
+        post({ type: "continuum.event", chatId: state.chatId, evt: `assistant.settled:${id}`, text });
+      }
 
-      return logTruthLine(role, id, text);
+      return logged;
     } catch (_) { return false; }
   }
 
@@ -678,6 +680,44 @@ try {
     } catch (_) {}
 
     return false;
+  }
+
+  function findSendButton() {
+    const selectors = [
+      "button[data-testid='send-button']",
+      "button[aria-label='Send prompt']",
+      "button[aria-label='Send message']"
+    ];
+
+    for (const sel of selectors) {
+      try {
+        const btn = document.querySelector(sel);
+        if (!btn) continue;
+        if (btn.disabled) continue;
+        if (btn.getAttribute && btn.getAttribute("aria-disabled") === "true") continue;
+        return btn;
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  function tryAutoSendSeed(seed, chatIdForEvent) {
+    try {
+      if (!seed || !seed.autoSend) return true;
+
+      const btn = findSendButton();
+      if (!btn) {
+        post({ type: "continuum.event", chatId: chatIdForEvent || "unknown", evt: "signal.send.failed:no_button" });
+        return false;
+      }
+
+      btn.click();
+      return true;
+    } catch (_) {
+      post({ type: "continuum.event", chatId: chatIdForEvent || "unknown", evt: "signal.send.failed:exception" });
+      return false;
+    }
   }
 
 
@@ -954,10 +994,16 @@ try {
       }
 
       post({ type: "continuum.event", chatId: currentId || originId || "unknown", evt: "rehydrate.seed_inserted:" + mode + ":" + label });
-      post({ type: "continuum.event", chatId: currentId || originId || "unknown", evt: "refresh.inject.success:" + label });
+      post({ type: "continuum.event", chatId: currentId || originId || "unknown", evt: "refresh.inject.success:" + mode + ":" + label });
 
       state.pendingSeed = null;
       stopInjectorLoopIfIdle();
+
+      if (seed.autoSend) {
+        const eventChatId = currentId || originId || "unknown";
+        setTimeout(() => { tryAutoSendSeed(seed, eventChatId); }, 60);
+      }
+
       return true;
     } catch (_) { return false; }
   }
@@ -1484,7 +1530,8 @@ function handleHostMessage(event) {
         requireNewChat: openNewChat,
         originChatId: getChatIdFromLocation(),
         requestedAt: Date.now(),
-        fallback: false
+        fallback: false,
+        autoSend: msg.autoSend === true
       };
 
       startInjectorLoop();
