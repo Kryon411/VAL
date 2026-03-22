@@ -1,14 +1,16 @@
-Before Pulse opens a fresh continuation chat, write a compact PREVIOUS CHAT SUMMARY for this thread.
+Please write a compact, high-signal PREVIOUS CHAT SUMMARY for the current chat thread.
 
-Summarize the thread state immediately before this request.
-Exclude this request itself and any Pulse / Continuum orchestration from the summary.
+Summarize the most important state of the discussion immediately before this request.
+Focus on decisions, completed work, current direction, unresolved questions, concrete constraints, and important context that should be preserved.
+Exclude this request itself and any meta discussion about summarizing or moving between chats.
 Do not continue the work.
 Do not solve anything new.
 Do not speculate.
 Do not be conversational.
-Do not mention Pulse, Continuum, Signal, snapshots, Truth logs, templates, or packet assembly.
+Do not mention summaries, snapshots, templates, packet assembly, or transfer mechanics.
 Keep the output compact, plain-text, and bullet-based.
-Use 2 to 6 bullets when possible.
+Prefer 4 to 8 high-signal bullets when useful.
+Each bullet should stand on its own and preserve concrete details.
 If there is nothing useful to report, write "- None."
 Output only the section below.
 

@@ -43,7 +43,7 @@ namespace VAL.Tests.Continuum
                     {
                         Role = TruthRole.User,
                         LineIndex = 4,
-                        Text = "Before Pulse opens a fresh continuation chat, write a compact PREVIOUS CHAT SUMMARY for this thread.\n\nSummarize the thread state immediately before this request.\nExclude this request itself and any Pulse / Continuum orchestration from the summary.\nOutput exactly:\n\nPREVIOUS CHAT SUMMARY\n- "
+                        Text = "Please write a compact, high-signal PREVIOUS CHAT SUMMARY for the current chat thread.\n\nSummarize the most important state of the discussion immediately before this request.\nFocus on decisions, completed work, current direction, unresolved questions, concrete constraints, and important context that should be preserved.\nExclude this request itself and any meta discussion about summarizing or moving between chats.\nOutput exactly:\n\nPREVIOUS CHAT SUMMARY\n- "
                     },
                     new TruthMessage
                     {
@@ -60,7 +60,7 @@ namespace VAL.Tests.Continuum
             Assert.Equal(4, snapshot.FrozenMessageCount);
             Assert.DoesNotContain(snapshot.TruthView.Messages, m => m.LineIndex == 4 || m.LineIndex == 5);
             Assert.Contains("Refactor VAL Pulse so Continuum owns final packet rendering.", sections.WhereWeLeftOff.User);
-            Assert.DoesNotContain("Before Pulse opens a fresh continuation chat", sections.WhereWeLeftOff.User);
+            Assert.DoesNotContain("Please write a compact, high-signal PREVIOUS CHAT SUMMARY", sections.WhereWeLeftOff.User);
             Assert.DoesNotContain("PREVIOUS CHAT SUMMARY", sections.WhereWeLeftOff.Assistant);
         }
     }

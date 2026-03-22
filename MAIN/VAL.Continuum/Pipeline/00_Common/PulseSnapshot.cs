@@ -137,10 +137,12 @@ namespace VAL.Continuum.Pipeline
             if (string.IsNullOrWhiteSpace(normalized))
                 return false;
 
-            return normalized.StartsWith("Before Pulse opens a fresh continuation chat, write a compact PREVIOUS CHAT SUMMARY for this thread.", StringComparison.Ordinal) ||
+            return normalized.StartsWith("Please write a compact, high-signal PREVIOUS CHAT SUMMARY for the current chat thread.", StringComparison.Ordinal) ||
+                   normalized.StartsWith("Before Pulse opens a fresh continuation chat, write a compact PREVIOUS CHAT SUMMARY for this thread.", StringComparison.Ordinal) ||
                    normalized.StartsWith("CONTINUUM SIGNAL INPUT (EXCLUDE FROM CONTINUITY)", StringComparison.Ordinal) ||
                    normalized.StartsWith("Prepare a VAL Pulse handoff for a new chat.", StringComparison.Ordinal) ||
                    normalized.StartsWith("Prepare a compact semantic handoff summary from the frozen Continuum snapshot below.", StringComparison.Ordinal) ||
+                   normalized.Contains("Summarize the most important state of the discussion immediately before this request.", StringComparison.Ordinal) ||
                    normalized.Contains("Summarize the thread state immediately before this request.", StringComparison.Ordinal) ||
                    (normalized.Contains("Output only these sections.", StringComparison.Ordinal) &&
                     normalized.Contains("PREVIOUS CHAT SUMMARY", StringComparison.Ordinal) &&

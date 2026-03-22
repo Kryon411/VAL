@@ -17,6 +17,18 @@ namespace VAL.Tests.Continuum
         }
 
         [Fact]
+        public void TryParseAcceptsDomNormalizedParagraphSummary()
+        {
+            var ok = SignalPacket.TryParse(BuildDomNormalizedSignalSummary(), out var summary);
+
+            Assert.True(ok);
+            Assert.NotNull(summary);
+            Assert.Equal(5, summary.PreviousChatSummary.Count);
+            Assert.Equal("Host-side idempotent logging was implemented, eliminating duplication across restarts and stabilizing append-only behavior.", summary.PreviousChatSummary[0]);
+            Assert.Equal("System has reached a near-complete state, with remaining work focused on refinement, ergonomics, and smoothing handoff behavior rather than core functionality.", summary.PreviousChatSummary[4]);
+        }
+
+        [Fact]
         public void TryParseRejectsConversationalPreface()
         {
             var malformed = "Here you go.\n\n" + BuildValidSignalSummary();
@@ -78,6 +90,22 @@ OPEN LOOPS
 @"PREVIOUS CHAT SUMMARY
 - Continuum now owns final Pulse packet composition.
 - Signal is narrowed to a visible PREVIOUS CHAT SUMMARY only.";
+        }
+
+        private static string BuildDomNormalizedSignalSummary()
+        {
+            return
+@"PREVIOUS CHAT SUMMARY
+
+Host-side idempotent logging was implemented, eliminating duplication across restarts and stabilizing append-only behavior.
+
+Backfill and capture are now deterministic and resumable, shifting remaining issues from correctness to performance and policy tuning.
+
+Tagging noise in summaries was identified as a policy issue, leading to adoption of a stricter Context.txt to reduce over-tagging.
+
+Quick refresh outputs confirm correct rehydration behavior, with assistant responses aligning to constraints and workflow without drift.
+
+System has reached a near-complete state, with remaining work focused on refinement, ergonomics, and smoothing handoff behavior rather than core functionality.";
         }
     }
 }

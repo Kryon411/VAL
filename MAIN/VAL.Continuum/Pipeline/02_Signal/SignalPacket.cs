@@ -67,9 +67,24 @@ namespace VAL.Continuum.Pipeline.Signal
             if (string.IsNullOrWhiteSpace(normalized))
                 return false;
 
+            if (TryParseMarkedBullets(normalized, out bullets))
+                return true;
+
+            if (TryParseParagraphBullets(normalized, out bullets))
+                return true;
+
+            bullets = Array.Empty<string>();
+            return false;
+        }
+
+        private static bool TryParseMarkedBullets(string normalized, out IReadOnlyList<string> bullets)
+        {
+            bullets = Array.Empty<string>();
+
             var lines = normalized.Split('\n');
             var items = new List<string>();
             StringBuilder? current = null;
+            var sawMarker = false;
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -78,10 +93,11 @@ namespace VAL.Continuum.Pipeline.Signal
                     continue;
 
                 var trimmed = rawLine.TrimStart();
-                if (trimmed.StartsWith("- ", StringComparison.Ordinal))
+                if (TryStripBulletMarker(trimmed, out var bulletText))
                 {
+                    sawMarker = true;
                     FinalizeCurrent(items, current);
-                    current = new StringBuilder(trimmed.Substring(2).Trim());
+                    current = new StringBuilder(bulletText);
                     continue;
                 }
 
@@ -95,7 +111,46 @@ namespace VAL.Continuum.Pipeline.Signal
             }
 
             FinalizeCurrent(items, current);
-            if (items.Count == 0)
+            if (!sawMarker || items.Count == 0)
+                return false;
+
+            bullets = items;
+            return true;
+        }
+
+        private static bool TryParseParagraphBullets(string normalized, out IReadOnlyList<string> bullets)
+        {
+            bullets = Array.Empty<string>();
+
+            var lines = normalized.Split('\n');
+            var items = new List<string>();
+            var current = new StringBuilder();
+            var paragraphCount = 0;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var trimmed = lines[i].Trim();
+                if (string.IsNullOrWhiteSpace(trimmed))
+                {
+                    if (FinalizeParagraph(items, current))
+                        paragraphCount++;
+
+                    continue;
+                }
+
+                if (ForbiddenHeadings.Contains(trimmed))
+                    return false;
+
+                if (current.Length > 0)
+                    current.Append(' ');
+
+                current.Append(trimmed);
+            }
+
+            if (FinalizeParagraph(items, current))
+                paragraphCount++;
+
+            if (paragraphCount < 2 || items.Count == 0)
                 return false;
 
             bullets = items;
@@ -110,6 +165,66 @@ namespace VAL.Continuum.Pipeline.Signal
             var value = current.ToString().Trim();
             if (!string.IsNullOrWhiteSpace(value))
                 bullets.Add(value);
+        }
+
+        private static bool FinalizeParagraph(ICollection<string> bullets, StringBuilder current)
+        {
+            if (current == null || current.Length == 0)
+                return false;
+
+            var value = current.ToString().Trim();
+            current.Clear();
+
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            bullets.Add(value);
+            return true;
+        }
+
+        private static bool TryStripBulletMarker(string text, out string value)
+        {
+            value = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            if (text.StartsWith("- ", StringComparison.Ordinal) ||
+                text.StartsWith("* ", StringComparison.Ordinal) ||
+                text.StartsWith("• ", StringComparison.Ordinal))
+            {
+                value = text.Substring(2).Trim();
+                return !string.IsNullOrWhiteSpace(value);
+            }
+
+            int markerLength = GetNumberedMarkerLength(text);
+            if (markerLength <= 0)
+                return false;
+
+            value = text.Substring(markerLength).Trim();
+            return !string.IsNullOrWhiteSpace(value);
+        }
+
+        private static int GetNumberedMarkerLength(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return 0;
+
+            int i = 0;
+            while (i < text.Length && char.IsDigit(text[i]))
+                i++;
+
+            if (i == 0 || i >= text.Length)
+                return 0;
+
+            if (text[i] != '.' && text[i] != ')')
+                return 0;
+
+            int markerLength = i + 1;
+            if (markerLength < text.Length && text[markerLength] == ' ')
+                markerLength++;
+
+            return markerLength;
         }
 
         private static bool TrySplitSingleSection(
