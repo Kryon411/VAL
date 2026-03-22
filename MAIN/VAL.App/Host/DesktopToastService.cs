@@ -9,13 +9,14 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
 
-namespace VAL.Host
+namespace VAL.Host.Services
 {
-    public static class ToastManager
+    public sealed class DesktopToastService : IToastService
     {
-        private static Popup? _popup;
-        private static StackPanel? _stack;
-        private static Window? _window;
+        private readonly IDesktopUiContext _uiContext;
+        private Popup? _popup;
+        private StackPanel? _stack;
+        private Window? _window;
 
         // SoftGlass theme constants (match the Control Centre dock aesthetic)
         private static readonly CornerRadius SoftGlassCorner = new CornerRadius(18);
@@ -156,27 +157,21 @@ namespace VAL.Host
 
         // Launch quiet period: suppress passive system toasts during initial startup.
         // User-invoked toasts should bypass this policy at call sites.
-        private static DateTime _initializedUtc = DateTime.MinValue;
+        private DateTime _initializedUtc = DateTime.MinValue;
         private static readonly TimeSpan LaunchQuietPeriod = TimeSpan.FromSeconds(12);
 
-        public static bool IsLaunchQuietPeriodActive
+        public DesktopToastService(IDesktopUiContext uiContext)
+        {
+            _uiContext = uiContext ?? throw new ArgumentNullException(nameof(uiContext));
+        }
+
+        public bool IsLaunchQuietPeriodActive
         {
             get
             {
                 if (_initializedUtc == DateTime.MinValue) return true;
                 return (DateTime.UtcNow - _initializedUtc) < LaunchQuietPeriod;
             }
-        }
-
-        public enum ToastDurationBucket
-        {
-            XS,
-            S,
-            M,
-            L,
-            LShort,
-            XL,
-            Sticky
         }
 
         private sealed class ToastMeta
@@ -190,11 +185,11 @@ namespace VAL.Host
         private const double BottomInset = 60;
 
         // Burst-dedupe: prevents identical toasts stacking when events fire multiple times.
-        private static readonly object _dedupeLock = new object();
-        private static readonly Dictionary<string, DateTime> _recentToastKeys = new Dictionary<string, DateTime>();
+        private readonly object _dedupeLock = new object();
+        private readonly Dictionary<string, DateTime> _recentToastKeys = new Dictionary<string, DateTime>();
         private static readonly TimeSpan _dedupeWindow = TimeSpan.FromMilliseconds(2000);
 
-        private static bool ShouldSuppressToast(string title, string? subtitle)
+        private bool ShouldSuppressToast(string title, string? subtitle)
         {
             var key = (title ?? string.Empty).Trim() + "\n" + (subtitle ?? string.Empty).Trim();
             var now = DateTime.UtcNow;
@@ -213,29 +208,28 @@ namespace VAL.Host
             }
         }
 
-        private static TimeSpan? GetLifetime(ToastDurationBucket bucket)
+        private static TimeSpan? GetLifetime(ToastDuration duration)
         {
-            switch (bucket)
+            switch (duration)
             {
-                case ToastDurationBucket.XS: return TimeSpan.FromSeconds(2);
-                case ToastDurationBucket.S: return TimeSpan.FromSeconds(5);
-                case ToastDurationBucket.M: return TimeSpan.FromSeconds(10);
-                case ToastDurationBucket.L: return TimeSpan.FromSeconds(14);
-                case ToastDurationBucket.LShort: return TimeSpan.FromSeconds(9);
-                case ToastDurationBucket.XL: return TimeSpan.FromSeconds(22);
-                case ToastDurationBucket.Sticky: return null;
+                case ToastDuration.XS: return TimeSpan.FromSeconds(2);
+                case ToastDuration.S: return TimeSpan.FromSeconds(5);
+                case ToastDuration.M: return TimeSpan.FromSeconds(10);
+                case ToastDuration.L: return TimeSpan.FromSeconds(14);
+                case ToastDuration.XL: return TimeSpan.FromSeconds(22);
+                case ToastDuration.Sticky: return null;
                 default: return TimeSpan.FromSeconds(10);
             }
         }
 
-        public static void Initialize(Window w)
+        public void Initialize(Window hostWindow)
         {
             if (_initializedUtc == DateTime.MinValue)
                 _initializedUtc = DateTime.UtcNow;
 
             if (_popup != null) return;
 
-            _window = w;
+            _window = hostWindow;
 
             _stack = new StackPanel
             {
@@ -246,14 +240,14 @@ namespace VAL.Host
             _popup = new Popup
             {
                 AllowsTransparency = true,
-                PlacementTarget = w,
+                PlacementTarget = hostWindow,
                 Placement = PlacementMode.Relative,
                 StaysOpen = true
             };
 
-            w.SizeChanged += (_, __) => Reposition();
-            w.LocationChanged += (_, __) => Reposition();
-            w.StateChanged += (_, __) => Reposition();
+            hostWindow.SizeChanged += (_, __) => Reposition();
+            hostWindow.LocationChanged += (_, __) => Reposition();
+            hostWindow.StateChanged += (_, __) => Reposition();
 
             _popup.Child = new Border
             {
@@ -264,7 +258,7 @@ namespace VAL.Host
             Reposition();
         }
 
-        private static void Reposition()
+        private void Reposition()
         {
             if (_popup == null || _stack == null || _window == null) return;
 
@@ -305,23 +299,10 @@ namespace VAL.Host
             }
         }
 
-        // Compatibility API: shows a standard toast using the default bucket (M).
-        public static void Show(string title, string? subtitle = null)
-        {
-            ShowCatalog(title, subtitle, ToastDurationBucket.M);
-        }
-
-        // Catalog API: message-only toast (no subtitle).
-        public static void ShowCatalog(string message, ToastDurationBucket duration, string? groupKey = null, bool replaceGroup = false)
-        {
-            ShowCatalog(message, null, duration, groupKey, replaceGroup);
-        }
-
-        // Catalog API: supports title + subtitle when needed.
-        public static void ShowCatalog(
+        public void ShowMessage(
             string title,
-            string? subtitle,
-            ToastDurationBucket duration,
+            string? subtitle = null,
+            ToastDuration duration = ToastDuration.M,
             string? groupKey = null,
             bool replaceGroup = false,
             bool bypassBurstDedupe = false)
@@ -329,10 +310,7 @@ namespace VAL.Host
             if (_popup == null || _stack == null) return;
             if (!bypassBurstDedupe && ShouldSuppressToast(title ?? string.Empty, subtitle)) return;
 
-            var dispatcher = Application.Current?.Dispatcher;
-            if (dispatcher == null) return;
-
-            dispatcher.Invoke(() =>
+            InvokeOnUi(() =>
             {
                 if (_popup == null || _stack == null) return;
 
@@ -420,7 +398,7 @@ namespace VAL.Host
             });
         }
 
-        private static void RemoveGroupToasts(string groupKey)
+        private void RemoveGroupToasts(string groupKey)
         {
             if (_stack == null || _popup == null) return;
 
@@ -461,23 +439,19 @@ namespace VAL.Host
             }
         }
 
-        public static void ShowActions(string title, string subtitle, params (string Label, Action OnClick)[] actions)
-        {
-            ShowActions(title, subtitle, null, false, sticky: false, actions);
-        }
-
-        public static void ShowActions(string title, string subtitle, string? groupKey, bool replaceGroup, params (string Label, Action OnClick)[] actions)
-        {
-            ShowActions(title, subtitle, groupKey, replaceGroup, sticky: false, actions);
-        }
-
         /// <summary>
         /// Action toast with explicit stickiness control.
         /// Sticky action toasts remain visible until a button is clicked.
         /// </summary>
-        public static void ShowActions(string title, string subtitle, string? groupKey, bool replaceGroup, bool sticky, params (string Label, Action OnClick)[] actions)
+        public void ShowActions(
+            string title,
+            string subtitle,
+            (string Label, Action OnClick)[] actions,
+            string? groupKey = null,
+            bool replaceGroup = false,
+            bool sticky = false)
         {
-            Application.Current?.Dispatcher.Invoke(() =>
+            InvokeOnUi(() =>
             {
                 if (_popup == null || _stack == null) return;
                 if (ShouldSuppressToast(title ?? string.Empty, subtitle ?? string.Empty)) return;
@@ -621,12 +595,12 @@ namespace VAL.Host
         /// <summary>
         /// Dismiss (remove) all toasts for a given groupKey.
         /// </summary>
-        public static void DismissGroup(string groupKey)
+        public void DismissGroup(string groupKey)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(groupKey)) return;
-                Application.Current?.Dispatcher.Invoke(() =>
+                InvokeOnUi(() =>
                 {
                     try { RemoveGroupToasts(groupKey); } catch { }
                 });
@@ -637,6 +611,17 @@ namespace VAL.Host
             }
         }
 
+        private void InvokeOnUi(Action action)
+        {
+            var dispatcher = _uiContext.Dispatcher;
+            if (dispatcher.CheckAccess())
+            {
+                action();
+                return;
+            }
+
+            dispatcher.Invoke(action);
+        }
 
     }
 }

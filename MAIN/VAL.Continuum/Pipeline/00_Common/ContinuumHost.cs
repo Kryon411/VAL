@@ -76,7 +76,7 @@ namespace VAL.Continuum
             "This chat can be prepared for continuation. If you’d like, Prelude can set things up so a future Pulse jump has the right context.";
 
         // Prelude prompt (new chat): action toast shown when the user interacts with the blank new-chat composer.
-        // NOTE: Title includes "detected a new chat" so ToastManager.ShowActions will treat it as Sticky.
+        // NOTE: Title includes "detected a new chat" so the desktop toast service treats it as sticky.
         private const string Toast_PreludePromptTitle =
             "Starting a new chat?";
 

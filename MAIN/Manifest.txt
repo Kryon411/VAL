@@ -37,7 +37,7 @@ MAIN/Host/Services/Adapters/CommandDispatcherAdapter.cs
 MAIN/Host/Services/Adapters/ModuleLoaderAdapter.cs
 MAIN/Host/Services/Adapters/OperationCoordinatorAdapter.cs
 MAIN/Host/Services/Adapters/SessionContextAdapter.cs
-MAIN/Host/Services/Adapters/ToastServiceAdapter.cs
+MAIN/VAL.App/Host/DesktopToastService.cs
 MAIN/Host/Services/ContinuumPump.cs
 MAIN/Host/Services/CrashHandler.cs
 MAIN/Host/Services/DataWipeService.cs
@@ -124,7 +124,6 @@ MAIN/VAL.App/CrashWindow.xaml
 MAIN/VAL.App/CrashWindow.xaml.cs
 MAIN/VAL.App/DiagnosticsWindow.xaml
 MAIN/VAL.App/DiagnosticsWindow.xaml.cs
-MAIN/VAL.App/Host/ToastManager.cs
 MAIN/VAL.App/Hosting/ValAppServiceCollectionExtensions.cs
 MAIN/VAL.App/MainWindow.xaml
 MAIN/VAL.App/MainWindow.xaml.cs

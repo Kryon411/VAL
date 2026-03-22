@@ -62,7 +62,8 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<ISessionContext>(sp => sp.GetRequiredService<SessionContext>());
             builder.Services.AddSingleton<OperationCoordinator>();
             builder.Services.AddSingleton<IOperationCoordinator>(sp => sp.GetRequiredService<OperationCoordinator>());
-            builder.Services.AddSingleton<IToastService, ToastServiceAdapter>();
+            builder.Services.AddSingleton<DesktopToastService>();
+            builder.Services.AddSingleton<IToastService>(sp => sp.GetRequiredService<DesktopToastService>());
             builder.Services.AddSingleton<ToastHubService>();
             builder.Services.AddSingleton<IToastHub>(sp => sp.GetRequiredService<ToastHubService>());
             builder.Services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();
