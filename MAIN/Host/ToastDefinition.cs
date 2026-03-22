@@ -1,16 +1,17 @@
 using System;
+using VAL.Host.Services;
 
 namespace VAL.Host
 {
     /// <summary>
     /// Declarative defaults for a toast type.
-    /// ToastHub applies gating/policy, then delegates rendering to ToastManager.
+    /// ToastHub applies gating/policy, then delegates rendering to IToastService.
     /// </summary>
     public sealed record ToastDefinition(
         ToastKey Key,
         string Title,
         string? Subtitle,
-        ToastManager.ToastDurationBucket Duration,
+        ToastDuration Duration,
         string? GroupKey,
         bool ReplaceGroup,
         bool BypassBurstDedupe,

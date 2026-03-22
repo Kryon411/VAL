@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using VAL.Continuum.Pipeline;
+using VAL.Host.Services;
 
 namespace VAL.Host
 {
@@ -20,7 +21,7 @@ namespace VAL.Host
             ToastKey Key,
             string Title,
             string? Subtitle,
-            ToastManager.ToastDurationBucket Duration,
+            ToastDuration Duration,
             string? GroupKey,
             bool ReplaceGroup,
             bool BypassBurstDedupe,
@@ -32,10 +33,16 @@ namespace VAL.Host
 
         private readonly object _gate = new();
         private readonly object _reasonGate = new();
+        private readonly IToastService _toastService;
         // Cooldown de-dupe is per (key + context) so chat-specific nudges don't suppress each other.
         private readonly Dictionary<string, DateTime> _lastShownUtc = new();
         private readonly Dictionary<string, DateTime> _reasonDedupeUtc = new();
         private static readonly TimeSpan ReasonDedupeWindow = TimeSpan.FromSeconds(2);
+
+        public ToastHubService(IToastService toastService)
+        {
+            _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
+        }
 
         // Central catalog (policy table).
         private static readonly Dictionary<ToastKey, ToastDef> Defs =
@@ -50,7 +57,7 @@ namespace VAL.Host
                         ToastKey.VoidEnabled,
                         "Void is now on. Screenshots and code blocks will be hidden to keep the conversation easy to read.",
                         null,
-                        ToastManager.ToastDurationBucket.L,
+                        ToastDuration.L,
                         "void",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -65,7 +72,7 @@ namespace VAL.Host
                         ToastKey.VoidDisabled,
                         "Void is now off. All screenshots and code blocks are visible again.",
                         null,
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "void",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -84,7 +91,7 @@ namespace VAL.Host
                         ToastKey.ContinuumArchivingPaused,
                         "Continuum has been paused and archiving has stopped.",
                         null,
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "continuum.lifecycle",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -103,7 +110,7 @@ namespace VAL.Host
                         ToastKey.PreludeAvailable,
                         "This chat can be prepared for continuation. If you’d like, Prelude can set things up so a future Pulse jump has the right context.",
                         null,
-                        ToastManager.ToastDurationBucket.L,
+                        ToastDuration.L,
                         "continuum_guidance",
                         ReplaceGroup: false,
                         BypassBurstDedupe: false,
@@ -118,7 +125,7 @@ namespace VAL.Host
                         ToastKey.PreludePrompt,
                         "Starting a new chat?",
                         "Prelude can set up this chat for continuation. If you’d like, it will insert setup and instructions so a future Pulse jump has the right context.",
-                        ToastManager.ToastDurationBucket.Sticky, // ShowActions controls duration; keep a sane default.
+                        ToastDuration.Sticky, // ShowActions controls duration; keep a sane default.
                         "continuum_guidance",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -133,7 +140,7 @@ namespace VAL.Host
                         ToastKey.ChroniclePrompt,
                         "Create an archive for future Pulse jumps?",
                         "Chronicle can create a local archive so future Pulse jumps have the right context.",
-                        ToastManager.ToastDurationBucket.Sticky,
+                        ToastDuration.Sticky,
                         "continuum_guidance",
                         ReplaceGroup: false,
                         BypassBurstDedupe: false,
@@ -148,7 +155,7 @@ namespace VAL.Host
                         ToastKey.ChronicleSuggested,
                         "VAL has detected you’re continuing in a chat without an archive. Chronicle can rebuild one to help maintain context for Pulse jumps. Please select Chronicle in the Control Centre.",
                         null,
-                        ToastManager.ToastDurationBucket.XL,
+                        ToastDuration.XL,
                         "continuum_guidance",
                         ReplaceGroup: false,
                         BypassBurstDedupe: false,
@@ -167,7 +174,7 @@ namespace VAL.Host
                         ToastKey.PulseInitiated,
                         "A Pulse jump has been initiated. Please stand by.",
                         null,
-                        ToastManager.ToastDurationBucket.XS,
+                        ToastDuration.XS,
                         "pulse",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -182,7 +189,7 @@ namespace VAL.Host
                         ToastKey.PulseReady,
                         "Your Pulse jump is ready. Please hit Send to finalize and continue.",
                         null,
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "pulse",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -197,7 +204,7 @@ namespace VAL.Host
                         ToastKey.PulseAlreadyRunning,
                         "A Pulse jump is already in progress. Please wait a moment for it to finish.",
                         null,
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "pulse",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -212,7 +219,7 @@ namespace VAL.Host
                         ToastKey.PulseUnavailable,
                         "Pulse can’t be used in this chat yet. Preparing the chat with Chronicle will make Pulse jumps available.",
                         null,
-                        ToastManager.ToastDurationBucket.L,
+                        ToastDuration.L,
                         "pulse",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -227,7 +234,7 @@ namespace VAL.Host
                         ToastKey.PulseNoTruthLogFound,
                         "There’s no archive for this chat yet. Running Chronicle will create one so Pulse jumps can work properly.",
                         null,
-                        ToastManager.ToastDurationBucket.L,
+                        ToastDuration.L,
                         "pulse",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -246,7 +253,7 @@ namespace VAL.Host
                         ToastKey.ChronicleUnavailable,
                         "Chronicle can only be used in an existing chat. Please open the conversation you want to archive and try again.",
                         null,
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "chronicle",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -261,7 +268,7 @@ namespace VAL.Host
                         ToastKey.ChronicleStarted,
                         "Chronicle has started. VAL is rebuilding an archive for this chat — please do not send messages until Chronicle is complete.",
                         null,
-                        ToastManager.ToastDurationBucket.Sticky,
+                        ToastDuration.Sticky,
                         "chronicle",
                         ReplaceGroup: true,
                         BypassBurstDedupe: true,
@@ -276,7 +283,7 @@ namespace VAL.Host
                         ToastKey.ChronicleCompleted,
                         "Chronicle is complete. This chat is now archived and ready for Pulse jumps.",
                         null,
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "chronicle",
                         ReplaceGroup: true,
                         BypassBurstDedupe: true,
@@ -295,7 +302,7 @@ namespace VAL.Host
                         ToastKey.AbyssSearching,
                         "Abyss: searching…",
                         null,
-                        ToastManager.ToastDurationBucket.XS,
+                        ToastDuration.XS,
                         "abyss",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -310,7 +317,7 @@ namespace VAL.Host
                         ToastKey.AbyssMatches,
                         "Abyss: matches ready.",
                         null,
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "abyss",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -325,7 +332,7 @@ namespace VAL.Host
                         ToastKey.AbyssNoMatches,
                         "Abyss: no matches found.",
                         null,
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "abyss",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -340,7 +347,7 @@ namespace VAL.Host
                         ToastKey.AbyssNoTruthLogs,
                         "Abyss: no Truth.log files found.",
                         null,
-                        ToastManager.ToastDurationBucket.L,
+                        ToastDuration.L,
                         "abyss",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -355,7 +362,7 @@ namespace VAL.Host
                         ToastKey.AbyssNoQuery,
                         "Abyss: enter a search query first.",
                         null,
-                        ToastManager.ToastDurationBucket.S,
+                        ToastDuration.S,
                         "abyss",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -370,7 +377,7 @@ namespace VAL.Host
                         ToastKey.AbyssResultsWritten,
                         "Abyss: wrote Abyss.Results.txt",
                         null,
-                        ToastManager.ToastDurationBucket.S,
+                        ToastDuration.S,
                         "abyss",
                         ReplaceGroup: false,
                         BypassBurstDedupe: false,
@@ -385,7 +392,7 @@ namespace VAL.Host
                         ToastKey.AbyssInjected,
                         "Abyss: injected result.",
                         null,
-                        ToastManager.ToastDurationBucket.S,
+                        ToastDuration.S,
                         "abyss",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -400,7 +407,7 @@ namespace VAL.Host
                         ToastKey.AbyssNoSelection,
                         "Abyss: choose a result number to inject.",
                         null,
-                        ToastManager.ToastDurationBucket.S,
+                        ToastDuration.S,
                         "abyss",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -419,7 +426,7 @@ namespace VAL.Host
                         ToastKey.ActionUnavailable,
                         "That action isn’t available right now. Please try again in a moment.",
                         null,
-                        ToastManager.ToastDurationBucket.S,
+                        ToastDuration.S,
                         null,
                         ReplaceGroup: false,
                         BypassBurstDedupe: false,
@@ -434,7 +441,7 @@ namespace VAL.Host
                         ToastKey.NavigationNoHistory,
                         "There’s no page to go back to yet.",
                         null,
-                        ToastManager.ToastDurationBucket.S,
+                        ToastDuration.S,
                         null,
                         ReplaceGroup: false,
                         BypassBurstDedupe: false,
@@ -449,7 +456,7 @@ namespace VAL.Host
                         ToastKey.OperationInProgress,
                         "An operation is already in progress.",
                         null,
-                        ToastManager.ToastDurationBucket.S,
+                        ToastDuration.S,
                         "op.guard",
                         ReplaceGroup: true,
                         BypassBurstDedupe: true,
@@ -464,7 +471,7 @@ namespace VAL.Host
                         ToastKey.OperationCancelled,
                         "Operation cancelled.",
                         null,
-                        ToastManager.ToastDurationBucket.S,
+                        ToastDuration.S,
                         "op.guard",
                         ReplaceGroup: true,
                         BypassBurstDedupe: true,
@@ -483,7 +490,7 @@ namespace VAL.Host
                         ToastKey.DataWipeCompleted,
                         "Data wipe complete. Logs, profiles, and local memory have been cleared.",
                         "Privacy settings were preserved.",
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "data_wipe",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -498,7 +505,7 @@ namespace VAL.Host
                         ToastKey.DataWipePartial,
                         "Data wipe completed with some locked files.",
                         "Close any open logs or folders and try again.",
-                        ToastManager.ToastDurationBucket.M,
+                        ToastDuration.M,
                         "data_wipe",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -517,7 +524,7 @@ namespace VAL.Host
                         ToastKey.TelemetrySessionSizeEarly,
                         "VAL has detected this conversation may soon affect performance. A Pulse jump is recommended. Clicking the Pulse button in the Control Centre will move you into a new chat with the context intact.",
                         null,
-                        ToastManager.ToastDurationBucket.L,
+                        ToastDuration.L,
                         "telemetry",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -532,7 +539,7 @@ namespace VAL.Host
                         ToastKey.TelemetrySessionSizeLarge,
                         "This conversation has grown large and may begin to feel slower. A Pulse jump is strongly recommended to carry the important context forward while keeping things responsive.",
                         null,
-                        ToastManager.ToastDurationBucket.XL,
+                        ToastDuration.XL,
                         "telemetry",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -547,7 +554,7 @@ namespace VAL.Host
                         ToastKey.TelemetrySessionSizeVeryLarge,
                         "This conversation is now very large and performance may be impacted. Using a Pulse jump will help maintain context and restore responsiveness.",
                         null,
-                        ToastManager.ToastDurationBucket.XL,
+                        ToastDuration.XL,
                         "telemetry",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,
@@ -558,7 +565,7 @@ namespace VAL.Host
                 },
             };
 
-        public bool IsLaunchQuietPeriodActive => ToastManager.IsLaunchQuietPeriodActive;
+        public bool IsLaunchQuietPeriodActive => _toastService.IsLaunchQuietPeriodActive;
 
         /// <summary>
         /// Standard (catalog) toasts. Returns true if a toast was dispatched.
@@ -581,7 +588,7 @@ namespace VAL.Host
                 return false;
 
             // Launch quiet period applies only to passive/system nudges.
-            if (def.IsPassive && !bypassLaunchQuiet && ToastManager.IsLaunchQuietPeriodActive)
+            if (def.IsPassive && !bypassLaunchQuiet && _toastService.IsLaunchQuietPeriodActive)
             {
                 LogSuppressed(key, origin, reason, "launch-quiet", chatId);
                 return false;
@@ -641,7 +648,7 @@ namespace VAL.Host
                 }
             }
 
-            ToastManager.ShowCatalog(
+            _toastService.ShowMessage(
                 title,
                 subtitle,
                 duration,
@@ -672,7 +679,7 @@ namespace VAL.Host
             if (!Defs.TryGetValue(key, out var def))
                 return false;
 
-            if (def.IsPassive && !bypassLaunchQuiet && ToastManager.IsLaunchQuietPeriodActive)
+            if (def.IsPassive && !bypassLaunchQuiet && _toastService.IsLaunchQuietPeriodActive)
             {
                 LogSuppressed(key, origin, reason, "launch-quiet", chatId);
                 return false;
@@ -728,8 +735,8 @@ namespace VAL.Host
                 }
             }
 
-            var sticky = def.Duration == ToastManager.ToastDurationBucket.Sticky;
-            ToastManager.ShowActions(title, subtitle, groupKey, replaceGroup, sticky, actions);
+            var sticky = def.Duration == ToastDuration.Sticky;
+            _toastService.ShowActions(title, subtitle, actions, groupKey, replaceGroup, sticky);
             return true;
         }
 
@@ -752,7 +759,7 @@ namespace VAL.Host
 
         public void DismissGroup(string groupKey)
         {
-            ToastManager.DismissGroup(groupKey);
+            _toastService.DismissGroup(groupKey);
         }
 
         private bool ShouldSuppressByReason(ToastKey key, ToastReason reason)
@@ -781,3 +788,4 @@ namespace VAL.Host
         }
     }
 }
+
