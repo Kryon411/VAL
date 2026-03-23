@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using VAL.Host.Services;
 
 namespace VAL.Continuum.Pipeline.Common
 {
@@ -34,7 +35,7 @@ namespace VAL.Continuum.Pipeline.Common
                 var direct = Path.Combine(productRoot, "Modules", "Continuum", ContextFileName);
                 if (File.Exists(direct)) return direct;
 
-                // In some layouts ResolveProductRoot may return the repository root; also probe PRODUCT/ beneath it.
+                // Keep a defensive nested probe for mixed layouts during local development.
                 var nested = Path.Combine(productRoot, "PRODUCT", "Modules", "Continuum", ContextFileName);
                 if (File.Exists(nested)) return nested;
             }
@@ -79,22 +80,7 @@ namespace VAL.Continuum.Pipeline.Common
         /// </summary>
         public static string ResolveProductRoot()
         {
-            // Candidate starting points: base directory, current directory, and process directory.
-            var candidates = new[]
-            {
-                SafeDir(AppContext.BaseDirectory),
-                SafeDir(Environment.ProcessPath),
-                SafeDir(Directory.GetCurrentDirectory()),
-            };
-
-            foreach (var start in candidates)
-            {
-                var found = TryFindProductRootFrom(start);
-                if (!string.IsNullOrWhiteSpace(found)) return found;
-            }
-
-            // Last resort: base directory.
-            return SafeDir(AppContext.BaseDirectory);
+            return AppPathLayout.ResolveProductRoot();
         }
 
         private static string TryFindRepoRoot()
@@ -118,28 +104,6 @@ namespace VAL.Continuum.Pipeline.Common
                     var parent = Directory.GetParent(dir);
                     dir = parent?.FullName ?? string.Empty;
                 }
-            }
-
-            return string.Empty;
-        }
-
-        private static string TryFindProductRootFrom(string startDir)
-        {
-            if (string.IsNullOrWhiteSpace(startDir)) return string.Empty;
-
-            var dir = startDir;
-
-            for (var depth = 0; depth < 10 && !string.IsNullOrWhiteSpace(dir); depth++)
-            {
-                // Case A: dir IS the product root.
-                if (Directory.Exists(Path.Combine(dir, "Modules", "Continuum"))) return dir;
-
-                // Case B: dir contains PRODUCT/Modules/Continuum.
-                var productDir = Path.Combine(dir, "PRODUCT");
-                if (Directory.Exists(Path.Combine(productDir, "Modules", "Continuum"))) return productDir;
-
-                var parent = Directory.GetParent(dir);
-                dir = parent?.FullName ?? string.Empty;
             }
 
             return string.Empty;
