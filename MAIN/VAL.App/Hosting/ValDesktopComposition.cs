@@ -78,7 +78,10 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<DesktopToastService>();
             builder.Services.AddSingleton<IToastService>(sp => sp.GetRequiredService<DesktopToastService>());
             builder.Services.AddSingleton<ITruthTelemetryPublisher, TruthTelemetryPublisher>();
-            builder.Services.AddSingleton<ITruthStore, TruthStore>();
+            builder.Services.AddSingleton<ITruthStore>(sp =>
+                new TruthStore(
+                    sp.GetRequiredService<ITruthTelemetryPublisher>(),
+                    sp.GetRequiredService<IAppPaths>().MemoryChatsRoot));
             builder.Services.AddSingleton<ITruthViewBuilder, TruthViewBuilder>();
             builder.Services.AddSingleton<ToastLedgerService>();
             builder.Services.AddSingleton<IToastLedger>(sp => sp.GetRequiredService<ToastLedgerService>());

@@ -31,14 +31,21 @@ namespace VAL.Continuum.Pipeline.Truth
         }
 
         private readonly ITruthTelemetryPublisher _telemetryPublisher;
+        private readonly string _memoryChatsRoot;
         private readonly ConcurrentDictionary<string, ChatIndex> _indexByChat =
             new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, RebuildSession> _rebuildByChat =
             new(StringComparer.Ordinal);
 
         public TruthStore(ITruthTelemetryPublisher telemetryPublisher)
+            : this(telemetryPublisher, memoryChatsRootOverride: null)
+        {
+        }
+
+        public TruthStore(ITruthTelemetryPublisher telemetryPublisher, string? memoryChatsRootOverride)
         {
             _telemetryPublisher = telemetryPublisher ?? throw new ArgumentNullException(nameof(telemetryPublisher));
+            _memoryChatsRoot = ResolveMemoryChatsRoot(memoryChatsRootOverride);
         }
 
         public string TruthFileName => TruthStorage.TruthFileName;
@@ -117,7 +124,7 @@ namespace VAL.Continuum.Pipeline.Truth
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
 
-            return Path.Combine(GetProductRoot(), "Memory", "Chats", chatId);
+            return Path.Combine(_memoryChatsRoot, chatId);
         }
 
         public string GetTruthPath(string chatId)
@@ -350,6 +357,23 @@ namespace VAL.Continuum.Pipeline.Truth
                 lines.Add($"{entry.Role}|{entry.Payload}");
 
             return lines.ToArray();
+        }
+
+        private static string ResolveMemoryChatsRoot(string? memoryChatsRootOverride)
+        {
+            if (!string.IsNullOrWhiteSpace(memoryChatsRootOverride))
+            {
+                try
+                {
+                    return Path.GetFullPath(memoryChatsRootOverride.Trim());
+                }
+                catch
+                {
+                    return memoryChatsRootOverride.Trim();
+                }
+            }
+
+            return Path.Combine(GetProductRoot(), "Memory", "Chats");
         }
 
         private static string GetProductRoot()

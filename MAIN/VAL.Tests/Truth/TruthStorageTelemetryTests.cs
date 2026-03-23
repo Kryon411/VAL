@@ -10,6 +10,7 @@ namespace VAL.Tests.Truth
         [Fact]
         public void AppendTruthLinePublishesBytesThroughTruthTelemetryPublisher()
         {
+            var root = CreateTempRoot();
             var chatId = Guid.NewGuid().ToString("N");
             var observedChatId = string.Empty;
             var observedBytes = 0L;
@@ -18,9 +19,7 @@ namespace VAL.Tests.Truth
                 observedChatId = id;
                 observedBytes = bytes;
             });
-            var truthStore = new TruthStore(telemetryPublisher);
-
-            CleanupChat(chatId);
+            var truthStore = new TruthStore(telemetryPublisher, root);
 
             try
             {
@@ -28,43 +27,65 @@ namespace VAL.Tests.Truth
 
                 Assert.Equal(chatId, observedChatId);
                 Assert.True(observedBytes > 0);
-                Assert.True(File.Exists(TruthStorage.GetTruthPath(chatId)));
+                Assert.True(File.Exists(truthStore.GetTruthPath(chatId)));
             }
             finally
             {
-                CleanupChat(chatId);
+                CleanupRoot(root);
             }
         }
 
         [Fact]
         public void AppendTruthLineWithoutThresholdMonitorStillWritesTruthLog()
         {
+            var root = CreateTempRoot();
             var chatId = Guid.NewGuid().ToString("N");
-            var truthStore = new TruthStore(NullTruthTelemetryPublisher.Instance);
-
-            CleanupChat(chatId);
+            var truthStore = new TruthStore(NullTruthTelemetryPublisher.Instance, root);
 
             try
             {
                 truthStore.AppendTruthLine(chatId, 'A', "reply");
 
-                var truthPath = TruthStorage.GetTruthPath(chatId);
+                var truthPath = truthStore.GetTruthPath(chatId);
                 Assert.True(File.Exists(truthPath));
                 Assert.Contains("A|reply", File.ReadAllText(truthPath));
             }
             finally
             {
-                CleanupChat(chatId);
+                CleanupRoot(root);
             }
         }
 
-        private static void CleanupChat(string chatId)
+        [Fact]
+        public void GetChatDirUsesConfiguredMemoryChatsRoot()
+        {
+            var root = CreateTempRoot();
+            var chatId = Guid.NewGuid().ToString("N");
+            var truthStore = new TruthStore(NullTruthTelemetryPublisher.Instance, root);
+
+            try
+            {
+                Assert.Equal(Path.Combine(root, chatId), truthStore.GetChatDir(chatId));
+            }
+            finally
+            {
+                CleanupRoot(root);
+            }
+        }
+
+        private static string CreateTempRoot()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "val-truth-store-tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            return root;
+        }
+
+        private static void CleanupRoot(string root)
         {
             try
             {
-                var dir = TruthStorage.GetChatDir(chatId);
-                if (Directory.Exists(dir))
-                    Directory.Delete(dir, recursive: true);
+                if (Directory.Exists(root))
+                    Directory.Delete(root, recursive: true);
             }
             catch
             {
