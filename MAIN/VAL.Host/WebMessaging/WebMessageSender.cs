@@ -14,10 +14,12 @@ namespace VAL.Host.WebMessaging
         };
 
         private readonly IWebViewRuntime _webViewRuntime;
+        private readonly ILog _log;
 
-        public WebMessageSender(IWebViewRuntime webViewRuntime)
+        public WebMessageSender(IWebViewRuntime webViewRuntime, ILog log)
         {
-            _webViewRuntime = webViewRuntime;
+            _webViewRuntime = webViewRuntime ?? throw new ArgumentNullException(nameof(webViewRuntime));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void Send(MessageEnvelope envelope)
@@ -32,7 +34,7 @@ namespace VAL.Host.WebMessaging
             }
             catch (Exception)
             {
-                ValLog.Warn(nameof(WebMessageSender), "Failed to send web message envelope.");
+                _log.Warn(nameof(WebMessageSender), "Failed to send web message envelope.");
             }
         }
     }

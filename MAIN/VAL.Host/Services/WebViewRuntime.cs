@@ -19,6 +19,7 @@ namespace VAL.Host.Services
         private readonly IAppPaths _appPaths;
         private readonly WebViewOptions _webViewOptions;
         private readonly IWebViewSessionNonce _sessionNonce;
+        private readonly ILog _log;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private Task? _initTask;
         private bool _eventsWired;
@@ -35,11 +36,12 @@ namespace VAL.Host.Services
         public CoreWebView2? Core { get; private set; }
         public Uri? LastChatUri => _lastChatUri;
 
-        public WebViewRuntime(IAppPaths appPaths, IOptions<WebViewOptions> webViewOptions, IWebViewSessionNonce sessionNonce)
+        public WebViewRuntime(IAppPaths appPaths, IOptions<WebViewOptions> webViewOptions, IWebViewSessionNonce sessionNonce, ILog log)
         {
-            _appPaths = appPaths;
-            _webViewOptions = webViewOptions.Value;
-            _sessionNonce = sessionNonce;
+            _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
+            _webViewOptions = webViewOptions?.Value ?? throw new ArgumentNullException(nameof(webViewOptions));
+            _sessionNonce = sessionNonce ?? throw new ArgumentNullException(nameof(sessionNonce));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public event Action<WebMessageEnvelope>? WebMessageJsonReceived;
@@ -79,7 +81,7 @@ namespace VAL.Host.Services
             }
             catch (Exception ex)
             {
-                ValLog.Error(nameof(WebViewRuntime), $"WebView2 initialization failed: {ex}");
+                _log.LogError(nameof(WebViewRuntime), $"WebView2 initialization failed: {ex}");
                 throw;
             }
         }
@@ -91,7 +93,7 @@ namespace VAL.Host.Services
                 var core = Core;
                 if (core == null)
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "PostJson called before WebView2 initialization.");
+                    _log.Warn(nameof(WebViewRuntime), "PostJson called before WebView2 initialization.");
                     return;
                 }
 
@@ -101,7 +103,7 @@ namespace VAL.Host.Services
                 }
                 catch
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "Failed to post JSON to WebView2.");
+                    _log.Warn(nameof(WebViewRuntime), "Failed to post JSON to WebView2.");
                 }
             });
         }
@@ -113,7 +115,7 @@ namespace VAL.Host.Services
                 var core = Core;
                 if (core == null)
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "ExecuteScriptAsync called before WebView2 initialization.");
+                    _log.Warn(nameof(WebViewRuntime), "ExecuteScriptAsync called before WebView2 initialization.");
                     return;
                 }
 
@@ -123,7 +125,7 @@ namespace VAL.Host.Services
                 }
                 catch
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "Failed to execute script in WebView2.");
+                    _log.Warn(nameof(WebViewRuntime), "Failed to execute script in WebView2.");
                 }
             });
         }
@@ -138,7 +140,7 @@ namespace VAL.Host.Services
                 var core = Core;
                 if (core == null)
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "Navigate called before WebView2 initialization.");
+                    _log.Warn(nameof(WebViewRuntime), "Navigate called before WebView2 initialization.");
                     return;
                 }
 
@@ -148,7 +150,7 @@ namespace VAL.Host.Services
                 }
                 catch
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "Failed to navigate WebView2 to requested URL.");
+                    _log.Warn(nameof(WebViewRuntime), "Failed to navigate WebView2 to requested URL.");
                 }
             });
         }
@@ -191,7 +193,7 @@ namespace VAL.Host.Services
                 if (Core == null)
                 {
                     var message = "WebView2 core initialization failed. Runtime missing or initialization did not complete.";
-                    ValLog.Error(nameof(WebViewRuntime), message);
+                    _log.LogError(nameof(WebViewRuntime), message);
                     throw new InvalidOperationException(message);
                 }
 
@@ -209,7 +211,7 @@ namespace VAL.Host.Services
                     }
                     catch
                     {
-                        ValLog.Warn(nameof(WebViewRuntime), "Failed to apply user agent override.");
+                        _log.Warn(nameof(WebViewRuntime), "Failed to apply user agent override.");
                     }
                 }
 
@@ -334,7 +336,7 @@ namespace VAL.Host.Services
             if (!ShouldLog(ref _lastRejectedLogTicks, RejectedLogIntervalTicks))
                 return;
 
-            ValLog.Warn(nameof(WebViewRuntime),
+            _log.Warn(nameof(WebViewRuntime),
                 $"Rejected web message ({reason}): {source ?? "<null>"}");
         }
 
@@ -343,7 +345,7 @@ namespace VAL.Host.Services
             if (!ShouldLog(ref _lastBridgeDisarmedLogTicks, BridgeLogIntervalTicks))
                 return;
 
-            ValLog.Warn(nameof(WebViewRuntime),
+            _log.Warn(nameof(WebViewRuntime),
                 $"Bridge disarmed due to untrusted origin: {source ?? "<null>"}");
         }
 
@@ -353,7 +355,7 @@ namespace VAL.Host.Services
                 return;
 
             var origin = _currentUri?.ToString() ?? "<null>";
-            ValLog.Warn(nameof(WebViewRuntime),
+            _log.Warn(nameof(WebViewRuntime),
                 $"Ignoring web message while bridge disarmed (current origin: {origin})");
         }
 
@@ -362,7 +364,7 @@ namespace VAL.Host.Services
             if (!ShouldLog(ref _lastNavigationBlockedLogTicks, BridgeLogIntervalTicks))
                 return;
 
-            ValLog.Warn(nameof(WebViewRuntime),
+            _log.Warn(nameof(WebViewRuntime),
                 $"Canceled navigation to unsafe or unknown URI: {uri ?? "<null>"}");
         }
 
@@ -410,7 +412,7 @@ namespace VAL.Host.Services
                 var core = Core;
                 if (core == null)
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "Failed to inject WebView session nonce.");
+                    _log.Warn(nameof(WebViewRuntime), "Failed to inject WebView session nonce.");
                     return;
                 }
 
@@ -420,7 +422,7 @@ namespace VAL.Host.Services
                 }
                 catch
                 {
-                    ValLog.Warn(nameof(WebViewRuntime), "Failed to inject WebView session nonce.");
+                    _log.Warn(nameof(WebViewRuntime), "Failed to inject WebView session nonce.");
                 }
             });
         }

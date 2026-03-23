@@ -8,6 +8,8 @@ namespace VAL.Host.Services
 {
     public sealed class AppPaths : IAppPaths
     {
+        private readonly ILog _log;
+
         public string ContentRoot { get; }
         public string ProductRoot { get; }
         public string StateRoot { get; }
@@ -17,13 +19,14 @@ namespace VAL.Host.Services
         public string MemoryChatsRoot { get; }
         public string ProfileRoot { get; }
 
-        public AppPaths(IOptions<ValOptions> options)
-            : this(options, contentRootOverride: null)
+        public AppPaths(IOptions<ValOptions> options, ILog log)
+            : this(options, log, contentRootOverride: null)
         {
         }
 
-        internal AppPaths(IOptions<ValOptions> options, string? contentRootOverride)
+        internal AppPaths(IOptions<ValOptions> options, ILog log, string? contentRootOverride)
         {
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             var warnings = new List<string>();
             var config = options.Value;
 
@@ -44,18 +47,18 @@ namespace VAL.Host.Services
             var logFile = Path.Combine(LogsRoot, "VAL.log");
             ValLog.Configure(logFile, config.EnableVerboseLogging);
 
-            ValLog.Verbose(nameof(AppPaths), $"Resolved ContentRoot: {ContentRoot}");
-            ValLog.Verbose(nameof(AppPaths), $"Resolved ProductRoot: {ProductRoot}");
-            ValLog.Verbose(nameof(AppPaths), $"Resolved StateRoot: {StateRoot}");
-            ValLog.Verbose(nameof(AppPaths), $"Resolved DataRoot: {DataRoot}");
-            ValLog.Verbose(nameof(AppPaths), $"Resolved LogsRoot: {LogsRoot}");
-            ValLog.Verbose(nameof(AppPaths), $"Resolved MemoryChatsRoot: {MemoryChatsRoot}");
-            ValLog.Verbose(nameof(AppPaths), $"Resolved ProfileRoot: {ProfileRoot}");
-            ValLog.Verbose(nameof(AppPaths), $"Resolved ModulesRoot: {ModulesRoot}");
+            _log.Verbose(nameof(AppPaths), $"Resolved ContentRoot: {ContentRoot}");
+            _log.Verbose(nameof(AppPaths), $"Resolved ProductRoot: {ProductRoot}");
+            _log.Verbose(nameof(AppPaths), $"Resolved StateRoot: {StateRoot}");
+            _log.Verbose(nameof(AppPaths), $"Resolved DataRoot: {DataRoot}");
+            _log.Verbose(nameof(AppPaths), $"Resolved LogsRoot: {LogsRoot}");
+            _log.Verbose(nameof(AppPaths), $"Resolved MemoryChatsRoot: {MemoryChatsRoot}");
+            _log.Verbose(nameof(AppPaths), $"Resolved ProfileRoot: {ProfileRoot}");
+            _log.Verbose(nameof(AppPaths), $"Resolved ModulesRoot: {ModulesRoot}");
 
             foreach (var warning in warnings)
             {
-                ValLog.Warn(nameof(AppPaths), warning);
+                _log.Warn(nameof(AppPaths), warning);
             }
         }
 

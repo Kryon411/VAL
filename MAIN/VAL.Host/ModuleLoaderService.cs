@@ -32,6 +32,7 @@ namespace VAL.Host.Services
         private readonly ModuleOptions _moduleOptions;
         private readonly IAppPaths _appPaths;
         private readonly IBuildInfo _buildInfo;
+        private readonly ILog _log;
         private readonly ModuleRegistrationTracker _registrationTracker = new();
         private readonly object _statusLock = new();
         private readonly Dictionary<string, ModuleStatusInfo> _moduleStatuses = new(StringComparer.OrdinalIgnoreCase);
@@ -45,11 +46,13 @@ namespace VAL.Host.Services
         public ModuleLoaderService(
             IOptions<ModuleOptions> moduleOptions,
             IAppPaths appPaths,
-            IBuildInfo buildInfo)
+            IBuildInfo buildInfo,
+            ILog log)
         {
             _moduleOptions = moduleOptions?.Value ?? throw new ArgumentNullException(nameof(moduleOptions));
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _buildInfo = buildInfo ?? throw new ArgumentNullException(nameof(buildInfo));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         private sealed class ModuleManifest
@@ -145,7 +148,7 @@ namespace VAL.Host.Services
                 ? Path.Combine(resolvedProductRoot, "Modules")
                 : modulesRoot;
 
-            ValLog.Info("ModuleLoader", $"Resolved ModulesRoot: {resolvedModulesRoot}");
+            _log.Info("ModuleLoader", $"Resolved ModulesRoot: {resolvedModulesRoot}");
 
             // MAIN layout:
             //  - Dock\Dock.module.json  (core UI)
@@ -176,7 +179,7 @@ namespace VAL.Host.Services
                 {
                     var details = FormatConfigExceptionDetails(ex);
                     var reason = $"Config parse error: {details}";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleNameFromFile, $"Skipped ({reason})");
                     return;
                 }
@@ -184,7 +187,7 @@ namespace VAL.Host.Services
                 if (manifest == null)
                 {
                     var reason = "Invalid manifest: Empty or unreadable config.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleNameFromFile, $"Skipped ({reason})");
                     return;
                 }
@@ -196,7 +199,7 @@ namespace VAL.Host.Services
                 if (string.IsNullOrWhiteSpace(moduleName))
                 {
                     var reason = "Invalid manifest: name is required.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleNameFromFile, $"Skipped ({reason})");
                     return;
                 }
@@ -204,7 +207,7 @@ namespace VAL.Host.Services
                 if (string.IsNullOrWhiteSpace(manifest.version))
                 {
                     var reason = "Invalid manifest: version is required.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -212,7 +215,7 @@ namespace VAL.Host.Services
                 if (string.IsNullOrWhiteSpace(manifest.apiVersion))
                 {
                     var reason = "Invalid manifest: apiVersion is required.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -220,7 +223,7 @@ namespace VAL.Host.Services
                 if (!string.Equals(manifest.apiVersion, SupportedApiVersion, StringComparison.OrdinalIgnoreCase))
                 {
                     var reason = $"Incompatible apiVersion '{manifest.apiVersion}'. Host supports '{SupportedApiVersion}'.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -229,7 +232,7 @@ namespace VAL.Host.Services
                 if (string.IsNullOrWhiteSpace(hostMinVersionRaw))
                 {
                     var reason = "Invalid manifest: hostMinVersion is required.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -238,7 +241,7 @@ namespace VAL.Host.Services
                 if (hostMinVersionParsed == null)
                 {
                     var reason = $"Invalid manifest: hostMinVersion '{hostMinVersionRaw}' is not a valid version.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -246,7 +249,7 @@ namespace VAL.Host.Services
                 if (hostVersionParsed != null && hostVersionParsed < hostMinVersionParsed)
                 {
                     var reason = $"Incompatible host version '{hostVersionParsed}'. Requires '{hostMinVersionParsed}'.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -254,7 +257,7 @@ namespace VAL.Host.Services
                 if (manifest.capabilities == null)
                 {
                     var reason = "Invalid manifest: capabilities is required.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -268,7 +271,7 @@ namespace VAL.Host.Services
                 if (invalidCapabilities.Count > 0)
                 {
                     var reason = $"Unsupported capabilities: {string.Join(", ", invalidCapabilities)}.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -276,7 +279,7 @@ namespace VAL.Host.Services
                 if (!manifest.enabled.HasValue)
                 {
                     var reason = "Invalid manifest: enabled must be specified.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -284,7 +287,7 @@ namespace VAL.Host.Services
                 if (manifest.entryScripts == null || manifest.entryScripts.Length == 0)
                 {
                     var reason = "Invalid manifest: entryScripts must include at least one script.";
-                    ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                     RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                     return;
                 }
@@ -310,7 +313,7 @@ namespace VAL.Host.Services
                     if (string.IsNullOrWhiteSpace(script))
                     {
                         var reason = "Invalid manifest: entryScripts contains an empty path.";
-                        ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                         RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                         return;
                     }
@@ -323,7 +326,7 @@ namespace VAL.Host.Services
                     if (!File.Exists(scriptPath))
                     {
                         var reason = $"Invalid manifest: missing entry script '{trimmed}'.";
-                        ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                         RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                         return;
                     }
@@ -340,7 +343,7 @@ namespace VAL.Host.Services
                         if (string.IsNullOrWhiteSpace(style))
                         {
                             var reason = "Invalid manifest: styles contains an empty path.";
-                            ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                            _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                             RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                             return;
                         }
@@ -353,7 +356,7 @@ namespace VAL.Host.Services
                         if (!File.Exists(stylePath))
                         {
                             var reason = $"Invalid manifest: missing style '{trimmed}'.";
-                            ValLog.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                            _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                             RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                             return;
                         }
@@ -379,7 +382,7 @@ namespace VAL.Host.Services
                     catch (Exception ex)
                     {
                         // Do not fail module load chain for one broken module.
-                        ValLog.Warn("ModuleLoader", $"Script load failed for module '{moduleName}': {ex.GetType().Name}: {ex.Message}");
+                        _log.Warn("ModuleLoader", $"Script load failed for module '{moduleName}': {ex.GetType().Name}: {ex.Message}");
                     }
                 }
 
@@ -420,7 +423,7 @@ namespace VAL.Host.Services
                     catch (Exception ex)
                     {
                         // ignore
-                        ValLog.Warn("ModuleLoader", $"Style injection failed for module '{moduleName}': {ex.GetType().Name}: {ex.Message}");
+                        _log.Warn("ModuleLoader", $"Style injection failed for module '{moduleName}': {ex.GetType().Name}: {ex.Message}");
                     }
                 }
 
@@ -446,7 +449,7 @@ namespace VAL.Host.Services
                 {
                         if (_rateLimiter.Allow("module.discovery.console_log", LogInterval))
                         {
-                            ValLog.Warn(nameof(ModuleLoaderService),
+                            _log.Warn(nameof(ModuleLoaderService),
                                 $"Module discovery devtools log failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
                         }
                 }
@@ -457,7 +460,7 @@ namespace VAL.Host.Services
                     {
                         if (!_registrationTracker.TryMarkRegistered(core, configPath))
                         {
-                            ValLog.Verbose("ModuleLoader", $"Skipping already-registered module for this core: {configPath}");
+                            _log.Verbose("ModuleLoader", $"Skipping already-registered module for this core: {configPath}");
                             continue;
                         }
 
@@ -475,21 +478,21 @@ namespace VAL.Host.Services
                     catch (Exception ex)
                     {
                         // keep loading remaining modules
-                        ValLog.Warn("ModuleLoader", $"Module load failed: {configPath}. {ex.GetType().Name}: {ex.Message}");
-                        ValLog.Error("ModuleLoader", ex.ToString());
+                        _log.Warn("ModuleLoader", $"Module load failed: {configPath}. {ex.GetType().Name}: {ex.Message}");
+                        _log.LogError("ModuleLoader", ex.ToString());
                     }
                 }
             }
             catch
             {
                 // Enumeration failure should never prevent VAL from running.
-                ValLog.Warn("ModuleLoader", "Module discovery failed.");
+                _log.Warn("ModuleLoader", "Module discovery failed.");
             }
 
             var statusSnapshot = GetModuleStatuses();
             var loadedCount = statusSnapshot.Count(status => string.Equals(status.Status, "Loaded", StringComparison.OrdinalIgnoreCase));
             var skippedCount = statusSnapshot.Count - loadedCount;
-            ValLog.Info("ModuleLoader", $"Modules Status: {loadedCount} loaded, {skippedCount} skipped.");
+            _log.Info("ModuleLoader", $"Modules Status: {loadedCount} loaded, {skippedCount} skipped.");
         }
 
         public Task InitializeAsync(CoreWebView2 core)

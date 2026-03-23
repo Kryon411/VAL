@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Microsoft.Extensions.Options;
+using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
 using Xunit;
@@ -67,7 +68,7 @@ namespace VAL.Tests.Hosting
                 ModulesPath = string.Empty,
             });
 
-            return new AppPaths(options, contentRoot);
+            return new AppPaths(options, new FakeLog(), contentRoot);
         }
 
         private static string CreateTempRoot()
@@ -88,6 +89,14 @@ namespace VAL.Tests.Hosting
             {
                 // Ignore cleanup failures in temp directories.
             }
+        }
+
+        private sealed class FakeLog : ILog
+        {
+            public void Info(string category, string message) { }
+            public void Warn(string category, string message) { }
+            public void LogError(string category, string message) { }
+            public void Verbose(string category, string message) { }
         }
     }
 }

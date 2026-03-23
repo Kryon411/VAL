@@ -7,10 +7,12 @@ namespace VAL.Host.Services
     public sealed class UiThread : IUiThread
     {
         private readonly Dispatcher _dispatcher;
+        private readonly ILog _log;
 
-        public UiThread(IDesktopUiContext uiContext)
+        public UiThread(IDesktopUiContext uiContext, ILog log)
         {
             _dispatcher = uiContext?.Dispatcher ?? throw new ArgumentNullException(nameof(uiContext));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void Invoke(Action action)
@@ -51,7 +53,7 @@ namespace VAL.Host.Services
                 }
                 catch
                 {
-                    ValLog.Warn(nameof(UiThread), "UI timer tick failed.");
+                    _log.Warn(nameof(UiThread), "UI timer tick failed.");
                 }
             };
 

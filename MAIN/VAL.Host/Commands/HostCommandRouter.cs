@@ -26,16 +26,19 @@ namespace VAL.Host.Commands
         private readonly CommandRegistry _commandRegistry;
         private readonly ICommandDiagnosticsReporter? _diagnosticsReporter;
         private readonly ISessionContext _sessionContext;
+        private readonly ILog _log;
         private long _lastBlockedTypeLogTicks;
 
         public HostCommandRouter(
             CommandRegistry commandRegistry,
             ICommandDiagnosticsReporter? diagnosticsReporter = null,
-            ISessionContext? sessionContext = null)
+            ISessionContext? sessionContext = null,
+            ILog? log = null)
         {
             _commandRegistry = commandRegistry ?? throw new ArgumentNullException(nameof(commandRegistry));
             _diagnosticsReporter = diagnosticsReporter;
             _sessionContext = sessionContext ?? new SessionContext();
+            _log = log ?? ValLog.Instance;
         }
 
         public HostCommandExecutionResult HandleWebMessage(WebMessageEnvelope webMessage)
@@ -65,7 +68,7 @@ namespace VAL.Host.Commands
             var commandName = parsedEnvelope.Name?.Trim();
             if (string.IsNullOrWhiteSpace(commandName))
             {
-                ValLog.Warn(nameof(HostCommandRouter), "Web message missing command name.");
+                _log.Warn(nameof(HostCommandRouter), "Web message missing command name.");
                 return HostCommandExecutionResult.Blocked("<missing>", "Command name was missing.", isDockInvocation, diagnosticDetail: "missing-command-name");
             }
 
@@ -102,7 +105,7 @@ namespace VAL.Host.Commands
             switch (result.Status)
             {
                 case CommandDispatchStatus.RejectedHandlerException:
-                    ValLog.Warn(nameof(HostCommandRouter),
+                    _log.Warn(nameof(HostCommandRouter),
                         $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: handler-exception, detail: {result.Detail}, exception: {result.Exception?.GetType().Name}).");
                     return HostCommandExecutionResult.Error(cmd.Type, "Command failed while executing.", isDockInvocation, result.Exception, result.Detail);
 
@@ -110,12 +113,12 @@ namespace VAL.Host.Commands
                 case CommandDispatchStatus.RejectedUnknownType:
                 case CommandDispatchStatus.RejectedDeprecated:
                 case CommandDispatchStatus.RejectedEmptyType:
-                    ValLog.Warn(nameof(HostCommandRouter),
+                    _log.Warn(nameof(HostCommandRouter),
                         $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: {result.Status}, detail: {result.Detail}).");
                     return HostCommandExecutionResult.Blocked(cmd.Type, "Command was blocked by host validation.", isDockInvocation, result.Detail);
 
                 default:
-                    ValLog.Warn(nameof(HostCommandRouter),
+                    _log.Warn(nameof(HostCommandRouter),
                         $"Command rejected '{cmd.Type}' (module: {result.Module ?? "<unknown>"}, reason: unknown-rejection).");
                     return HostCommandExecutionResult.Error(cmd.Type, "Command failed with an unknown host error.", isDockInvocation, result.Exception, result.Detail);
             }
@@ -142,7 +145,7 @@ namespace VAL.Host.Commands
                 return;
 
             var sourceHost = sourceUri?.Host ?? "<unknown>";
-            ValLog.Warn(nameof(HostCommandRouter), $"Blocked web message type: {type} (source: {sourceHost}, reason: {reason})");
+            _log.Warn(nameof(HostCommandRouter), $"Blocked web message type: {type} (source: {sourceHost}, reason: {reason})");
         }
     }
 }

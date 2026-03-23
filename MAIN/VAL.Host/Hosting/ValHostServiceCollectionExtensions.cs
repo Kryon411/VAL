@@ -81,7 +81,8 @@ namespace VAL.Host.Hosting
                 new HostCommandRouter(
                     sp.GetRequiredService<CommandRegistry>(),
                     sp.GetService<ICommandDiagnosticsReporter>(),
-                    sp.GetRequiredService<ISessionContext>()));
+                    sp.GetRequiredService<ISessionContext>(),
+                    sp.GetRequiredService<ILog>()));
 
             services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
             services.AddSingleton<IWebMessageSender, WebMessageSender>();

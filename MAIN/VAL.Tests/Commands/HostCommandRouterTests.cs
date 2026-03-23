@@ -1,5 +1,6 @@
 using System;
 using VAL.Contracts;
+using VAL.Host;
 using VAL.Host.Commands;
 using VAL.Host.WebMessaging;
 using Xunit;
@@ -119,7 +120,15 @@ namespace VAL.Tests.Commands
         {
             var registry = new CommandRegistry();
             register(registry);
-            return new HostCommandRouter(registry);
+            return new HostCommandRouter(registry, log: new FakeLog());
+        }
+
+        private sealed class FakeLog : ILog
+        {
+            public void Info(string category, string message) { }
+            public void Warn(string category, string message) { }
+            public void LogError(string category, string message) { }
+            public void Verbose(string category, string message) { }
         }
     }
 }
