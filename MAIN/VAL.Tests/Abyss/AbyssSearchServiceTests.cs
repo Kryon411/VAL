@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using VAL.Host;
 using VAL.Host.Abyss;
 using Xunit;
 
@@ -41,7 +42,7 @@ namespace VAL.Tests.Abyss
             var root = CreateTempRoot();
             var chatId = Guid.NewGuid().ToString();
             var truthPath = CreateTruthPath(root, chatId);
-            var service = new AbyssSearchService();
+            var service = new AbyssSearchService(new FakeLog());
 
             try
             {
@@ -78,7 +79,7 @@ namespace VAL.Tests.Abyss
             var root = CreateTempRoot();
             var olderChatId = Guid.NewGuid().ToString();
             var newerChatId = Guid.NewGuid().ToString();
-            var service = new AbyssSearchService();
+            var service = new AbyssSearchService(new FakeLog());
 
             try
             {
@@ -136,6 +137,14 @@ namespace VAL.Tests.Abyss
             {
                 // best-effort cleanup
             }
+        }
+
+        private sealed class FakeLog : ILog
+        {
+            public void Info(string category, string message) { }
+            public void Warn(string category, string message) { }
+            public void LogError(string category, string message) { }
+            public void Verbose(string category, string message) { }
         }
     }
 }

@@ -35,15 +35,17 @@ namespace VAL.Host
         private readonly object _reasonGate = new();
         private readonly IToastService _toastService;
         private readonly IToastLedger _toastLedger;
+        private readonly ILog _log;
         // Cooldown de-dupe is per (key + context) so chat-specific nudges don't suppress each other.
         private readonly Dictionary<string, DateTime> _lastShownUtc = new();
         private readonly Dictionary<string, DateTime> _reasonDedupeUtc = new();
         private static readonly TimeSpan ReasonDedupeWindow = TimeSpan.FromSeconds(2);
 
-        public ToastHubService(IToastService toastService, IToastLedger toastLedger)
+        public ToastHubService(IToastService toastService, IToastLedger toastLedger, ILog log)
         {
             _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
             _toastLedger = toastLedger ?? throw new ArgumentNullException(nameof(toastLedger));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         // Central catalog (policy table).
@@ -783,10 +785,10 @@ namespace VAL.Host
             }
         }
 
-        private static void LogSuppressed(ToastKey key, ToastOrigin origin, ToastReason reason, string detail, string? chatId)
+        private void LogSuppressed(ToastKey key, ToastOrigin origin, ToastReason reason, string detail, string? chatId)
         {
             var chatTag = string.IsNullOrWhiteSpace(chatId) ? "n/a" : chatId;
-            ValLog.Verbose(LogCategory, $"Suppressed toast {key} (origin={origin}, reason={reason}, chat={chatTag}, detail={detail}).");
+            _log.Verbose(LogCategory, $"Suppressed toast {key} (origin={origin}, reason={reason}, chat={chatTag}, detail={detail}).");
         }
     }
 }

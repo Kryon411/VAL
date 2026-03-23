@@ -7,11 +7,13 @@ namespace VAL.Host.Services
     {
         private readonly IAppPaths _appPaths;
         private readonly IPortalRuntimeStateManager _portalRuntimeStateManager;
+        private readonly ILog _log;
 
-        public DataWipeService(IAppPaths appPaths, IPortalRuntimeStateManager portalRuntimeStateManager)
+        public DataWipeService(IAppPaths appPaths, IPortalRuntimeStateManager portalRuntimeStateManager, ILog log)
         {
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _portalRuntimeStateManager = portalRuntimeStateManager ?? throw new ArgumentNullException(nameof(portalRuntimeStateManager));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public DataWipeResult WipeData()
@@ -44,7 +46,7 @@ namespace VAL.Host.Services
             return new DataWipeResult(success, partial, deleted, failed);
         }
 
-        private static void TryDeleteDirectory(string path, string label, ref int deleted, ref int failed)
+        private void TryDeleteDirectory(string path, string label, ref int deleted, ref int failed)
         {
             if (string.IsNullOrWhiteSpace(path))
                 return;
@@ -56,12 +58,12 @@ namespace VAL.Host.Services
             {
                 Directory.Delete(path, recursive: true);
                 deleted++;
-                ValLog.Info(nameof(DataWipeService), $"Wiped {label} at {path}");
+                _log.Info(nameof(DataWipeService), $"Wiped {label} at {path}");
             }
             catch (Exception ex)
             {
                 failed++;
-                ValLog.Warn(nameof(DataWipeService), $"Failed to wipe {label} at {path}. {ex.GetType().Name}: {ex.Message}");
+                _log.Warn(nameof(DataWipeService), $"Failed to wipe {label} at {path}. {ex.GetType().Name}: {ex.Message}");
             }
         }
 

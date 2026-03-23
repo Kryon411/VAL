@@ -37,10 +37,16 @@ namespace VAL.Host.Abyss
 
     public sealed class AbyssSearchService
     {
+        private readonly ILog _log;
         private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
         private readonly object _cacheGate = new();
         private readonly Dictionary<string, TruthLogCache> _cacheByRoot = new(StringComparer.OrdinalIgnoreCase);
+
+        public AbyssSearchService(ILog log)
+        {
+            _log = log ?? throw new ArgumentNullException(nameof(log));
+        }
 
         private sealed class TruthLogCache
         {
@@ -371,7 +377,7 @@ namespace VAL.Host.Abyss
             if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
-            ValLog.Warn(nameof(AbyssSearchService), $"Abyss file operation failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+            _log.Warn(nameof(AbyssSearchService), $"Abyss file operation failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
         }
 
         private static int ScoreExchange(AbyssExchange exchange, IReadOnlyList<string> tokens)
