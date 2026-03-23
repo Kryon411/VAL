@@ -160,6 +160,7 @@ MAIN/VAL.Host/Logging/LogLevel.cs
 MAIN/VAL.Host/Logging/LogSanitizer.cs
 MAIN/VAL.Host/Logging/RateLimiter.cs
 MAIN/VAL.Host/Logging/RollingFileLogSink.cs
+MAIN/VAL.Host/Logging/ValLogRuntime.cs
 MAIN/VAL.Host/ModuleLoaderService.cs
 MAIN/VAL.Host/ModuleRegistrationTracker.cs
 MAIN/VAL.Host/Options/ModuleOptions.cs
@@ -167,6 +168,7 @@ MAIN/VAL.Host/Options/ValOptions.cs
 MAIN/VAL.Host/Options/WebViewOptions.cs
 MAIN/VAL.Host/Portal/PortalRuntime.cs
 MAIN/VAL.Host/Portal/PortalStaging.cs
+MAIN/VAL.Host/Properties/InternalsVisibleTo.cs
 MAIN/VAL.Host/Security/SafePathResolver.cs
 MAIN/VAL.Host/Security/WebCommandRegistry.cs
 MAIN/VAL.Host/Security/WebMessageOriginGuard.cs
@@ -218,6 +220,7 @@ MAIN/VAL.Tests/Continuum/ContinuumInjectInboxTests.cs
 MAIN/VAL.Tests/Hosting/ValHostServiceCollectionExtensionsTests.cs
 MAIN/VAL.Tests/Logging/RateLimiterTests.cs
 MAIN/VAL.Tests/Logging/RollingFileLogSinkTests.cs
+MAIN/VAL.Tests/Logging/ValLogRuntimeTests.cs
 MAIN/VAL.Tests/Modules/ModuleManifestContractTests.cs
 MAIN/VAL.Tests/Modules/ModuleRegistrationTrackerTests.cs
 MAIN/VAL.Tests/Security/SafePathResolverTests.cs
