@@ -12,11 +12,13 @@ namespace VAL.Host.Services
         private const string Category = "SafeBoot";
         private readonly string _localConfigPath;
         private readonly SmokeTestSettings _smokeSettings;
+        private readonly ILog _log;
 
-        public SafeBoot(string localConfigPath, SmokeTestSettings smokeSettings)
+        public SafeBoot(string localConfigPath, SmokeTestSettings smokeSettings, ILog? log = null)
         {
             _localConfigPath = localConfigPath;
             _smokeSettings = smokeSettings;
+            _log = log ?? ValLog.Instance;
         }
 
         public bool FallbackUsed { get; private set; }
@@ -29,20 +31,20 @@ namespace VAL.Host.Services
             EnsureDirectory(appPaths.ProfileRoot);
             EnsureDirectory(appPaths.ModulesRoot);
 
-            ValLog.Info(Category, $"Version: {buildInfo.Version}");
-            ValLog.Info(Category, $"InformationalVersion: {buildInfo.InformationalVersion}");
-            ValLog.Info(Category, $"Environment: {buildInfo.Environment}");
+            _log.Info(Category, $"Version: {buildInfo.Version}");
+            _log.Info(Category, $"InformationalVersion: {buildInfo.InformationalVersion}");
+            _log.Info(Category, $"Environment: {buildInfo.Environment}");
             if (!string.IsNullOrWhiteSpace(buildInfo.GitSha))
-                ValLog.Info(Category, $"GitSha: {buildInfo.GitSha}");
+                _log.Info(Category, $"GitSha: {buildInfo.GitSha}");
             if (!string.IsNullOrWhiteSpace(buildInfo.BuildDate))
-                ValLog.Info(Category, $"BuildDateUtc: {buildInfo.BuildDate}");
+                _log.Info(Category, $"BuildDateUtc: {buildInfo.BuildDate}");
 
             var appSettingsPath = Path.Combine(appPaths.ContentRoot, "appsettings.json");
-            ValLog.Info(Category, $"ContentRoot: {appPaths.ContentRoot}");
-            ValLog.Info(Category, $"ConfigPath.AppSettings: {appSettingsPath}");
-            ValLog.Info(Category, $"ConfigPath.LocalOverride: {_localConfigPath}");
-            ValLog.Info(Category, $"DevToolsEnabled: {webViewOptions.EffectiveAllowDevTools}");
-            ValLog.Info(Category, $"SafeBootFallbackUsed: {FallbackUsed}");
+            _log.Info(Category, $"ContentRoot: {appPaths.ContentRoot}");
+            _log.Info(Category, $"ConfigPath.AppSettings: {appSettingsPath}");
+            _log.Info(Category, $"ConfigPath.LocalOverride: {_localConfigPath}");
+            _log.Info(Category, $"DevToolsEnabled: {webViewOptions.EffectiveAllowDevTools}");
+            _log.Info(Category, $"SafeBootFallbackUsed: {FallbackUsed}");
         }
 
         public void HandleFatalStartupException(Exception exception)
@@ -51,8 +53,8 @@ namespace VAL.Host.Services
 
             try
             {
-                ValLog.Warn(Category, "SafeBoot fallback invoked due to startup failure.");
-                ValLog.Error(Category, exception.ToString());
+                _log.Warn(Category, "SafeBoot fallback invoked due to startup failure.");
+                _log.LogError(Category, exception.ToString());
             }
             catch
             {
@@ -102,7 +104,7 @@ namespace VAL.Host.Services
             }
         }
 
-        private static void InitializeDiagnostics(IBuildInfo buildInfo, IAppPaths appPaths)
+        private void InitializeDiagnostics(IBuildInfo buildInfo, IAppPaths appPaths)
         {
             try
             {
@@ -117,7 +119,7 @@ namespace VAL.Host.Services
                 var hash = buildInfo?.InformationalVersion ?? "unknown";
                 var os = RuntimeInformation.OSDescription ?? "unknown";
                 var rid = RuntimeInformation.RuntimeIdentifier ?? "unknown";
-                ValLog.Info("Startup", $"VAL start v={version} hash={hash} os={os} rid={rid}");
+                _log.Info("Startup", $"VAL start v={version} hash={hash} os={os} rid={rid}");
             }
             catch
             {

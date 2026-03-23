@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Startup;
@@ -17,7 +18,8 @@ namespace VAL
             IHost? host = null;
             var smokeSettings = SmokeTestSettings.FromArgs(args);
             var startupOptions = StartupOptionsParser.Parse(args);
-            var crashGuard = new StartupCrashGuard();
+            ILog log = ValLog.Instance;
+            var crashGuard = new StartupCrashGuard(log: log);
             var crashGuardSafeMode = crashGuard.EvaluateAndMarkStarting();
             if (!startupOptions.SafeModeExplicit && crashGuardSafeMode)
             {
@@ -28,7 +30,7 @@ namespace VAL
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "VAL",
                 "config.json");
-            var safeBoot = new SafeBoot(localConfigPath, smokeSettings);
+            var safeBoot = new SafeBoot(localConfigPath, smokeSettings, log);
 
             try
             {
