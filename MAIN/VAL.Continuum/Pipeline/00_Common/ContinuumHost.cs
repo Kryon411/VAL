@@ -25,6 +25,7 @@ namespace VAL.Continuum
         private readonly IContinuumInjectInbox _injectQueue;
         private readonly ISessionContext _sessionContext;
         private readonly OperationCoordinator _operationCoordinator;
+        private readonly IToastLedger _toastLedger;
 
         // Best-effort UI context captured from the WebMessageReceived thread (usually UI/Dispatcher).
         private SynchronizationContext? _uiCtx;
@@ -35,7 +36,8 @@ namespace VAL.Continuum
             IContinuumWriter writer,
             IContinuumInjectInbox injectQueue,
             ISessionContext sessionContext,
-            OperationCoordinator operationCoordinator)
+            OperationCoordinator operationCoordinator,
+            IToastLedger toastLedger)
         {
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
@@ -43,6 +45,7 @@ namespace VAL.Continuum
             _injectQueue = injectQueue ?? throw new ArgumentNullException(nameof(injectQueue));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _operationCoordinator = operationCoordinator ?? throw new ArgumentNullException(nameof(operationCoordinator));
+            _toastLedger = toastLedger ?? throw new ArgumentNullException(nameof(toastLedger));
         }
 
         public bool IsMessageSenderWired => _messageSender != null;
@@ -53,6 +56,7 @@ namespace VAL.Continuum
         private IContinuumInjectInbox InjectQueue => _injectQueue;
         private ISessionContext SessionContext => _sessionContext;
         private OperationCoordinator OperationCoordinator => _operationCoordinator;
+        private IToastLedger ToastLedger => _toastLedger;
 
         // -------------------------
         // Toast Catalog v1 (final)

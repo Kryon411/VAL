@@ -3,6 +3,7 @@ using System.Windows.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VAL.Continuum;
+using VAL.Continuum.Pipeline;
 using VAL.Continuum.Pipeline.Telemetry;
 using VAL.Host;
 using VAL.Host.Abyss;
@@ -65,6 +66,8 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<IOperationCoordinator>(sp => sp.GetRequiredService<OperationCoordinator>());
             builder.Services.AddSingleton<DesktopToastService>();
             builder.Services.AddSingleton<IToastService>(sp => sp.GetRequiredService<DesktopToastService>());
+            builder.Services.AddSingleton<ToastLedgerService>();
+            builder.Services.AddSingleton<IToastLedger>(sp => sp.GetRequiredService<ToastLedgerService>());
             builder.Services.AddSingleton<ToastHubService>();
             builder.Services.AddSingleton<IToastHub>(sp => sp.GetRequiredService<ToastHubService>());
             builder.Services.AddSingleton<ICommandDispatcher, CommandDispatcherAdapter>();

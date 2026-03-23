@@ -11,10 +11,10 @@ namespace VAL.Continuum.Pipeline
     /// Best-effort per-chat toast ledger to ensure "once per chat" rules survive restarts.
     /// Storage: &lt;ChatDir&gt;\\ToastLedger.json
     /// </summary>
-    public static class ToastLedger
+    public sealed class ToastLedgerService : IToastLedger
     {
         private const string LedgerFileName = "ToastLedger.json";
-        private static readonly object Gate = new object();
+        private readonly object _gate = new();
 
         private sealed class LedgerModel
         {
@@ -28,14 +28,14 @@ namespace VAL.Continuum.Pipeline
             return Path.Combine(dir, LedgerFileName);
         }
 
-        public static bool TryMarkShown(string chatId, string toastId)
+        public bool TryMarkShown(string chatId, string toastId)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return false;
             if (string.IsNullOrWhiteSpace(toastId)) return false;
 
             try
             {
-                lock (Gate)
+                lock (_gate)
                 {
                     var model = Load(chatId);
                     if (model.shown.Contains(toastId))
@@ -52,14 +52,14 @@ namespace VAL.Continuum.Pipeline
             }
         }
 
-        public static bool HasShown(string chatId, string toastId)
+        public bool HasShown(string chatId, string toastId)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return false;
             if (string.IsNullOrWhiteSpace(toastId)) return false;
 
             try
             {
-                lock (Gate)
+                lock (_gate)
                 {
                     var model = Load(chatId);
                     return model.shown.Contains(toastId);

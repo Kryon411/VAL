@@ -34,14 +34,16 @@ namespace VAL.Host
         private readonly object _gate = new();
         private readonly object _reasonGate = new();
         private readonly IToastService _toastService;
+        private readonly IToastLedger _toastLedger;
         // Cooldown de-dupe is per (key + context) so chat-specific nudges don't suppress each other.
         private readonly Dictionary<string, DateTime> _lastShownUtc = new();
         private readonly Dictionary<string, DateTime> _reasonDedupeUtc = new();
         private static readonly TimeSpan ReasonDedupeWindow = TimeSpan.FromSeconds(2);
 
-        public ToastHubService(IToastService toastService)
+        public ToastHubService(IToastService toastService, IToastLedger toastLedger)
         {
             _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
+            _toastLedger = toastLedger ?? throw new ArgumentNullException(nameof(toastLedger));
         }
 
         // Central catalog (policy table).
@@ -611,7 +613,7 @@ namespace VAL.Host
                 }
 
                 var lid = ledgerIdOverride ?? def.LedgerId ?? ("toast." + key);
-                if (!ToastLedger.TryMarkShown(chatId, lid))
+                if (!_toastLedger.TryMarkShown(chatId, lid))
                 {
                     LogSuppressed(key, origin, reason, "once-per-chat:ledger", chatId);
                     return false;
@@ -701,7 +703,7 @@ namespace VAL.Host
                 }
 
                 var lid = ledgerIdOverride ?? def.LedgerId ?? ("toast." + key);
-                if (!ToastLedger.TryMarkShown(chatId, lid))
+                if (!_toastLedger.TryMarkShown(chatId, lid))
                 {
                     LogSuppressed(key, origin, reason, "once-per-chat:ledger", chatId);
                     return false;

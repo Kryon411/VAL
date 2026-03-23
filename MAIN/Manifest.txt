@@ -79,7 +79,8 @@ MAIN/Modules/Continuum/Continuum.Pipeline.Map.txt
 MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumContext.cs
 MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumHost.cs
 MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumPreamble.cs
-MAIN/Modules/Continuum/Pipeline/00_Common/ToastLedger.cs
+MAIN/VAL.Continuum/Pipeline/00_Common/IToastLedger.cs
+MAIN/VAL.Continuum/Pipeline/00_Common/ToastLedgerService.cs
 MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Commands.cs
 MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Entry.cs
 MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Flow.cs
