@@ -14,16 +14,19 @@ namespace VAL.Host.Services
         private static readonly RateLimiter RateLimiter = new();
 
         private readonly ISessionContext _sessionContext;
+        private readonly ITruthStore _truthStore;
         private readonly string? _productRootOverride;
 
-        public TruthHealthReportService(ISessionContext sessionContext)
+        public TruthHealthReportService(ISessionContext sessionContext, ITruthStore truthStore)
         {
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
+            _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
         }
 
-        internal TruthHealthReportService(ISessionContext sessionContext, string? productRootOverride)
+        internal TruthHealthReportService(ISessionContext sessionContext, ITruthStore truthStore, string? productRootOverride)
         {
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
+            _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
             _productRootOverride = productRootOverride;
         }
 
@@ -99,7 +102,7 @@ namespace VAL.Host.Services
             }
         }
 
-        private static System.Collections.Generic.List<TruthHealthSnapshot> BuildReports(string? productRoot)
+        private System.Collections.Generic.List<TruthHealthSnapshot> BuildReports(string? productRoot)
         {
             var reports = new System.Collections.Generic.List<TruthHealthSnapshot>();
             if (string.IsNullOrWhiteSpace(productRoot))
@@ -120,10 +123,10 @@ namespace VAL.Host.Services
                     if (string.IsNullOrWhiteSpace(chatId))
                         continue;
 
-                    var truthPath = Path.Combine(chatDir, TruthStorage.TruthFileName);
+                    var truthPath = Path.Combine(chatDir, _truthStore.TruthFileName);
                     var repairLogPath = Path.Combine(chatDir, "Truth.repair.log");
                     var report = ToSnapshotReport(TruthHealth.Build(chatId, truthPath, repairLogPath, repairTailFirst: false));
-                    var relativePath = Path.Combine("Memory", "Chats", chatId, TruthStorage.TruthFileName);
+                    var relativePath = Path.Combine("Memory", "Chats", chatId, _truthStore.TruthFileName);
                     var isLargeLog = report.Bytes > WarnMb * 1024L * 1024L;
                     reports.Add(new TruthHealthSnapshot(report, relativePath, isLargeLog));
                 }
@@ -146,7 +149,7 @@ namespace VAL.Host.Services
 
             try
             {
-                var chatDir = TruthStorage.GetChatDir(chatId);
+                var chatDir = _truthStore.GetChatDir(chatId);
                 var chatsRoot = Directory.GetParent(chatDir);
                 var memoryRoot = chatsRoot?.Parent;
                 var productRoot = memoryRoot?.Parent;
@@ -162,7 +165,7 @@ namespace VAL.Host.Services
         {
             truthPath = string.Empty;
             repairLogPath = string.Empty;
-            relativePath = Path.Combine("Memory", "Chats", chatId, TruthStorage.TruthFileName);
+            relativePath = Path.Combine("Memory", "Chats", chatId, _truthStore.TruthFileName);
 
             if (!string.IsNullOrWhiteSpace(_productRootOverride))
             {
@@ -173,7 +176,7 @@ namespace VAL.Host.Services
                 return true;
             }
 
-            truthPath = TruthStorage.GetTruthPath(chatId);
+            truthPath = _truthStore.GetTruthPath(chatId);
             var dir = Path.GetDirectoryName(truthPath) ?? string.Empty;
             repairLogPath = Path.Combine(dir, "Truth.repair.log");
             return true;

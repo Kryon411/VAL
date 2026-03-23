@@ -15,6 +15,12 @@ namespace VAL.Continuum.Pipeline
     {
         private const string LedgerFileName = "ToastLedger.json";
         private readonly object _gate = new();
+        private readonly ITruthStore _truthStore;
+
+        public ToastLedgerService(ITruthStore truthStore)
+        {
+            _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
+        }
 
         private sealed class LedgerModel
         {
@@ -22,9 +28,9 @@ namespace VAL.Continuum.Pipeline
             public HashSet<string> shown { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
-        private static string GetLedgerPath(string chatId)
+        private string GetLedgerPath(string chatId)
         {
-            var dir = TruthStorage.EnsureChatDir(chatId);
+            var dir = _truthStore.EnsureChatDir(chatId);
             return Path.Combine(dir, LedgerFileName);
         }
 
@@ -71,7 +77,7 @@ namespace VAL.Continuum.Pipeline
             }
         }
 
-        private static LedgerModel Load(string chatId)
+        private LedgerModel Load(string chatId)
         {
             try
             {
@@ -92,7 +98,7 @@ namespace VAL.Continuum.Pipeline
             }
         }
 
-        private static void Save(string chatId, LedgerModel model)
+        private void Save(string chatId, LedgerModel model)
         {
             try
             {

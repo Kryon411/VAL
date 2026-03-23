@@ -29,8 +29,9 @@ namespace VAL.Tests.Truth
 
                 var sessionContext = new SessionContext();
                 sessionContext.SetActiveChatId(chatId);
+                var truthStore = new TruthStore(NullTruthTelemetryPublisher.Instance);
 
-                var service = new TruthHealthReportService(sessionContext, root);
+                var service = new TruthHealthReportService(sessionContext, truthStore, root);
                 var result = service.GetCurrentSnapshot();
 
                 Assert.True(result.HasActiveChat);

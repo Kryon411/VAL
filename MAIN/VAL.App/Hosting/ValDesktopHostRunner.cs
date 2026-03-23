@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using VAL.Continuum.Pipeline.Telemetry;
-using VAL.Continuum.Pipeline.Truth;
 using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
@@ -77,8 +76,6 @@ namespace VAL.Hosting
             }
 
             monitor.ThresholdReached += OnThresholdReached;
-            TruthTelemetryBridge.Configure(monitor.UpdateFromTruthBytes);
-
             return new TelemetryRegistration(monitor, OnThresholdReached);
         }
 
@@ -142,7 +139,6 @@ namespace VAL.Hosting
                     return;
 
                 _disposed = true;
-                TruthTelemetryBridge.Configure(null);
                 _monitor.ThresholdReached -= _handler;
             }
         }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using VAL.Continuum;
 using VAL.Continuum.Pipeline;
 using VAL.Continuum.Pipeline.Telemetry;
+using VAL.Continuum.Pipeline.Truth;
 using VAL.Host;
 using VAL.Host.Abyss;
 using VAL.Host.Commands;
@@ -66,6 +67,8 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<IOperationCoordinator>(sp => sp.GetRequiredService<OperationCoordinator>());
             builder.Services.AddSingleton<DesktopToastService>();
             builder.Services.AddSingleton<IToastService>(sp => sp.GetRequiredService<DesktopToastService>());
+            builder.Services.AddSingleton<ITruthTelemetryPublisher, TruthTelemetryPublisher>();
+            builder.Services.AddSingleton<ITruthStore, TruthStore>();
             builder.Services.AddSingleton<ToastLedgerService>();
             builder.Services.AddSingleton<IToastLedger>(sp => sp.GetRequiredService<ToastLedgerService>());
             builder.Services.AddSingleton<ToastHubService>();
@@ -83,7 +86,6 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<IPortalRuntimeStateManager, PortalRuntimeStateManager>();
             builder.Services.AddSingleton<IPortalRuntimeService, PortalRuntimeService>();
             builder.Services.AddSingleton<IModuleRuntimeService, ModuleRuntimeService>();
-            builder.Services.AddSingleton<VAL.Continuum.Pipeline.Truth.IContinuumWriter, VAL.Continuum.Pipeline.Truth.ContinuumWriter>();
             builder.Services.AddSingleton<VAL.Continuum.Pipeline.Inject.IContinuumInjectInbox, VAL.Continuum.Pipeline.Inject.ContinuumInjectInbox>();
             builder.Services.AddSingleton<TelemetryThresholdMonitor>();
             builder.Services.AddSingleton<IContinuumPump, ContinuumPump>();

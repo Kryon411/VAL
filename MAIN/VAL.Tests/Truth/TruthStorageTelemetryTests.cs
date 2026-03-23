@@ -5,25 +5,26 @@ using Xunit;
 
 namespace VAL.Tests.Truth
 {
-    public sealed class TruthStorageTelemetryTests
+    public sealed class TruthStoreTelemetryTests
     {
         [Fact]
-        public void AppendTruthLinePublishesBytesThroughTruthTelemetryBridge()
+        public void AppendTruthLinePublishesBytesThroughTruthTelemetryPublisher()
         {
             var chatId = Guid.NewGuid().ToString("N");
             var observedChatId = string.Empty;
             var observedBytes = 0L;
-
-            CleanupChat(chatId);
-            TruthTelemetryBridge.Configure((id, bytes) =>
+            var telemetryPublisher = new RecordingTruthTelemetryPublisher((id, bytes) =>
             {
                 observedChatId = id;
                 observedBytes = bytes;
             });
+            var truthStore = new TruthStore(telemetryPublisher);
+
+            CleanupChat(chatId);
 
             try
             {
-                TruthStorage.AppendTruthLine(chatId, 'U', "hello");
+                truthStore.AppendTruthLine(chatId, 'U', "hello");
 
                 Assert.Equal(chatId, observedChatId);
                 Assert.True(observedBytes > 0);
@@ -31,22 +32,21 @@ namespace VAL.Tests.Truth
             }
             finally
             {
-                TruthTelemetryBridge.Configure(null);
                 CleanupChat(chatId);
             }
         }
 
         [Fact]
-        public void AppendTruthLineWithoutConfiguredBridgeStillWritesTruthLog()
+        public void AppendTruthLineWithoutThresholdMonitorStillWritesTruthLog()
         {
             var chatId = Guid.NewGuid().ToString("N");
+            var truthStore = new TruthStore(NullTruthTelemetryPublisher.Instance);
 
             CleanupChat(chatId);
-            TruthTelemetryBridge.Configure(null);
 
             try
             {
-                TruthStorage.AppendTruthLine(chatId, 'A', "reply");
+                truthStore.AppendTruthLine(chatId, 'A', "reply");
 
                 var truthPath = TruthStorage.GetTruthPath(chatId);
                 Assert.True(File.Exists(truthPath));
@@ -69,6 +69,21 @@ namespace VAL.Tests.Truth
             catch
             {
                 // best-effort cleanup
+            }
+        }
+
+        private sealed class RecordingTruthTelemetryPublisher : ITruthTelemetryPublisher
+        {
+            private readonly Action<string, long> _publish;
+
+            public RecordingTruthTelemetryPublisher(Action<string, long> publish)
+            {
+                _publish = publish;
+            }
+
+            public void PublishTruthBytes(string chatId, long bytes)
+            {
+                _publish(chatId, bytes);
             }
         }
     }

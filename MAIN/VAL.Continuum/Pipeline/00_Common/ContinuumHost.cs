@@ -21,7 +21,7 @@ namespace VAL.Continuum
     {
         private readonly IWebMessageSender _messageSender;
         private readonly IToastHub _toastHub;
-        private readonly IContinuumWriter _writer;
+        private readonly ITruthStore _writer;
         private readonly IContinuumInjectInbox _injectQueue;
         private readonly ISessionContext _sessionContext;
         private readonly OperationCoordinator _operationCoordinator;
@@ -33,7 +33,7 @@ namespace VAL.Continuum
         public ContinuumHost(
             IWebMessageSender messageSender,
             IToastHub toastHub,
-            IContinuumWriter writer,
+            ITruthStore writer,
             IContinuumInjectInbox injectQueue,
             ISessionContext sessionContext,
             OperationCoordinator operationCoordinator,
@@ -52,7 +52,7 @@ namespace VAL.Continuum
 
         private Action<MessageEnvelope> PostToWebMessage => _messageSender.Send;
         private IToastHub Toasts => _toastHub;
-        private IContinuumWriter Writer => _writer;
+        private ITruthStore Writer => _writer;
         private IContinuumInjectInbox InjectQueue => _injectQueue;
         private ISessionContext SessionContext => _sessionContext;
         private OperationCoordinator OperationCoordinator => _operationCoordinator;

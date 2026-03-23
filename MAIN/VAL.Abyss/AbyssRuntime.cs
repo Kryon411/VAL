@@ -38,17 +38,19 @@ namespace VAL.Host.Abyss
         private readonly IWebMessageSender _messageSender;
         private readonly IToastHub _toastHub;
         private readonly ISessionContext _sessionContext;
+        private readonly ITruthStore _truthStore;
         private List<AbyssSearchResult> _lastResults = new();
         private string? _lastQuery;
         private string? _lastQueryOriginal;
         private string? _lastGeneratedUtc;
         private CancellationTokenSource? _searchCts;
 
-        public AbyssRuntime(IWebMessageSender messageSender, IToastHub toastHub, ISessionContext sessionContext)
+        public AbyssRuntime(IWebMessageSender messageSender, IToastHub toastHub, ISessionContext sessionContext, ITruthStore truthStore)
         {
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
+            _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
         }
 
         public void InjectPrompt(string? chatId)
@@ -603,7 +605,7 @@ namespace VAL.Host.Abyss
             {
                 var resolved = _sessionContext.ResolveChatId(chatId);
                 if (_sessionContext.IsValidChatId(resolved))
-                    return TruthStorage.EnsureChatDir(resolved);
+                    return _truthStore.EnsureChatDir(resolved);
             }
             catch { }
 

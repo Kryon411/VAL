@@ -52,6 +52,7 @@ MAIN/Host/Services/PrivacySettingsService.cs
 MAIN/Host/Services/SafeBoot.cs
 MAIN/Host/Services/SmokeTestRunner.cs
 MAIN/Host/Services/TruthHealthReportService.cs
+MAIN/Host/Services/TruthTelemetryPublisher.cs
 MAIN/Host/Services/TruthHealthWindowService.cs
 MAIN/Host/Startup/StartupCrashGuard.cs
 MAIN/Host/ToastArchitectureMap.md
@@ -233,8 +234,9 @@ MAIN/VAL.Tests/Truth/TruthLineTests.cs
 MAIN/VAL.Tests/Truth/TruthReaderTests.cs
 MAIN/VAL.Tests/VAL.Tests.csproj
 MAIN/VAL.Truth/Pipeline/AtomicFile.cs
-MAIN/VAL.Truth/Pipeline/Truth/ContinuumWriter.cs
-MAIN/VAL.Truth/Pipeline/Truth/IContinuumWriter.cs
+MAIN/VAL.Truth/Pipeline/Truth/ITruthStore.cs
+MAIN/VAL.Truth/Pipeline/Truth/ITruthTelemetryPublisher.cs
+MAIN/VAL.Truth/Pipeline/Truth/NullTruthTelemetryPublisher.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.File.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.Health.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.Line.cs
@@ -242,6 +244,7 @@ MAIN/VAL.Truth/Pipeline/Truth/Truth.Messages.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.Normalize.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.Reader.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.Storage.cs
+MAIN/VAL.Truth/Pipeline/Truth/TruthStore.cs
 MAIN/VAL.Truth/Properties/InternalsVisibleTo.cs
 MAIN/VAL.Truth/VAL.Truth.csproj
 README.md

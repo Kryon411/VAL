@@ -15,9 +15,6 @@ namespace VAL.Host.Services
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IWebMessageSender _webMessageSender;
         private readonly IPrivacySettingsService _privacySettingsService;
-        private readonly IToastHub _toastHub;
-        private readonly VAL.Continuum.Pipeline.Truth.IContinuumWriter _continuumWriter;
-        private readonly VAL.Continuum.Pipeline.Inject.IContinuumInjectInbox _injectQueue;
         private readonly StartupOptions _startupOptions;
 
         private CoreWebView2? _modulesInitializedForCore;
@@ -29,18 +26,12 @@ namespace VAL.Host.Services
             IWebViewRuntime webViewRuntime,
             IWebMessageSender webMessageSender,
             IPrivacySettingsService privacySettingsService,
-            IToastHub toastHub,
-            VAL.Continuum.Pipeline.Truth.IContinuumWriter continuumWriter,
-            VAL.Continuum.Pipeline.Inject.IContinuumInjectInbox injectQueue,
             StartupOptions startupOptions)
         {
             _moduleLoader = moduleLoader;
             _webViewRuntime = webViewRuntime;
             _webMessageSender = webMessageSender;
             _privacySettingsService = privacySettingsService;
-            _toastHub = toastHub;
-            _continuumWriter = continuumWriter;
-            _injectQueue = injectQueue;
             _startupOptions = startupOptions;
         }
 

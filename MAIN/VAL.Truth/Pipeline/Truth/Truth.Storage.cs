@@ -298,10 +298,10 @@ namespace VAL.Continuum.Pipeline.Truth
             }
         }
 
-        public static void AppendTruthLine(string chatId, char role, string text)
+        public static bool AppendTruthLine(string chatId, char role, string text)
         {
-            if (string.IsNullOrWhiteSpace(chatId)) return;
-            if (string.IsNullOrWhiteSpace(text)) return;
+            if (string.IsNullOrWhiteSpace(chatId)) return false;
+            if (string.IsNullOrWhiteSpace(text)) return false;
 
             try
             {
@@ -309,98 +309,68 @@ namespace VAL.Continuum.Pipeline.Truth
 
                 var roleChar = (role == 'A' || role == 'a') ? 'A' : 'U';
                 var normalized = NormalizeForStorage(text);
-                if (string.IsNullOrWhiteSpace(normalized)) return;
-
-                bool appended = false;
+                if (string.IsNullOrWhiteSpace(normalized)) return false;
 
                 // If Chronicle is rebuilding this chat, route writes to the rebuild temp file
                 // and commit atomically only when Chronicle completes.
                 if (_rebuildByChat.TryGetValue(chatId, out var rebuild))
                 {
                     if (rebuild.Token.IsCancellationRequested)
-                        return;
+                        return false;
 
                     lock (rebuild.Gate)
                     {
                         if (rebuild.Token.IsCancellationRequested)
-                            return;
+                            return false;
 
                         var fp = Fingerprint(roleChar, NormalizeForFingerprint(normalized));
                         if (rebuild.Seen.Contains(fp))
-                            return;
+                            return false;
 
                         var prefix = roleChar == 'A' ? "A|" : "U|";
                         var line = prefix + normalized + Environment.NewLine;
                         File.AppendAllText(rebuild.TempPath, line);
                         rebuild.Seen.Add(fp);
-                        appended = true;
-                    }
-                }
-                else
-                {
-                    var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
-                    lock (idx.Gate)
-                    {
-                        // If Truth.log was deleted out-of-band (rebuild scripts, manual cleanup),
-                        // clear the in-memory de-dupe index so capture can resume safely.
-                        try
-                        {
-                            var path = GetTruthPath(chatId);
-                            if (idx.Loaded && !File.Exists(path) && idx.Seen.Count > 0)
-                                idx.Seen.Clear();
-                        }
-                        catch { }
-
-                        EnsureIndexLoaded(chatId, idx);
-
-                        var fp = Fingerprint(roleChar, NormalizeForFingerprint(normalized));
-                        if (idx.Seen.Contains(fp))
-                            return; // idempotent
-
-                        var prefix = roleChar == 'A' ? "A|" : "U|";
-                        // One physical line per message (payload itself is already escaped for storage).
-                        var line = prefix + normalized + Environment.NewLine;
-
-                        // IMPORTANT: only mark as "seen" after the append succeeds,
-                        // otherwise an IO failure could cause permanent message loss.
-                        if (!AtomicFile.TryAppendAllText(GetTruthPath(chatId), line))
-                            return;
-                        idx.Seen.Add(fp);
-
-                        appended = true;
+                        return true;
                     }
                 }
 
-                // Telemetry: best-effort size hygiene (nudge Pulse before sessions get unstable).
-                // Must never affect Truth writing or throw.
-                if (appended)
+                var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
+                lock (idx.Gate)
                 {
-                    long bytes = 0;
+                    // If Truth.log was deleted out-of-band (rebuild scripts, manual cleanup),
+                    // clear the in-memory de-dupe index so capture can resume safely.
                     try
                     {
-                        var p = GetTruthPath(chatId);
-                        if (File.Exists(p)) bytes = new FileInfo(p).Length;
+                        var path = GetTruthPath(chatId);
+                        if (idx.Loaded && !File.Exists(path) && idx.Seen.Count > 0)
+                            idx.Seen.Clear();
                     }
                     catch { }
 
-                    TryUpdateTelemetry(chatId, bytes);
+                    EnsureIndexLoaded(chatId, idx);
+
+                    var fp = Fingerprint(roleChar, NormalizeForFingerprint(normalized));
+                    if (idx.Seen.Contains(fp))
+                        return false; // idempotent
+
+                    var prefix = roleChar == 'A' ? "A|" : "U|";
+                    // One physical line per message (payload itself is already escaped for storage).
+                    var line = prefix + normalized + Environment.NewLine;
+
+                    // IMPORTANT: only mark as "seen" after the append succeeds,
+                    // otherwise an IO failure could cause permanent message loss.
+                    if (!AtomicFile.TryAppendAllText(GetTruthPath(chatId), line))
+                        return false;
+                    idx.Seen.Add(fp);
+
+                    return true;
                 }
             }
             catch
             {
                 // must never crash app
-            }
-        }
-
-        private static void TryUpdateTelemetry(string chatId, long bytes)
-        {
-            try
-            {
-                TruthTelemetryBridge.Publish(chatId, bytes);
-            }
-            catch
-            {
-                // telemetry must never throw
+                return false;
             }
         }
 
