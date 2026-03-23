@@ -10,7 +10,7 @@ namespace VAL.Continuum.Pipeline
     internal static class PulsePacketComposer
     {
         private static readonly string[] NoneBullets = { "None." };
-        internal const string PreviousChatSummaryHeading = "PREVIOUS CHAT SUMMARY";
+        internal const string ThreadStateSummaryHeading = "THREAD STATE SUMMARY";
         internal const string WhereWeLeftOffHeading = "WHERE WE LEFT OFF";
         internal const string OpenLoopsHeading = "OPEN LOOPS";
         internal const string CriticalContextHeading = "CRITICAL CONTEXT";
@@ -23,7 +23,7 @@ namespace VAL.Continuum.Pipeline
 
             var sb = new StringBuilder();
             AppendBlock(sb, ContinuumPreamble.BuildPulseContinuityPreamble());
-            AppendBulletSection(sb, PreviousChatSummaryHeading, ComposePreviousChatSummary(snapshot, deterministicSections, signalSummary));
+            AppendBulletSection(sb, ThreadStateSummaryHeading, ComposeThreadStateSummary(snapshot, deterministicSections, signalSummary));
             AppendExchangeSection(sb, WhereWeLeftOffHeading, deterministicSections.WhereWeLeftOff);
             AppendBulletSection(sb, OpenLoopsHeading, ComposeOpenLoops(deterministicSections));
             AppendBulletSection(sb, CriticalContextHeading, ComposeCriticalContext(deterministicSections));
@@ -31,7 +31,7 @@ namespace VAL.Continuum.Pipeline
             return sb.ToString().Trim();
         }
 
-        private static IReadOnlyList<string> ComposePreviousChatSummary(PulseSnapshot snapshot, DeterministicPulseSections deterministicSections, SignalSummary? signalSummary)
+        private static IReadOnlyList<string> ComposeThreadStateSummary(PulseSnapshot snapshot, DeterministicPulseSections deterministicSections, SignalSummary? signalSummary)
         {
             if (signalSummary?.PreviousChatSummary?.Count > 0)
                 return signalSummary.PreviousChatSummary;

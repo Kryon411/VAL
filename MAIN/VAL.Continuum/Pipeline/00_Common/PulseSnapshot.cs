@@ -137,7 +137,9 @@ namespace VAL.Continuum.Pipeline
             if (string.IsNullOrWhiteSpace(normalized))
                 return false;
 
-            return normalized.StartsWith("Please write a compact, high-signal PREVIOUS CHAT SUMMARY for the current chat thread.", StringComparison.Ordinal) ||
+            return normalized.StartsWith("Please write a compact, high-signal THREAD STATE SUMMARY for the current chat thread.", StringComparison.Ordinal) ||
+                   normalized.StartsWith("Please write a compact, high-signal PREVIOUS CHAT SUMMARY for the current chat thread.", StringComparison.Ordinal) ||
+                   normalized.StartsWith("Before Pulse opens a fresh continuation chat, write a compact THREAD STATE SUMMARY for this thread.", StringComparison.Ordinal) ||
                    normalized.StartsWith("Before Pulse opens a fresh continuation chat, write a compact PREVIOUS CHAT SUMMARY for this thread.", StringComparison.Ordinal) ||
                    normalized.StartsWith("CONTINUUM SIGNAL INPUT (EXCLUDE FROM CONTINUITY)", StringComparison.Ordinal) ||
                    normalized.StartsWith("Prepare a VAL Pulse handoff for a new chat.", StringComparison.Ordinal) ||
@@ -145,11 +147,11 @@ namespace VAL.Continuum.Pipeline
                    normalized.Contains("Summarize the most important state of the discussion immediately before this request.", StringComparison.Ordinal) ||
                    normalized.Contains("Summarize the thread state immediately before this request.", StringComparison.Ordinal) ||
                    (normalized.Contains("Output only these sections.", StringComparison.Ordinal) &&
-                    normalized.Contains("PREVIOUS CHAT SUMMARY", StringComparison.Ordinal) &&
+                    ContainsSummaryHeading(normalized) &&
                     normalized.Contains("OPEN LOOPS", StringComparison.Ordinal) &&
                     normalized.Contains("CRITICAL CONTEXT", StringComparison.Ordinal)) ||
                    (normalized.Contains("Output exactly:", StringComparison.Ordinal) &&
-                    normalized.Contains("PREVIOUS CHAT SUMMARY", StringComparison.Ordinal) &&
+                    ContainsSummaryHeading(normalized) &&
                     normalized.Contains("- ", StringComparison.Ordinal));
         }
 
@@ -159,9 +161,21 @@ namespace VAL.Continuum.Pipeline
                 return false;
 
             return normalized.StartsWith("VAL Pulse Handoff", StringComparison.Ordinal) ||
-                   (normalized.StartsWith("PREVIOUS CHAT SUMMARY", StringComparison.Ordinal) &&
+                   (StartsWithSummaryHeading(normalized) &&
                     normalized.Contains("\nOPEN LOOPS\n", StringComparison.Ordinal) &&
                     normalized.Contains("\nCRITICAL CONTEXT\n", StringComparison.Ordinal));
+        }
+
+        private static bool ContainsSummaryHeading(string normalized)
+        {
+            return normalized.Contains("THREAD STATE SUMMARY", StringComparison.Ordinal) ||
+                   normalized.Contains("PREVIOUS CHAT SUMMARY", StringComparison.Ordinal);
+        }
+
+        private static bool StartsWithSummaryHeading(string normalized)
+        {
+            return normalized.StartsWith("THREAD STATE SUMMARY", StringComparison.Ordinal) ||
+                   normalized.StartsWith("PREVIOUS CHAT SUMMARY", StringComparison.Ordinal);
         }
 
         private static string Normalize(string? text)

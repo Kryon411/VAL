@@ -18,7 +18,7 @@ namespace VAL.Tests.Continuum
 
             var rendered = PulsePacketComposer.Compose(snapshot, sections, signalSummary);
 
-            Assert.Contains(PulsePacketComposer.PreviousChatSummaryHeading, rendered);
+            Assert.Contains(PulsePacketComposer.ThreadStateSummaryHeading, rendered);
             Assert.Contains(PulsePacketComposer.WhereWeLeftOffHeading, rendered);
             Assert.Contains(PulsePacketComposer.OpenLoopsHeading, rendered);
             Assert.Contains(PulsePacketComposer.CriticalContextHeading, rendered);
@@ -52,8 +52,8 @@ namespace VAL.Tests.Continuum
 
             var rendered = PulsePacketComposer.Compose(snapshot, sections, signalSummary: null);
 
-            Assert.Contains("The following is a guide and carried context from a previous chat.", rendered);
-            Assert.Contains("PREVIOUS CHAT SUMMARY", rendered);
+            Assert.Contains("The following is a guide and carried context from an earlier chat in this workstream.", rendered);
+            Assert.Contains("THREAD STATE SUMMARY", rendered);
             Assert.Contains("WHERE WE LEFT OFF", rendered);
             Assert.Contains("USER:", rendered);
             Assert.Contains("ASSISTANT:", rendered);
@@ -126,7 +126,7 @@ namespace VAL.Tests.Continuum
                 PreviousChatSummary = new[]
                 {
                     "Continuum now owns final Pulse packet composition.",
-                    "Signal is narrowed to a visible PREVIOUS CHAT SUMMARY only."
+                    "Signal is narrowed to a visible THREAD STATE SUMMARY only."
                 }
             };
         }

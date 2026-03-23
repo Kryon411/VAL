@@ -84,7 +84,7 @@ namespace VAL.Continuum.Pipeline
         internal static string BuildPulseContinuityPreamble()
         {
             return
-@"The following is a guide and carried context from a previous chat.
+@"The following is a guide and carried context from an earlier chat in this workstream.
 
 Use this frozen snapshot to resume the work without redoing prior analysis.
 
@@ -93,7 +93,7 @@ On the first assistant reply after injection:
 - Otherwise acknowledge readiness in one short line and wait.
 
 Treat WHERE WE LEFT OFF as the authoritative continuation anchor.
-Treat PREVIOUS CHAT SUMMARY, OPEN LOOPS, CRITICAL CONTEXT, and TRUTH WALKBACK HIGHLIGHTS as supporting context.";
+Treat THREAD STATE SUMMARY, OPEN LOOPS, CRITICAL CONTEXT, and TRUTH WALKBACK HIGHLIGHTS as supporting context.";
         }
 
         public static string LoadPulsePacketTemplate() => LoadPulsePacketTemplate(string.Empty);

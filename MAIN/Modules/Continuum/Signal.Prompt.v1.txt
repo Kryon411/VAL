@@ -1,4 +1,4 @@
-Please write a compact, high-signal PREVIOUS CHAT SUMMARY for the current chat thread.
+Please write a compact, high-signal THREAD STATE SUMMARY for the current chat thread.
 
 Summarize the most important state of the discussion immediately before this request.
 Focus on decisions, completed work, current direction, unresolved questions, concrete constraints, and important context that should be preserved.
@@ -16,5 +16,5 @@ Output only the section below.
 
 Output exactly:
 
-PREVIOUS CHAT SUMMARY
+THREAD STATE SUMMARY
 - 

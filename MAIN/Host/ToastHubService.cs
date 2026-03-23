@@ -178,7 +178,7 @@ namespace VAL.Host
                         ToastKey.PulseInitiated,
                         "A Pulse jump has been initiated. Please stand by.",
                         null,
-                        ToastDuration.XS,
+                        ToastDuration.Sticky,
                         "pulse",
                         ReplaceGroup: true,
                         BypassBurstDedupe: false,

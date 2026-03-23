@@ -4,7 +4,7 @@ Source of truth:
 - VAL.Continuum/Pipeline/00_Common/PulsePacketComposer.cs
 
 Stable final section order:
-- PREVIOUS CHAT SUMMARY
+- THREAD STATE SUMMARY
 - WHERE WE LEFT OFF
 - OPEN LOOPS
 - CRITICAL CONTEXT

@@ -13,7 +13,7 @@ namespace VAL.Tests.Continuum
             Assert.True(ok);
             Assert.NotNull(summary);
             Assert.Equal("Continuum now owns final Pulse packet composition.", summary.PreviousChatSummary[0]);
-            Assert.Equal("Signal is narrowed to a visible PREVIOUS CHAT SUMMARY only.", summary.PreviousChatSummary[1]);
+            Assert.Equal("Signal is narrowed to a visible THREAD STATE SUMMARY only.", summary.PreviousChatSummary[1]);
         }
 
         [Fact]
@@ -26,6 +26,16 @@ namespace VAL.Tests.Continuum
             Assert.Equal(5, summary.PreviousChatSummary.Count);
             Assert.Equal("Host-side idempotent logging was implemented, eliminating duplication across restarts and stabilizing append-only behavior.", summary.PreviousChatSummary[0]);
             Assert.Equal("System has reached a near-complete state, with remaining work focused on refinement, ergonomics, and smoothing handoff behavior rather than core functionality.", summary.PreviousChatSummary[4]);
+        }
+
+        [Fact]
+        public void TryParseStillAcceptsLegacyPreviousChatSummaryHeading()
+        {
+            var ok = SignalPacket.TryParse(BuildLegacySignalSummary(), out var summary);
+
+            Assert.True(ok);
+            Assert.NotNull(summary);
+            Assert.Equal("Legacy packets remain readable while the new heading rolls out.", summary.PreviousChatSummary[0]);
         }
 
         [Fact]
@@ -61,7 +71,7 @@ End of Pulse Handoff";
         public void TryParseRejectsNonBulletSectionBody()
         {
             var malformed =
-@"PREVIOUS CHAT SUMMARY
+@"THREAD STATE SUMMARY
 Continuum owns the final packet.";
 
             var ok = SignalPacket.TryParse(malformed, out _);
@@ -73,7 +83,7 @@ Continuum owns the final packet.";
         public void TryParseRejectsExtraSemanticHeadings()
         {
             var malformed =
-@"PREVIOUS CHAT SUMMARY
+@"THREAD STATE SUMMARY
 - Continuum owns the final packet.
 
 OPEN LOOPS
@@ -87,15 +97,15 @@ OPEN LOOPS
         private static string BuildValidSignalSummary()
         {
             return
-@"PREVIOUS CHAT SUMMARY
+@"THREAD STATE SUMMARY
 - Continuum now owns final Pulse packet composition.
-- Signal is narrowed to a visible PREVIOUS CHAT SUMMARY only.";
+- Signal is narrowed to a visible THREAD STATE SUMMARY only.";
         }
 
         private static string BuildDomNormalizedSignalSummary()
         {
             return
-@"PREVIOUS CHAT SUMMARY
+@"THREAD STATE SUMMARY
 
 Host-side idempotent logging was implemented, eliminating duplication across restarts and stabilizing append-only behavior.
 
@@ -106,6 +116,14 @@ Tagging noise in summaries was identified as a policy issue, leading to adoption
 Quick refresh outputs confirm correct rehydration behavior, with assistant responses aligning to constraints and workflow without drift.
 
 System has reached a near-complete state, with remaining work focused on refinement, ergonomics, and smoothing handoff behavior rather than core functionality.";
+        }
+
+        private static string BuildLegacySignalSummary()
+        {
+            return
+@"PREVIOUS CHAT SUMMARY
+- Legacy packets remain readable while the new heading rolls out.
+- The parser should accept both headings during migration.";
         }
     }
 }

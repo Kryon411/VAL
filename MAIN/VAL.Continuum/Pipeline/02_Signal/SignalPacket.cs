@@ -6,7 +6,8 @@ namespace VAL.Continuum.Pipeline.Signal
 {
     internal static class SignalPacket
     {
-        internal const string PreviousChatSummaryHeading = "PREVIOUS CHAT SUMMARY";
+        internal const string ThreadStateSummaryHeading = "THREAD STATE SUMMARY";
+        internal const string LegacyPreviousChatSummaryHeading = "PREVIOUS CHAT SUMMARY";
 
         private static readonly HashSet<string> ForbiddenHeadings = new(StringComparer.Ordinal)
         {
@@ -39,7 +40,7 @@ namespace VAL.Continuum.Pipeline.Signal
             if (string.IsNullOrWhiteSpace(normalized))
                 return false;
 
-            if (!TrySplitSingleSection(normalized, PreviousChatSummaryHeading, out var prefix, out var body))
+            if (!TrySplitSummarySection(normalized, out var prefix, out var body))
                 return false;
 
             if (!string.IsNullOrWhiteSpace(prefix))
@@ -57,6 +58,12 @@ namespace VAL.Continuum.Pipeline.Signal
             };
 
             return true;
+        }
+
+        private static bool TrySplitSummarySection(string text, out string prefix, out string body)
+        {
+            return TrySplitSingleSection(text, ThreadStateSummaryHeading, out prefix, out body) ||
+                   TrySplitSingleSection(text, LegacyPreviousChatSummaryHeading, out prefix, out body);
         }
 
         private static bool TryParseBulletSection(string body, out IReadOnlyList<string> bullets)
