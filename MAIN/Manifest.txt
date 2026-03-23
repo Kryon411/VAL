@@ -251,7 +251,6 @@ MAIN/VAL.Truth/Pipeline/Truth/Truth.Health.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.Line.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.Messages.cs
 MAIN/VAL.Truth/Pipeline/Truth/Truth.Reader.cs
-MAIN/VAL.Truth/Pipeline/Truth/Truth.Storage.cs
 MAIN/VAL.Truth/Pipeline/Truth/TruthStore.cs
 MAIN/VAL.Truth/Pipeline/Truth/TruthViewBuilder.cs
 MAIN/VAL.Truth/Properties/InternalsVisibleTo.cs

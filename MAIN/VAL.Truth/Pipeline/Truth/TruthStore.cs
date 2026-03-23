@@ -12,6 +12,8 @@ namespace VAL.Continuum.Pipeline.Truth
 {
     public sealed class TruthStore : ITruthStore
     {
+        public const string DefaultTruthFileName = "Truth.log";
+
         private sealed class RebuildSession
         {
             public readonly object Gate = new();
@@ -48,7 +50,7 @@ namespace VAL.Continuum.Pipeline.Truth
             _memoryChatsRoot = ResolveMemoryChatsRoot(memoryChatsRootOverride);
         }
 
-        public string TruthFileName => TruthStorage.TruthFileName;
+        public string TruthFileName => DefaultTruthFileName;
 
         public bool AppendTruthLine(string chatId, char role, string text)
         {

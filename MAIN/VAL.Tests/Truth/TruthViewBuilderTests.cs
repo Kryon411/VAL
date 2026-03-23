@@ -13,7 +13,7 @@ namespace VAL.Tests.Truth
         {
             var root = Path.Combine(Path.GetTempPath(), "val-truth-view-builder", Guid.NewGuid().ToString("N"));
             var chatId = "chat-1";
-            var truthPath = Path.Combine(root, chatId, TruthStorage.TruthFileName);
+            var truthPath = Path.Combine(root, chatId, TruthStore.DefaultTruthFileName);
             Directory.CreateDirectory(Path.GetDirectoryName(truthPath)!);
             File.WriteAllText(truthPath, "U|ChatGPT said:\\nCopy code\\nHello there" + Environment.NewLine + "A|Reply");
 
@@ -58,7 +58,7 @@ namespace VAL.Tests.Truth
                 _truthPath = truthPath;
             }
 
-            public string TruthFileName => TruthStorage.TruthFileName;
+            public string TruthFileName => TruthStore.DefaultTruthFileName;
 
             public bool AppendTruthLine(string chatId, char role, string text) => throw new NotSupportedException();
 

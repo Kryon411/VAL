@@ -33,7 +33,7 @@ namespace VAL.Host.Security
                     return false;
 
                 chatDir = fullChatDir;
-                truthPath = Path.Combine(fullChatDir, TruthStorage.TruthFileName);
+                truthPath = Path.Combine(fullChatDir, TruthStore.DefaultTruthFileName);
                 return true;
             }
             catch

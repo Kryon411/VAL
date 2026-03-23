@@ -22,7 +22,7 @@ namespace VAL.Tests.Truth
 
             try
             {
-                var truthPath = Path.Combine(chatDir, TruthStorage.TruthFileName);
+                var truthPath = Path.Combine(chatDir, TruthStore.DefaultTruthFileName);
                 File.WriteAllText(truthPath, "U|hello" + Environment.NewLine + "A|reply");
 
                 var repairPath = Path.Combine(chatDir, "Truth.repair.log");
@@ -45,7 +45,7 @@ namespace VAL.Tests.Truth
                 Assert.Equal(2, result.Snapshot.Report.PhysicalLineCount);
                 Assert.Equal(2, result.Snapshot.Report.LastParsedPhysicalLineNumber);
                 Assert.Equal(42, result.Snapshot.Report.LastRepairBytesRemoved);
-                Assert.Equal(Path.Combine("Memory", "Chats", chatId, TruthStorage.TruthFileName), result.Snapshot.RelativeTruthPath);
+                Assert.Equal(Path.Combine("Memory", "Chats", chatId, TruthStore.DefaultTruthFileName), result.Snapshot.RelativeTruthPath);
             }
             finally
             {

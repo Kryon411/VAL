@@ -54,7 +54,7 @@ namespace TruthDoctor
             foreach (var chatId in chatIds)
             {
                 var chatDir = Path.Combine(options.Root, "Memory", "Chats", chatId);
-                var truthPath = Path.Combine(chatDir, TruthStorage.TruthFileName);
+                var truthPath = Path.Combine(chatDir, TruthStore.DefaultTruthFileName);
                 var repairLogPath = Path.Combine(chatDir, "Truth.repair.log");
 
                 var report = TruthHealth.Build(chatId, truthPath, repairLogPath, options.RepairTailFirst);
@@ -175,7 +175,7 @@ namespace TruthDoctor
             return Directory.EnumerateDirectories(chatsRoot)
                 .Select(Path.GetFileName)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Where(name => File.Exists(Path.Combine(chatsRoot, name!, TruthStorage.TruthFileName)))
+                .Where(name => File.Exists(Path.Combine(chatsRoot, name!, TruthStore.DefaultTruthFileName)))
                 .Cast<string>()
                 .ToArray();
         }

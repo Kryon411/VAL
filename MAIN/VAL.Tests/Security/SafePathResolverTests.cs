@@ -19,7 +19,7 @@ namespace VAL.Tests.Security
             Assert.True(result);
             var expectedChatDir = Path.GetFullPath(Path.Combine(productRoot, "Memory", "Chats", chatId));
             Assert.Equal(expectedChatDir, chatDir);
-            Assert.Equal(Path.Combine(expectedChatDir, TruthStorage.TruthFileName), truthPath);
+            Assert.Equal(Path.Combine(expectedChatDir, TruthStore.DefaultTruthFileName), truthPath);
         }
 
         [Theory]

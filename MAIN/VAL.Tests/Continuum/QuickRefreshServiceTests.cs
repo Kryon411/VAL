@@ -15,7 +15,7 @@ namespace VAL.Tests.Continuum
         {
             var root = Path.Combine(Path.GetTempPath(), "val-quick-refresh-service", Guid.NewGuid().ToString("N"));
             var chatId = "chat-1";
-            var truthPath = Path.Combine(root, chatId, TruthStorage.TruthFileName);
+            var truthPath = Path.Combine(root, chatId, TruthStore.DefaultTruthFileName);
 
             try
             {
@@ -103,7 +103,7 @@ namespace VAL.Tests.Continuum
                 _truthPath = truthPath;
             }
 
-            public string TruthFileName => TruthStorage.TruthFileName;
+            public string TruthFileName => TruthStore.DefaultTruthFileName;
 
             public bool AppendTruthLine(string chatId, char role, string text) => throw new NotSupportedException();
 
