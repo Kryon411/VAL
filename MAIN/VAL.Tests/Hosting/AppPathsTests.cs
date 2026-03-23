@@ -68,7 +68,7 @@ namespace VAL.Tests.Hosting
                 ModulesPath = string.Empty,
             });
 
-            return new AppPaths(options, new FakeLog(), contentRoot);
+            return new AppPaths(options, contentRoot);
         }
 
         private static string CreateTempRoot()
@@ -91,12 +91,5 @@ namespace VAL.Tests.Hosting
             }
         }
 
-        private sealed class FakeLog : ILog
-        {
-            public void Info(string category, string message) { }
-            public void Warn(string category, string message) { }
-            public void LogError(string category, string message) { }
-            public void Verbose(string category, string message) { }
-        }
     }
 }

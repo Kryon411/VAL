@@ -18,9 +18,9 @@ namespace VAL.Host.Startup
         private readonly ILog _log;
         private readonly RateLimiter _rateLimiter = new();
 
-        public StartupCrashGuard(string? productRoot = null, ILog? log = null)
+        public StartupCrashGuard(ILog log, string? productRoot = null)
         {
-            _log = log ?? ValLog.Instance;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             _productRoot = string.IsNullOrWhiteSpace(productRoot)
                 ? AppPathLayout.ResolveProductRoot()
                 : productRoot;

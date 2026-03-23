@@ -91,7 +91,7 @@ namespace VAL.Tests.Truth
                 ProfilePath = "Profile",
             });
 
-            return new AppPaths(options, new FakeLog(), root);
+            return new AppPaths(options, root);
         }
 
         private sealed class FakeLog : ILog

@@ -12,13 +12,13 @@ namespace VAL.Host.Services
         private const string Category = "SafeBoot";
         private readonly string _localConfigPath;
         private readonly SmokeTestSettings _smokeSettings;
-        private readonly ILog _log;
+        private readonly ILogBootstrapper _log;
 
-        public SafeBoot(string localConfigPath, SmokeTestSettings smokeSettings, ILog? log = null)
+        public SafeBoot(string localConfigPath, SmokeTestSettings smokeSettings, ILogBootstrapper log)
         {
             _localConfigPath = localConfigPath;
-            _smokeSettings = smokeSettings;
-            _log = log ?? ValLog.Instance;
+            _smokeSettings = smokeSettings ?? throw new ArgumentNullException(nameof(smokeSettings));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public bool FallbackUsed { get; private set; }
@@ -113,7 +113,7 @@ namespace VAL.Host.Services
 
                 Directory.CreateDirectory(appPaths.LogsRoot);
                 var logPath = Path.Combine(appPaths.LogsRoot, "VAL.log");
-                ValLog.AddSink(new RollingFileLogSink(logPath));
+                _log.AddSink(new RollingFileLogSink(logPath));
 
                 var version = buildInfo?.Version ?? "unknown";
                 var hash = buildInfo?.InformationalVersion ?? "unknown";

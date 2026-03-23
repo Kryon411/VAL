@@ -155,11 +155,13 @@ MAIN/VAL.Host/HostMarker.cs
 MAIN/VAL.Host/ILog.cs
 MAIN/VAL.Host/Json/ValJsonOptions.cs
 MAIN/VAL.Host/Logging/ILogSink.cs
+MAIN/VAL.Host/Logging/ILogBootstrapper.cs
 MAIN/VAL.Host/Logging/LogEvent.cs
 MAIN/VAL.Host/Logging/LogLevel.cs
 MAIN/VAL.Host/Logging/LogSanitizer.cs
 MAIN/VAL.Host/Logging/RateLimiter.cs
 MAIN/VAL.Host/Logging/RollingFileLogSink.cs
+MAIN/VAL.Host/Logging/ValLogBootstrapper.cs
 MAIN/VAL.Host/Logging/ValLogRuntime.cs
 MAIN/VAL.Host/ModuleLoaderService.cs
 MAIN/VAL.Host/ModuleRegistrationTracker.cs

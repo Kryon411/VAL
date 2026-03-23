@@ -1,8 +1,8 @@
 using System;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using VAL.Contracts;
-using VAL.Host;
 
 namespace VAL.Host.WebMessaging
 {
@@ -35,7 +35,7 @@ namespace VAL.Host.WebMessaging
 
             if (string.IsNullOrWhiteSpace(json))
             {
-                ValLog.Warn(nameof(MessageEnvelope), "Parse failed: empty JSON payload.");
+                LogParseIssue("empty JSON payload");
                 return false;
             }
 
@@ -46,14 +46,14 @@ namespace VAL.Host.WebMessaging
 
                 if (root.ValueKind != JsonValueKind.Object)
                 {
-                    ValLog.Warn(nameof(MessageEnvelope), "Parse failed: root is not an object.");
+                    LogParseIssue("root is not an object");
                     return false;
                 }
 
                 var type = ReadString(root, "type");
                 if (string.IsNullOrWhiteSpace(type))
                 {
-                    ValLog.Warn(nameof(MessageEnvelope), "Parse failed: missing type.");
+                    LogParseIssue("missing type");
                     return false;
                 }
 
@@ -90,14 +90,19 @@ namespace VAL.Host.WebMessaging
             }
             catch (JsonException)
             {
-                ValLog.Warn(nameof(MessageEnvelope), "Parse failed: invalid JSON.");
+                LogParseIssue("invalid JSON");
                 return false;
             }
             catch (Exception)
             {
-                ValLog.Warn(nameof(MessageEnvelope), "Parse failed: unexpected error.");
+                LogParseIssue("unexpected error");
                 return false;
             }
+        }
+
+        private static void LogParseIssue(string detail)
+        {
+            Trace.WriteLine($"[VAL] MessageEnvelope parse failed: {detail}");
         }
 
         private static bool IsEnvelopeType(string? type)

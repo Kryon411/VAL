@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
-using VAL.Host;
 
 namespace VAL.Host.Logging
 {
@@ -156,8 +155,8 @@ namespace VAL.Host.Logging
 
             try
             {
-                ValLog.Warn(nameof(RollingFileLogSink),
-                    $"Rolling log rotation failed ({action}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+                Trace.WriteLine(
+                    $"[VAL] Rolling log rotation failed ({action}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
             }
             catch
             {

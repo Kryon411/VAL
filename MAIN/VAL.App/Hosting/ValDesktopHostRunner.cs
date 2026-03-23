@@ -1,9 +1,11 @@
 using System;
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using VAL.Continuum.Pipeline.Telemetry;
 using VAL.Host;
+using VAL.Host.Logging;
 using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Startup;
@@ -85,9 +87,19 @@ namespace VAL.Hosting
             StartupOptions startupOptions)
         {
             var log = services.GetRequiredService<ILog>();
+            var logBootstrapper = services.GetRequiredService<ILogBootstrapper>();
+            var valOptions = services.GetRequiredService<IOptions<ValOptions>>().Value;
             var appPaths = services.GetRequiredService<IAppPaths>();
             var buildInfo = services.GetRequiredService<IBuildInfo>();
             var webViewOptions = services.GetRequiredService<IOptions<WebViewOptions>>().Value;
+
+            logBootstrapper.Configure(
+                Path.Combine(appPaths.LogsRoot, "VAL.log"),
+                valOptions.EnableVerboseLogging);
+            if (appPaths is AppPaths resolvedPaths)
+            {
+                resolvedPaths.WriteDiagnostics(log);
+            }
 
             safeBoot.LogStartupInfo(buildInfo, appPaths, webViewOptions);
             if (startupOptions.SafeMode)

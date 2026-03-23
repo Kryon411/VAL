@@ -8,6 +8,7 @@ using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Commands;
 using VAL.Host.Hosting;
+using VAL.Host.Logging;
 using VAL.Host.Services;
 using VAL.Host.Startup;
 using Xunit;
@@ -65,6 +66,7 @@ namespace VAL.Tests.Hosting
             Assert.Same(smokeSettings, provider.GetRequiredService<SmokeTestSettings>());
             Assert.NotNull(provider.GetRequiredService<SmokeTestState>());
             Assert.NotNull(provider.GetRequiredService<ILog>());
+            Assert.NotNull(provider.GetRequiredService<ILogBootstrapper>());
         }
 
         [Fact]

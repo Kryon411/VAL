@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VAL.Host.Commands;
+using VAL.Host.Logging;
 using VAL.Host.Options;
 using VAL.Host.Security;
 using VAL.Host.Services;
@@ -86,7 +87,8 @@ namespace VAL.Host.Hosting
 
             services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
             services.AddSingleton<IWebMessageSender, WebMessageSender>();
-            services.AddSingleton<ILog>(_ => ValLog.Instance);
+            services.AddSingleton<ILogBootstrapper, ValLogBootstrapper>();
+            services.AddSingleton<ILog>(sp => sp.GetRequiredService<ILogBootstrapper>());
             services.AddSingleton<IAppPaths, AppPaths>();
             services.AddSingleton<IProcessLauncher, ProcessLauncher>();
             services.AddSingleton<IUiThread, UiThread>();

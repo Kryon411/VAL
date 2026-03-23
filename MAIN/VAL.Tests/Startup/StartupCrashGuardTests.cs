@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using VAL.Host;
 using VAL.Host.Startup;
 using Xunit;
 
@@ -13,7 +14,7 @@ namespace VAL.Tests.Startup
         {
             var productRoot = CreateTempRoot();
             WriteState(productRoot, 2);
-            var guard = new StartupCrashGuard(productRoot);
+            var guard = new StartupCrashGuard(new FakeLog(), productRoot);
 
             var safeMode = guard.EvaluateAndMarkStarting();
 
@@ -25,7 +26,7 @@ namespace VAL.Tests.Startup
         {
             var productRoot = CreateTempRoot();
             WriteState(productRoot, 3);
-            var guard = new StartupCrashGuard(productRoot);
+            var guard = new StartupCrashGuard(new FakeLog(), productRoot);
 
             guard.MarkSuccess();
 
@@ -44,7 +45,7 @@ namespace VAL.Tests.Startup
             var statePath = Path.Combine(productRoot, "State", "startup.json");
             Directory.CreateDirectory(Path.GetDirectoryName(statePath)!);
             File.WriteAllText(statePath, "not-json");
-            var guard = new StartupCrashGuard(productRoot);
+            var guard = new StartupCrashGuard(new FakeLog(), productRoot);
 
             var safeMode = guard.EvaluateAndMarkStarting();
 
@@ -69,6 +70,14 @@ namespace VAL.Tests.Startup
                 lastSuccessUtc = "2024-01-01T00:00:00Z"
             });
             File.WriteAllText(statePath, json);
+        }
+
+        private sealed class FakeLog : ILog
+        {
+            public void Info(string category, string message) { }
+            public void Warn(string category, string message) { }
+            public void LogError(string category, string message) { }
+            public void Verbose(string category, string message) { }
         }
     }
 }
