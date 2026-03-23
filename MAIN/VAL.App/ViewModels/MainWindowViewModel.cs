@@ -24,6 +24,7 @@ namespace VAL.ViewModels
         private readonly ITruthHealthWindowService _truthHealthWindowService;
         private readonly IToastService _toastService;
         private readonly StartupOptions _startupOptions;
+        private readonly ILog _log;
 
         private long _lastExitWarnedOperationId;
         private bool _isDockOpen;
@@ -41,7 +42,8 @@ namespace VAL.ViewModels
             IDiagnosticsWindowService diagnosticsWindowService,
             ITruthHealthWindowService truthHealthWindowService,
             IToastService toastService,
-            StartupOptions startupOptions)
+            StartupOptions startupOptions,
+            ILog log)
         {
             _operationCoordinator = operationCoordinator;
             _commandRouter = commandRouter;
@@ -54,6 +56,7 @@ namespace VAL.ViewModels
             _truthHealthWindowService = truthHealthWindowService;
             _toastService = toastService;
             _startupOptions = startupOptions;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
 
             ToggleDockCommand = new RelayCommand(() => IsDockOpen = !IsDockOpen);
             OpenLogsFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.LogsRoot));
@@ -100,7 +103,7 @@ namespace VAL.ViewModels
             }
             catch
             {
-                ValLog.Warn(nameof(MainWindowViewModel), "Portal runtime initialization failed.");
+                _log.Warn(nameof(MainWindowViewModel), "Portal runtime initialization failed.");
             }
 
             if (_startupOptions.SafeMode)
@@ -115,7 +118,7 @@ namespace VAL.ViewModels
             }
             catch
             {
-                ValLog.Warn(nameof(MainWindowViewModel), "Module initialization failed.");
+                _log.Warn(nameof(MainWindowViewModel), "Module initialization failed.");
             }
         }
 
@@ -127,7 +130,7 @@ namespace VAL.ViewModels
             }
             catch
             {
-                ValLog.Warn(nameof(MainWindowViewModel), "Portal window attach failed.");
+                _log.Warn(nameof(MainWindowViewModel), "Portal window attach failed.");
             }
         }
 
@@ -140,7 +143,7 @@ namespace VAL.ViewModels
             }
             catch
             {
-                ValLog.Warn(nameof(MainWindowViewModel), "Failed to handle web message.");
+                _log.Warn(nameof(MainWindowViewModel), "Failed to handle web message.");
                 _toastService.ShowMessage(
                     "Command failed.",
                     "The action could not be completed. See Logs/VAL.log for details.",
@@ -172,7 +175,7 @@ namespace VAL.ViewModels
             var commandName = string.IsNullOrWhiteSpace(result.CommandName) ? "<unknown>" : result.CommandName;
             var diagnostic = string.IsNullOrWhiteSpace(result.DiagnosticDetail) ? "none" : result.DiagnosticDetail;
             var exception = result.Exception == null ? "none" : LogSanitizer.Sanitize(result.Exception.ToString());
-            ValLog.Warn(nameof(MainWindowViewModel),
+            _log.Warn(nameof(MainWindowViewModel),
                 $"Dock command failed '{commandName}' (reason: {result.Reason}, diagnostic: {diagnostic}, exception: {exception}).");
 
             _toastService.ShowMessage(
@@ -207,7 +210,7 @@ namespace VAL.ViewModels
             }
             catch
             {
-                ValLog.Warn(nameof(MainWindowViewModel), "Close guard failed.");
+                _log.Warn(nameof(MainWindowViewModel), "Close guard failed.");
                 return false;
             }
         }

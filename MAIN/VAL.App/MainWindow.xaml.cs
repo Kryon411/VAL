@@ -18,6 +18,7 @@ namespace VAL
 {
     public partial class MainWindow : Window
     {
+        private readonly ILog _log;
         private readonly IToastService _toastService;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly MainWindowViewModel _viewModel;
@@ -62,6 +63,7 @@ namespace VAL
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
         public MainWindow(
+            ILog log,
             IToastService toastService,
             IWebViewRuntime webViewRuntime,
             MainWindowViewModel viewModel,
@@ -70,6 +72,7 @@ namespace VAL
             IStartupCrashGuard startupCrashGuard,
             IControlCentreUiStateStore uiStateStore)
         {
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             _toastService = toastService;
             _webViewRuntime = webViewRuntime;
             _viewModel = viewModel;
@@ -123,7 +126,7 @@ namespace VAL
             }
             catch
             {
-                ValLog.Warn("MainWindow", "Close guard failed.");
+                _log.Warn("MainWindow", "Close guard failed.");
             }
         }
 
@@ -141,7 +144,7 @@ namespace VAL
             }
             catch
             {
-                ValLog.Warn("MainWindow", "Failed to attach portal window handle.");
+                _log.Warn("MainWindow", "Failed to attach portal window handle.");
             }
         }
 
@@ -172,7 +175,7 @@ namespace VAL
             }
             catch
             {
-                ValLog.Warn("MainWindow", "Failed to close Control Centre overlay window.");
+                _log.Warn("MainWindow", "Failed to close Control Centre overlay window.");
             }
         }
 
@@ -191,7 +194,7 @@ namespace VAL
                 var hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
                 if (hr != 0)
                 {
-                    ValLog.Warn("MainWindow", $"Failed to set dark mode attribute (HRESULT=0x{hr:X8}).");
+                    _log.Warn("MainWindow", $"Failed to set dark mode attribute (HRESULT=0x{hr:X8}).");
                 }
             }
 
@@ -203,7 +206,7 @@ namespace VAL
             }
             catch (Exception ex)
             {
-                ValLog.Warn("MainWindow", $"WebView2 initialization failed: {ex}");
+                _log.Warn("MainWindow", $"WebView2 initialization failed: {ex}");
                 MessageBox.Show(
                     "VAL could not initialize the embedded browser. Please restart the app.",
                     "VAL",
@@ -222,12 +225,12 @@ namespace VAL
             }
             catch
             {
-                ValLog.Warn("MainWindow", "View model initialization failed.");
+                _log.Warn("MainWindow", "View model initialization failed.");
             }
 
             if (!Uri.TryCreate(_webViewOptions.StartUrl, UriKind.Absolute, out var startUri))
             {
-                ValLog.Warn("MainWindow", "Invalid StartUrl configured. Falling back to default.");
+                _log.Warn("MainWindow", "Invalid StartUrl configured. Falling back to default.");
                 startUri = new Uri(WebViewOptions.DefaultStartUrl);
             }
 
@@ -305,7 +308,7 @@ namespace VAL
                     }
 
                     _ccLoggedNotReady = true;
-                    ValLog.Info("MainWindow", "Control Centre click ignored because WebView2 is not ready.");
+                    _log.Info("MainWindow", "Control Centre click ignored because WebView2 is not ready.");
                     return;
                 }
 
@@ -313,7 +316,7 @@ namespace VAL
             }
             catch (Exception ex)
             {
-                ValLog.Warn("MainWindow", $"Failed to post Control Centre message: {ex.Message}");
+                _log.Warn("MainWindow", $"Failed to post Control Centre message: {ex.Message}");
             }
         }
 
@@ -511,7 +514,7 @@ namespace VAL
                 }
                 catch
                 {
-                    ValLog.Warn("MainWindow", "Failed to refresh overlay state after navigation.");
+                    _log.Warn("MainWindow", "Failed to refresh overlay state after navigation.");
                 }
             });
         }
@@ -539,7 +542,7 @@ namespace VAL
                 return;
             }
 
-            _ccOverlay = new ControlCentreOverlay();
+            _ccOverlay = new ControlCentreOverlay(_log);
             _ccOverlay.Owner = this;
             _ccOverlay.Clicked += ControlCentreOverlay_Clicked;
             _ccOverlay.GeometryChanged += ControlCentreOverlay_GeometryChanged;
@@ -635,7 +638,7 @@ namespace VAL
             var registered = RegisterHotKey(hwnd, HotKeyIdLayoutToggle, ModControl | ModAlt | ModShift, VKeyL);
             if (!registered)
             {
-                ValLog.Warn("MainWindow", "Failed to register layout hotkey Ctrl+Alt+Shift+L.");
+                _log.Warn("MainWindow", "Failed to register layout hotkey Ctrl+Alt+Shift+L.");
                 return;
             }
 
@@ -655,7 +658,7 @@ namespace VAL
                 var unregistered = UnregisterHotKey(hwnd, HotKeyIdLayoutToggle);
                 if (!unregistered)
                 {
-                    ValLog.Warn("MainWindow", "Failed to unregister layout hotkey Ctrl+Alt+Shift+L.");
+                    _log.Warn("MainWindow", "Failed to unregister layout hotkey Ctrl+Alt+Shift+L.");
                 }
             }
 

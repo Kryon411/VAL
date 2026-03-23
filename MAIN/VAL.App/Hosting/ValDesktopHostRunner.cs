@@ -84,6 +84,7 @@ namespace VAL.Hosting
             IServiceProvider services,
             StartupOptions startupOptions)
         {
+            var log = services.GetRequiredService<ILog>();
             var appPaths = services.GetRequiredService<IAppPaths>();
             var buildInfo = services.GetRequiredService<IBuildInfo>();
             var webViewOptions = services.GetRequiredService<IOptions<WebViewOptions>>().Value;
@@ -91,7 +92,7 @@ namespace VAL.Hosting
             safeBoot.LogStartupInfo(buildInfo, appPaths, webViewOptions);
             if (startupOptions.SafeMode)
             {
-                ValLog.Info("Startup", "SAFE MODE: modules disabled");
+                log.Info("Startup", "SAFE MODE: modules disabled");
             }
         }
 

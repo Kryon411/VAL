@@ -12,6 +12,7 @@ namespace VAL
 {
     public partial class ControlCentreOverlay : Window
     {
+        private readonly ILog _log;
         private const int WmNcHitTest = 0x0084;
         private const int HtTransparent = -1;
         private const int HtClient = 1;
@@ -42,8 +43,9 @@ namespace VAL
             }
         }
 
-        public ControlCentreOverlay()
+        public ControlCentreOverlay(ILog log)
         {
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             InitializeComponent();
             Loaded += ControlCentreOverlay_Loaded;
             SourceInitialized += ControlCentreOverlay_SourceInitialized;
@@ -255,7 +257,7 @@ namespace VAL
                 LauncherImage.Source = imageSource;
                 LauncherImage.Visibility = Visibility.Visible;
                 LauncherFallbackText.Visibility = Visibility.Collapsed;
-                ValLog.Info(nameof(ControlCentreOverlay), "Launcher icon source: PackResource PNG");
+                _log.Info(nameof(ControlCentreOverlay), "Launcher icon source: PackResource PNG");
                 return;
             }
 
@@ -265,17 +267,17 @@ namespace VAL
                 LauncherImage.Source = imageSource;
                 LauncherImage.Visibility = Visibility.Visible;
                 LauncherFallbackText.Visibility = Visibility.Collapsed;
-                ValLog.Info(nameof(ControlCentreOverlay), $"Launcher icon source: ICO ({icoPath})");
+                _log.Info(nameof(ControlCentreOverlay), $"Launcher icon source: ICO ({icoPath})");
                 return;
             }
 
             LauncherImage.Source = null;
             LauncherImage.Visibility = Visibility.Collapsed;
             LauncherFallbackText.Visibility = Visibility.Visible;
-            ValLog.Warn(nameof(ControlCentreOverlay), "Launcher icon source: fallback text 'CC' (pack resource/ICO unavailable).");
+            _log.Warn(nameof(ControlCentreOverlay), "Launcher icon source: fallback text 'CC' (pack resource/ICO unavailable).");
         }
 
-        private static BitmapImage? TryLoadPackPng(string packUri)
+        private BitmapImage? TryLoadPackPng(string packUri)
         {
             try
             {
@@ -290,12 +292,12 @@ namespace VAL
             }
             catch (Exception ex)
             {
-                ValLog.Warn(nameof(ControlCentreOverlay), $"Failed to load launcher pack PNG '{packUri}': {ex.Message}");
+                _log.Warn(nameof(ControlCentreOverlay), $"Failed to load launcher pack PNG '{packUri}': {ex.Message}");
                 return null;
             }
         }
 
-        private static BitmapFrame? TryLoadIcon(string iconPath)
+        private BitmapFrame? TryLoadIcon(string iconPath)
         {
             try
             {
@@ -311,7 +313,7 @@ namespace VAL
             }
             catch (Exception ex)
             {
-                ValLog.Warn(nameof(ControlCentreOverlay), $"Failed to load launcher ICO '{iconPath}': {ex.Message}");
+                _log.Warn(nameof(ControlCentreOverlay), $"Failed to load launcher ICO '{iconPath}': {ex.Message}");
                 return null;
             }
         }
