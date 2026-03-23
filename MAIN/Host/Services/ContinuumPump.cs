@@ -9,7 +9,6 @@ namespace VAL.Host.Services
 {
     public sealed class ContinuumPump : IContinuumPump, IDisposable
     {
-        private static readonly RateLimiter RateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
         private const int QueueWarnThreshold = 50;
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(200);
@@ -19,6 +18,7 @@ namespace VAL.Host.Services
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IUiThread _uiThread;
         private readonly IContinuumInjectInbox _injectQueue;
+        private readonly RateLimiter _rateLimiter = new();
 
         private CancellationTokenSource? _pumpCts;
         private Task? _pumpTask;
@@ -139,7 +139,7 @@ namespace VAL.Host.Services
                 catch
                 {
                     var key = "continuum.inject.dispatch.fail";
-                    if (RateLimiter.Allow(key, LogInterval))
+                    if (_rateLimiter.Allow(key, LogInterval))
                         ValLog.Warn(nameof(ContinuumPump), "Continuum dispatch failed.");
                 }
             });
@@ -154,7 +154,7 @@ namespace VAL.Host.Services
                 return;
 
             var key = "continuum.inject.queue.depth";
-            if (!RateLimiter.Allow(key, LogInterval))
+            if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
             ValLog.Warn(nameof(ContinuumPump), $"Continuum inject queue backlog: {count} items.");

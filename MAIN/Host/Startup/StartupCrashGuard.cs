@@ -14,8 +14,8 @@ namespace VAL.Host.Startup
         private const string Category = "StartupCrashGuard";
         private const int CrashThreshold = 2;
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(30);
-        private static readonly RateLimiter RateLimiter = new();
         private readonly string _productRoot;
+        private readonly RateLimiter _rateLimiter = new();
 
         public StartupCrashGuard(string? productRoot = null)
         {
@@ -121,9 +121,9 @@ namespace VAL.Host.Startup
             }
         }
 
-        private static void LogStateIssue(string message)
+        private void LogStateIssue(string message)
         {
-            if (RateLimiter.Allow("startup.guard.state", LogInterval))
+            if (_rateLimiter.Allow("startup.guard.state", LogInterval))
             {
                 ValLog.Warn(Category, message);
             }

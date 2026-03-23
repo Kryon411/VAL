@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
 using VAL.Host;
 
 namespace VAL.Host.Logging
@@ -15,9 +16,9 @@ namespace VAL.Host.Logging
         private readonly string _directory;
         private readonly string _baseName;
         private readonly string _extension;
-        private static readonly RateLimiter RateLimiter = new();
+        private readonly RateLimiter _rateLimiter = new();
+        private int _loggingWarning;
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
-        [ThreadStatic] private static bool _loggingWarning;
 
         public RollingFileLogSink(string filePath, long maxBytes = 2 * 1024 * 1024, int maxFiles = 5)
         {
@@ -145,17 +146,16 @@ namespace VAL.Host.Logging
             return Path.Combine(_directory, $"{_baseName}.{index}{_extension}");
         }
 
-        private static void LogRotationFailure(string action, Exception ex)
+        private void LogRotationFailure(string action, Exception ex)
         {
-            if (_loggingWarning)
+            if (!_rateLimiter.Allow($"log.rotate.{action}", LogInterval))
                 return;
 
-            if (!RateLimiter.Allow($"log.rotate.{action}", LogInterval))
+            if (Interlocked.Exchange(ref _loggingWarning, 1) == 1)
                 return;
 
             try
             {
-                _loggingWarning = true;
                 ValLog.Warn(nameof(RollingFileLogSink),
                     $"Rolling log rotation failed ({action}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
             }
@@ -165,7 +165,7 @@ namespace VAL.Host.Logging
             }
             finally
             {
-                _loggingWarning = false;
+                Volatile.Write(ref _loggingWarning, 0);
             }
         }
     }

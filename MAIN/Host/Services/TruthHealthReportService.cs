@@ -11,11 +11,11 @@ namespace VAL.Host.Services
     {
         internal const int WarnMb = 50;
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(20);
-        private static readonly RateLimiter RateLimiter = new();
 
         private readonly ISessionContext _sessionContext;
         private readonly ITruthStore _truthStore;
         private readonly string? _productRootOverride;
+        private readonly RateLimiter _rateLimiter = new();
 
         public TruthHealthReportService(ISessionContext sessionContext, ITruthStore truthStore)
         {
@@ -182,9 +182,9 @@ namespace VAL.Host.Services
             return true;
         }
 
-        private static void LogFailure()
+        private void LogFailure()
         {
-            if (!RateLimiter.Allow("truth.health.report", LogInterval))
+            if (!_rateLimiter.Allow("truth.health.report", LogInterval))
                 return;
 
             ValLog.Warn(nameof(TruthHealthReportService), "Truth health report generation failed.");
