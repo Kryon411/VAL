@@ -21,12 +21,12 @@ namespace VAL.Host.Commands
     public sealed class HostCommandRouter
     {
         private static readonly long BlockedTypeLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
-        private static long _lastBlockedTypeLogTicks;
         private static readonly JsonElement EmptyPayload = JsonSerializer.SerializeToElement(new { });
 
         private readonly CommandRegistry _commandRegistry;
         private readonly ICommandDiagnosticsReporter? _diagnosticsReporter;
         private readonly ISessionContext _sessionContext;
+        private long _lastBlockedTypeLogTicks;
 
         public HostCommandRouter(
             CommandRegistry commandRegistry,
@@ -131,7 +131,7 @@ namespace VAL.Host.Commands
             return string.Equals(cmd.Type, WebCommandNames.ToolsOpenDiagnostics, StringComparison.Ordinal);
         }
 
-        private static void LogBlockedType(string type, Uri? sourceUri, string reason)
+        private void LogBlockedType(string type, Uri? sourceUri, string reason)
         {
             var nowTicks = DateTimeOffset.UtcNow.Ticks;
             var lastTicks = Interlocked.Read(ref _lastBlockedTypeLogTicks);

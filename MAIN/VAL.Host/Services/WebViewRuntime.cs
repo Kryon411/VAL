@@ -44,12 +44,12 @@ namespace VAL.Host.Services
 
         public event Action<WebMessageEnvelope>? WebMessageJsonReceived;
         public event Action? NavigationCompleted;
-        private static long _lastRejectedLogTicks;
         private static readonly long RejectedLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
-        private static long _lastBridgeDisarmedLogTicks;
-        private static long _lastBridgeIgnoredLogTicks;
-        private static long _lastNavigationBlockedLogTicks;
         private static readonly long BridgeLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
+        private long _lastRejectedLogTicks;
+        private long _lastBridgeDisarmedLogTicks;
+        private long _lastBridgeIgnoredLogTicks;
+        private long _lastNavigationBlockedLogTicks;
 
         public async Task InitializeAsync(WebView2 control)
         {
@@ -303,7 +303,7 @@ namespace VAL.Host.Services
             }
         }
 
-        private static void HandleNavigationStarting(CoreWebView2NavigationStartingEventArgs e)
+        private void HandleNavigationStarting(CoreWebView2NavigationStartingEventArgs e)
         {
             var uri = e.Uri;
             if (!WebOriginPolicy.TryIsNavigationAllowed(uri, out _))
@@ -329,14 +329,9 @@ namespace VAL.Host.Services
                 LogBridgeDisarmed(source);
         }
 
-        private static void LogRejectedWebMessage(string? source, string reason)
+        private void LogRejectedWebMessage(string? source, string reason)
         {
-            var nowTicks = DateTimeOffset.UtcNow.Ticks;
-            var lastTicks = Interlocked.Read(ref _lastRejectedLogTicks);
-            if (nowTicks - lastTicks < RejectedLogIntervalTicks)
-                return;
-
-            if (Interlocked.CompareExchange(ref _lastRejectedLogTicks, nowTicks, lastTicks) != lastTicks)
+            if (!ShouldLog(ref _lastRejectedLogTicks, RejectedLogIntervalTicks))
                 return;
 
             ValLog.Warn(nameof(WebViewRuntime),
@@ -362,7 +357,7 @@ namespace VAL.Host.Services
                 $"Ignoring web message while bridge disarmed (current origin: {origin})");
         }
 
-        private static void LogBlockedNavigation(string? uri)
+        private void LogBlockedNavigation(string? uri)
         {
             if (!ShouldLog(ref _lastNavigationBlockedLogTicks, BridgeLogIntervalTicks))
                 return;

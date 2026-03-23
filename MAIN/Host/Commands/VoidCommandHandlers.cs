@@ -4,7 +4,7 @@ namespace VAL.Host.Commands
 {
     internal sealed class VoidCommandHandlers
     {
-        private static bool? _lastEnabledState;
+        private bool? _lastEnabledState;
         private readonly IToastHub _toastHub;
 
         public VoidCommandHandlers(IToastHub toastHub)

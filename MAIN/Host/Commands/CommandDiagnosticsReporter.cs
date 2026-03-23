@@ -8,7 +8,7 @@ namespace VAL.Host.Commands
 {
     internal sealed class CommandDiagnosticsReporter : ICommandDiagnosticsReporter
     {
-        private static int _diagnosticsFailureToastShown;
+        private int _diagnosticsFailureToastShown;
         private readonly IToastService _toastService;
 
         public CommandDiagnosticsReporter(IToastService toastService)
