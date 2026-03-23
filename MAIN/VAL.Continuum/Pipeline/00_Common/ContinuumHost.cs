@@ -17,11 +17,12 @@ using VAL.Continuum.Pipeline;
 
 namespace VAL.Continuum
 {
-    public sealed class ContinuumHost
+    internal sealed class ContinuumHost
     {
         private readonly IWebMessageSender _messageSender;
         private readonly IToastHub _toastHub;
         private readonly ITruthStore _writer;
+        private readonly IQuickRefreshService _quickRefreshService;
         private readonly IContinuumInjectInbox _injectQueue;
         private readonly ISessionContext _sessionContext;
         private readonly OperationCoordinator _operationCoordinator;
@@ -34,6 +35,7 @@ namespace VAL.Continuum
             IWebMessageSender messageSender,
             IToastHub toastHub,
             ITruthStore writer,
+            IQuickRefreshService quickRefreshService,
             IContinuumInjectInbox injectQueue,
             ISessionContext sessionContext,
             OperationCoordinator operationCoordinator,
@@ -42,6 +44,7 @@ namespace VAL.Continuum
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
             _writer = writer ?? throw new ArgumentNullException(nameof(writer));
+            _quickRefreshService = quickRefreshService ?? throw new ArgumentNullException(nameof(quickRefreshService));
             _injectQueue = injectQueue ?? throw new ArgumentNullException(nameof(injectQueue));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _operationCoordinator = operationCoordinator ?? throw new ArgumentNullException(nameof(operationCoordinator));
@@ -53,6 +56,7 @@ namespace VAL.Continuum
         private Action<MessageEnvelope> PostToWebMessage => _messageSender.Send;
         private IToastHub Toasts => _toastHub;
         private ITruthStore Writer => _writer;
+        private IQuickRefreshService QuickRefresh => _quickRefreshService;
         private IContinuumInjectInbox InjectQueue => _injectQueue;
         private ISessionContext SessionContext => _sessionContext;
         private OperationCoordinator OperationCoordinator => _operationCoordinator;
@@ -1183,7 +1187,7 @@ namespace VAL.Continuum
             try
             {
                 var token = OperationCoordinator.GetTokenIfRunning(GuardedOperationKind.Pulse);
-                var seed = QuickRefreshFlow.CreatePulseSeed(cid, renderedPulsePacket, "PulsePacketComposer", token);
+                var seed = QuickRefresh.CreatePulseSeed(cid, renderedPulsePacket, "PulsePacketComposer", token);
                 InjectQueue.Enqueue(seed);
             }
             catch (OperationCanceledException)
@@ -1459,14 +1463,14 @@ namespace VAL.Continuum
 
         private void RunPulseWithSignalFallback(string chatId, CancellationToken token)
         {
-            var snapshot = QuickRefreshFlow.BuildPulseSnapshot(chatId, token);
+            var snapshot = QuickRefresh.BuildPulseSnapshot(chatId, token);
             token.ThrowIfCancellationRequested();
 
-            var deterministicSections = QuickRefreshFlow.BuildDeterministicPulseSections(chatId, snapshot, token);
+            var deterministicSections = QuickRefresh.BuildDeterministicPulseSections(chatId, snapshot, token);
             token.ThrowIfCancellationRequested();
 
-            var deterministicFallbackPacket = QuickRefreshFlow.BuildDeterministicPulsePacket(snapshot, deterministicSections, token);
-            var deterministicFallbackSeed = QuickRefreshFlow.CreatePulseSeed(chatId, deterministicFallbackPacket, "PulsePacketComposer", token);
+            var deterministicFallbackPacket = QuickRefresh.BuildDeterministicPulsePacket(snapshot, deterministicSections, token);
+            var deterministicFallbackSeed = QuickRefresh.CreatePulseSeed(chatId, deterministicFallbackPacket, "PulsePacketComposer", token);
 
             token.ThrowIfCancellationRequested();
 

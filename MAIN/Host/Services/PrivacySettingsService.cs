@@ -7,7 +7,7 @@ using VAL.Continuum.Pipeline;
 
 namespace VAL.Host.Services
 {
-    public sealed class PrivacySettingsService : IPrivacySettingsService
+    internal sealed class PrivacySettingsService : IPrivacySettingsService
     {
         private const int CurrentVersion = 1;
         private static readonly JsonSerializerOptions JsonOptions = new()

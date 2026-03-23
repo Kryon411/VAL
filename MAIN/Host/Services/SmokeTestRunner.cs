@@ -14,7 +14,7 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Services
 {
-    public sealed class SmokeTestRunner
+    internal sealed class SmokeTestRunner
     {
         private static readonly string[] ExpectedModules =
         {

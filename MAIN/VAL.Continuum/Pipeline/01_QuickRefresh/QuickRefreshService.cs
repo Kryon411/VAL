@@ -4,30 +4,23 @@ using System.Threading;
 using VAL.Continuum.Pipeline;
 using VAL.Continuum.Pipeline.Filter1;
 using VAL.Continuum.Pipeline.Filter2;
-using VAL.Continuum.Pipeline.Truth;
 using VAL.Continuum.Pipeline.Inject;
+using VAL.Continuum.Pipeline.Truth;
 
 namespace VAL.Continuum.Pipeline.QuickRefresh
 {
-    public static class QuickRefreshFlow
+    internal sealed class QuickRefreshService : IQuickRefreshService
     {
-        public static void Run(string chatId, IContinuumInjectInbox injectInbox)
+        private readonly ITruthStore _truthStore;
+        private readonly ITruthViewBuilder _truthViewBuilder;
+
+        public QuickRefreshService(ITruthStore truthStore, ITruthViewBuilder truthViewBuilder)
         {
-            Run(chatId, injectInbox, CancellationToken.None);
+            _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
+            _truthViewBuilder = truthViewBuilder ?? throw new ArgumentNullException(nameof(truthViewBuilder));
         }
 
-        public static void Run(string chatId, IContinuumInjectInbox injectInbox, CancellationToken token)
-        {
-            if (string.IsNullOrWhiteSpace(chatId))
-                throw new ArgumentNullException(nameof(chatId));
-            ArgumentNullException.ThrowIfNull(injectInbox);
-
-            var injectSeed = BuildLegacyPulseSeed(chatId, token);
-            token.ThrowIfCancellationRequested();
-            injectInbox.Enqueue(injectSeed);
-        }
-
-        public static EssenceInjectController.InjectSeed BuildLegacyPulseSeed(string chatId, CancellationToken token)
+        public EssenceInjectController.InjectSeed BuildLegacyPulseSeed(string chatId, CancellationToken token)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
@@ -40,14 +33,14 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
             return CreatePulseSeed(chatId, pulsePacket, "PulsePacketComposer", token);
         }
 
-        internal static PulseSnapshot BuildPulseSnapshot(string chatId, CancellationToken token)
+        public PulseSnapshot BuildPulseSnapshot(string chatId, CancellationToken token)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
 
             token.ThrowIfCancellationRequested();
 
-            var truth = TruthNormalize.BuildView(chatId);
+            var truth = _truthViewBuilder.BuildView(chatId);
             token.ThrowIfCancellationRequested();
 
             if (truth.Messages == null || truth.Messages.Count == 0)
@@ -61,7 +54,7 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
             return snapshot;
         }
 
-        internal static DeterministicPulseSections BuildDeterministicPulseSections(string chatId, PulseSnapshot snapshot, CancellationToken token)
+        public DeterministicPulseSections BuildDeterministicPulseSections(string chatId, PulseSnapshot snapshot, CancellationToken token)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
@@ -75,7 +68,7 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
             return sections;
         }
 
-        internal static string BuildDeterministicPulsePacket(PulseSnapshot snapshot, DeterministicPulseSections deterministicSections, CancellationToken token)
+        public string BuildDeterministicPulsePacket(PulseSnapshot snapshot, DeterministicPulseSections deterministicSections, CancellationToken token)
         {
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(deterministicSections);
@@ -89,7 +82,7 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
             return pulsePacket;
         }
 
-        public static EssenceInjectController.InjectSeed CreatePulseSeed(
+        public EssenceInjectController.InjectSeed CreatePulseSeed(
             string chatId,
             string pulseText,
             string sourceFileName,
@@ -130,19 +123,14 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
                 .Trim();
         }
 
-        /// <summary>
-        /// Best-effort audit writer.
-        /// Writes small pipeline artifacts (Seed.log, RestructuredSeed.log, etc.) beside Truth.log.
-        /// Must never throw.
-        /// </summary>
-        private static void TryWriteAuditText(string chatId, string fileName, string text)
+        private void TryWriteAuditText(string chatId, string fileName, string text)
         {
             if (string.IsNullOrWhiteSpace(chatId)) return;
             if (string.IsNullOrWhiteSpace(fileName)) return;
 
             try
             {
-                var truthPath = TruthStorage.GetTruthPath(chatId);
+                var truthPath = _truthStore.GetTruthPath(chatId);
                 var dir = Path.GetDirectoryName(truthPath) ?? AppContext.BaseDirectory;
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
@@ -155,15 +143,13 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
             }
         }
 
-        private static bool TryWriteEssenceToContinuumStorage(string chatId, string essenceText, out string storedFileName)
+        private bool TryWriteEssenceToContinuumStorage(string chatId, string essenceText, out string storedFileName)
         {
-            // vNext build: keep deterministic and decoupled from legacy storage types.
-            // Always write beside Truth.log for audit/reuse.
             storedFileName = "Essence-M.Pulse.txt";
 
             try
             {
-                var truthPath = TruthStorage.GetTruthPath(chatId);
+                var truthPath = _truthStore.GetTruthPath(chatId);
                 var dir = Path.GetDirectoryName(truthPath) ?? AppContext.BaseDirectory;
                 var path = Path.Combine(dir, storedFileName);
                 AtomicFile.WriteAllTextAtomic(path, essenceText);

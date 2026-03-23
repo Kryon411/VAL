@@ -3,30 +3,31 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using VAL.Continuum.Pipeline;
-using VAL.Continuum.Pipeline.Truth;
 
 namespace VAL.Continuum.Pipeline.Truth
 {
-    /// <summary>
-    /// Structural-only Truth normalization.
-    /// - Does NOT filter / summarize Truth.log.
-    /// - Decodes escaped newlines (\\n) back into real newlines so paragraph logic works downstream.
-    /// - Removes obvious UI chrome lines that pollute tag detection (Copy code, Document, etc.).
-    /// </summary>
-    public static class TruthNormalize
+    public sealed class TruthViewBuilder : ITruthViewBuilder
     {
-        public static TruthView BuildView(string chatId)
+        private readonly ITruthStore _truthStore;
+
+        public TruthViewBuilder(ITruthStore truthStore)
+        {
+            _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
+        }
+
+        public TruthView BuildView(string chatId)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
 
-            var truthPath = TruthStorage.GetTruthPath(chatId);
+            var truthPath = _truthStore.GetTruthPath(chatId);
             var messages = new List<TruthMessage>();
 
             if (!File.Exists(truthPath))
             {
                 return new TruthView
                 {
+                    ChatId = chatId,
                     Messages = messages
                 };
             }
@@ -40,6 +41,7 @@ namespace VAL.Continuum.Pipeline.Truth
             {
                 return new TruthView
                 {
+                    ChatId = chatId,
                     Messages = messages
                 };
             }
@@ -50,7 +52,6 @@ namespace VAL.Continuum.Pipeline.Truth
                 if (string.IsNullOrWhiteSpace(rawLine))
                     continue;
 
-                // Format: "U|..." or "A|..."
                 var role = TruthRole.User;
                 var text = rawLine;
 
@@ -64,10 +65,7 @@ namespace VAL.Continuum.Pipeline.Truth
                     else if (prefix == 'U')
                         role = TruthRole.User;
                     else
-                    {
-                        // Unknown prefix: treat as user intent authority to avoid accidental loss.
                         role = TruthRole.User;
-                    }
                 }
 
                 text = DecodeEscapedNewlines(text);
@@ -91,9 +89,7 @@ namespace VAL.Continuum.Pipeline.Truth
                 Messages = messages
             };
 
-            // Optional audit renderer (human-readable)
             TryWriteViewFile(truthPath, view);
-
             return view;
         }
 
@@ -101,8 +97,6 @@ namespace VAL.Continuum.Pipeline.Truth
         {
             if (string.IsNullOrEmpty(s)) return string.Empty;
 
-            // Truth.log encodes newlines as literal "\n" for line-based append-only storage.
-            // Convert them back so paragraph splitting works.
             return s.Replace("\\r\\n", "\n").Replace("\\n", "\n").Replace("\\r", "\n");
         }
 
@@ -110,20 +104,13 @@ namespace VAL.Continuum.Pipeline.Truth
         {
             if (string.IsNullOrEmpty(s)) return string.Empty;
 
-            // Remove common capture artifacts that pollute downstream selection.
-            // Keep this conservative; Truth.log remains the source-of-truth.
             s = s.Replace("text\nCopy code\n", string.Empty);
             s = s.Replace("Copy code\n", string.Empty);
             s = s.Replace("\nCopy code", string.Empty);
-
-            // Attachment noise
             s = s.Replace("\nDocument\n", "\n");
-
-            // "ChatGPT said:" prefix (sometimes glued: "ChatGPT said:text...")
             s = s.Replace("ChatGPT said:", string.Empty);
             s = s.Replace("ChatGPT said", string.Empty);
 
-            // Fix common glue artifact: "textVAL ..." at start
             if (s.StartsWith("textVAL ", StringComparison.OrdinalIgnoreCase))
                 s = s.Substring(4);
 
@@ -138,10 +125,10 @@ namespace VAL.Continuum.Pipeline.Truth
                 var viewPath = Path.Combine(dir, "Truth.view");
                 var sb = new StringBuilder();
 
-                foreach (var m in view.Messages)
+                foreach (var message in view.Messages)
                 {
-                    var header = m.Role == TruthRole.Assistant ? "ASSISTANT:" : "USER:";
-                    sb.Append(header).Append(' ').AppendLine((m.Text ?? string.Empty).Trim());
+                    var header = message.Role == TruthRole.Assistant ? "ASSISTANT:" : "USER:";
+                    sb.Append(header).Append(' ').AppendLine((message.Text ?? string.Empty).Trim());
                     sb.AppendLine();
                 }
 

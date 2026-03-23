@@ -6,11 +6,11 @@ This is not AI memory. It is a mechanical pipeline that filters, budgets, and fo
 recent exchanges so a refreshed chat can resume cleanly with minimal drift.
 
 Primary Entry
-- Pipeline/01_QuickRefresh/QuickRefresh.Flow.cs
+- Pipeline/01_QuickRefresh/QuickRefreshService.cs
 
 Quick Refresh Flow (high level)
 1) Truth Normalize
-   - TruthNormalize.BuildView(chatId)
+   - ITruthViewBuilder.BuildView(chatId)
    - Reads:  Truth.log
    - Output: TruthView (normalized messages with stable locators)
 
