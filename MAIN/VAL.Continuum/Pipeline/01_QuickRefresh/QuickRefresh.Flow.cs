@@ -108,8 +108,8 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
 
             token.ThrowIfCancellationRequested();
 
-            // 5) Load Context.txt preamble and inject it into the Essence text for the final seed payload.
-            return ContinuumPreamble.InjectIntoEssence(essenceText, chatId);
+            // 5) Return the Pulse packet as-built. Continuation rules now live in the packet structure.
+            return essenceText;
         }
 
         private static string NormalizePulseText(string pulseText)

@@ -12,7 +12,7 @@ namespace VAL.Continuum.Pipeline.Filter2
     /// </summary>
     internal static class Filter2Rules
     {
-        // Total budget for RestructuredSeed (does NOT include Context.txt preamble injected later).
+        // Total budget for RestructuredSeed.
         public const int BudgetChars = 28_000;
 
         // Allow finishing ONE whole exchange after budget is crossed (prevents half-turn cutoffs).

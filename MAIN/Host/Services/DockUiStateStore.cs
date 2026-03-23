@@ -4,7 +4,6 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using VAL.Continuum.Pipeline.Common;
 using VAL.Host.Json;
 
 namespace VAL.Host.Services
@@ -22,7 +21,7 @@ namespace VAL.Host.Services
         public DockUiStateStore(string? productRoot = null)
         {
             _productRoot = string.IsNullOrWhiteSpace(productRoot)
-                ? ContinuumContext.ResolveProductRoot()
+                ? ProductRootResolver.ResolveProductRoot()
                 : productRoot;
 
             if (string.IsNullOrWhiteSpace(_productRoot))

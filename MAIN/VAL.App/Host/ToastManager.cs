@@ -486,13 +486,7 @@ namespace VAL.Host
                     RemoveGroupToasts(groupKey);
 
 
-                bool isNewChatAssist = replaceGroup && !string.IsNullOrWhiteSpace(groupKey) &&
-                    string.Equals(groupKey, "continuum_guidance", StringComparison.OrdinalIgnoreCase);
-
-                // Sticky behavior is used for:
-                // - New Chat Assist (Prelude prompt)
-                // - Explicitly sticky prompts (e.g., Chronicle guidance)
-                bool isSticky = sticky || isNewChatAssist;
+                bool isSticky = sticky;
 
                 var inner = new StackPanel { Orientation = Orientation.Vertical };
 
@@ -573,13 +567,7 @@ namespace VAL.Host
                     inner.Children.Add(btnRow);
                 }
 
-                // Stack position:
-                // - For New Chat Assist, place at the bottom of the toast stack (non-interruptive).
-                // - For other action toasts, keep current behavior (top).
-                if (isNewChatAssist)
-                    _stack.Children.Add(toast);
-                else
-                    _stack.Children.Insert(0, toast);
+                _stack.Children.Insert(0, toast);
 
                 _popup.IsOpen = true;
 
@@ -588,9 +576,6 @@ namespace VAL.Host
                 var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160));
                 toast.BeginAnimation(UIElement.OpacityProperty, fadeIn);
 
-                // Lifetime:
-                // - New Chat Assist should stay until the user clicks a button (no auto-timeout).
-                // - Other action toasts can still auto-dismiss.
                 if (!isSticky)
                 {
                     var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };

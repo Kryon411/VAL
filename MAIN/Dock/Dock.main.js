@@ -62,7 +62,6 @@
   const DEFAULT_COMMAND_NAMES = Object.freeze({
     VoidCommandSetEnabled: "void.command.set_enabled",
     ContinuumCommandPulse: "continuum.command.pulse",
-    ContinuumCommandInjectPreamble: "continuum.command.inject_preamble",
     ContinuumCommandChronicleCancel: "continuum.command.chronicle_cancel",
     ContinuumCommandChronicleRebuildTruth: "continuum.command.chronicle_rebuild_truth",
     ContinuumCommandOpenSessionFolder: "continuum.command.open_session_folder",
@@ -182,15 +181,6 @@ function setThemeEnabled(next){
 
 // Establish a boolean early so Theme state is deterministic and persists across restarts.
 try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEnabled = false; }
-
-
-// Prelude nudge suppression: used to avoid showing the "New chat detected" toast
-// during a Pulse cycle (Pulse opens a new chat automatically).
-const PRELUDE_NUDGE_SUPPRESS_KEY = "VAL_PreludeNudgeSuppressUntil";
-
-function suppressPreludeNudge(ms){
-  try { localStorage.setItem(PRELUDE_NUDGE_SUPPRESS_KEY, String(Date.now() + (ms||0))); } catch(_) {}
-}
 
 
   function getChatId(){
@@ -766,7 +756,6 @@ function suppressPreludeNudge(ms){
         if (item.id === "pulse") {
           if (refreshLocked) return;
           try {
-            suppressPreludeNudge(25000);
             sendCommand(item.command?.name, item.command?.payload, true, "dock_click");
             collapse(true);
             startRefreshCooldown(8000);

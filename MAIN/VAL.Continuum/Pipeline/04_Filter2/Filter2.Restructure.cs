@@ -26,8 +26,6 @@ namespace VAL.Continuum.Pipeline.Filter2
             "Do not restate, quote, or announce WWLO; answer it directly.",
             "Otherwise acknowledge continuity and wait."
         };
-        private static readonly string[] ParagraphSeparators = { "\n\n" };
-
         public static string BuildRestructuredSeed(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
             if (exchanges == null || exchanges.Count == 0)
@@ -57,7 +55,7 @@ namespace VAL.Continuum.Pipeline.Filter2
                 {
                     activeThreadBody.Append("\n\n");
                 }
-                activeThreadBody.Append(FormatExchange(pinnedTail[i], sanitizeAssistant: false));
+                activeThreadBody.Append(FormatExchange(pinnedTail[i]));
             }
             AppendSection(sb, "ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)", activeThreadBody.ToString());
 
@@ -72,7 +70,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             // Start adding older exchanges newest -> oldest (excluding the pinned tail).
             for (int i = total - pin - 1; i >= 0; i--)
             {
-                var block = FormatExchange(exchanges[i], sanitizeAssistant: false);
+                var block = FormatExchange(exchanges[i]);
                 var prefix = fillerBody.Length > 0 ? "\n\n" : string.Empty;
                 var blockWithGap = prefix + block;
 
@@ -119,7 +117,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             sb.AppendLine(FormattableString.Invariant($"USER: {userOut}"));
 
             var assistant = SelectWwloText(ex.AssistantTextUncut, ex.AssistantText);
-            AppendAssistantBlock(sb, assistant, sanitizeAssistant: false);
+            AppendAssistantBlock(sb, assistant);
             return sb.ToString().TrimEnd();
         }
 
@@ -133,134 +131,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             return candidate.Length <= MaxWwloUncutChars ? candidate : (sliced ?? string.Empty);
         }
 
-        private static string SanitizeAssistantForWwlo(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return text ?? string.Empty;
-
-            // If the assistant explicitly anchored a state sentence, do not strip those lines.
-            bool HasAnchorTag(string line)
-            {
-                var t = line.Trim();
-                return t.EndsWith("(goal)", StringComparison.OrdinalIgnoreCase)
-                    || t.EndsWith("(checkpoint)", StringComparison.OrdinalIgnoreCase)
-                    || t.EndsWith("(milestone)", StringComparison.OrdinalIgnoreCase);
-            }
-
-            var lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
-            int listy = 0;
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var t = lines[i].TrimStart();
-                if (HasAnchorTag(lines[i])) continue;
-
-                if (t.StartsWith('-') ||
-                    t.StartsWith('*') ||
-                    t.StartsWith('•') ||
-                    Regex.IsMatch(t, @"^\d+[\.\)]\s+"))
-                {
-                    listy++;
-                }
-            }
-
-            // Also detect common procedural prompts that should not lead a handoff.
-            int procedural = 0;
-            foreach (var l in lines)
-            {
-                var t = l.Trim();
-                if (HasAnchorTag(t)) continue;
-
-                if (t.Contains("do these", StringComparison.OrdinalIgnoreCase) ||
-                    t.Contains("checks in order", StringComparison.OrdinalIgnoreCase) ||
-                    t.Contains("tell me which", StringComparison.OrdinalIgnoreCase) ||
-                    t.Contains("report back", StringComparison.OrdinalIgnoreCase) ||
-                    t.Contains("answer just this", StringComparison.OrdinalIgnoreCase))
-                {
-                    procedural++;
-                }
-            }
-
-            bool looksLikeChecklist = listy >= 3 || procedural >= 2;
-
-            if (!looksLikeChecklist)
-            {
-                return text.Trim();
-            }
-
-            // Remove list blocks (numbered/bulleted) while preserving anchored lines.
-            var kept = new List<string>(lines.Length);
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var raw = lines[i];
-                var t = raw.TrimStart();
-
-                if (HasAnchorTag(raw))
-                {
-                    kept.Add(raw);
-                    continue;
-                }
-
-                bool isListy = t.StartsWith('-') ||
-                               t.StartsWith('*') ||
-                               t.StartsWith('•') ||
-                               Regex.IsMatch(t, @"^\d+[\.\)]\s+");
-
-                if (isListy) continue;
-
-                // Drop common "ops prompt" lines that are only relevant at runtime.
-                var tt = raw.Trim();
-                if (tt.Contains("do these", StringComparison.OrdinalIgnoreCase) ||
-                    tt.Contains("checks in order", StringComparison.OrdinalIgnoreCase) ||
-                    tt.Contains("tell me which", StringComparison.OrdinalIgnoreCase) ||
-                    tt.Contains("report back", StringComparison.OrdinalIgnoreCase) ||
-                    tt.Contains("answer just this", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                kept.Add(raw);
-            }
-
-            // Collapse excessive blank lines
-            var collapsed = new List<string>(kept.Count);
-            bool lastBlank = false;
-            foreach (var l in kept)
-            {
-                bool blank = string.IsNullOrWhiteSpace(l);
-                if (blank)
-                {
-                    if (!lastBlank) collapsed.Add(string.Empty);
-                    lastBlank = true;
-                }
-                else
-                {
-                    collapsed.Add(l.TrimEnd());
-                    lastBlank = false;
-                }
-            }
-
-            var result = string.Join("\n", collapsed).Trim();
-
-            // If we stripped too much, fall back to a conservative head+tail extraction.
-            if (result.Length < 40 && text.Length > 80)
-            {
-                // Keep first 2 paragraphs and last paragraph.
-                var paras = text.Split(ParagraphSeparators, StringSplitOptions.None)
-                    .Select(p => p.Trim())
-                    .Where(p => p.Length > 0)
-                    .ToList();
-                if (paras.Count <= 3) return text.Trim();
-
-                var take = new List<string>();
-                take.Add(paras[0]);
-                take.Add(paras[1]);
-                take.Add(paras[paras.Count - 1]);
-                result = string.Join("\n\n", take).Trim();
-            }
-
-            return result;
-        }
-
-        private static string FormatExchange(Filter1BuildSeed.SeedExchange ex, bool sanitizeAssistant)
+        private static string FormatExchange(Filter1BuildSeed.SeedExchange ex)
         {
             var sb = new StringBuilder();
 
@@ -268,7 +139,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             var assistant = !string.IsNullOrWhiteSpace(ex.AssistantText) ? ex.AssistantText.Trim() : string.Empty;
             var user = !string.IsNullOrWhiteSpace(ex.UserText) ? ex.UserText.Trim() : "[USER: empty]";
             sb.AppendLine(FormattableString.Invariant($"USER: {user}"));
-            AppendAssistantBlock(sb, assistant, sanitizeAssistant);
+            AppendAssistantBlock(sb, assistant);
 
             return sb.ToString().TrimEnd();
         }
@@ -420,13 +291,13 @@ namespace VAL.Continuum.Pipeline.Filter2
             return $"{min}\u2013{max}";
         }
 
-        private static void AppendAssistantBlock(StringBuilder sb, string assistantText, bool sanitizeAssistant)
+        private static void AppendAssistantBlock(StringBuilder sb, string assistantText)
         {
             sb.AppendLine("ASSISTANT:");
-            sb.AppendLine(NormalizeAssistantContent(assistantText, sanitizeAssistant));
+            sb.AppendLine(NormalizeAssistantContent(assistantText));
         }
 
-        private static string NormalizeAssistantContent(string assistantText, bool sanitizeAssistant)
+        private static string NormalizeAssistantContent(string assistantText)
         {
             var raw = assistantText ?? string.Empty;
             if (string.IsNullOrWhiteSpace(raw))
@@ -438,10 +309,6 @@ namespace VAL.Continuum.Pipeline.Filter2
             var remainder = match.Success ? raw.Substring(match.Length) : raw;
 
             var content = remainder;
-            if (sanitizeAssistant)
-            {
-                content = SanitizeAssistantForWwlo(content);
-            }
 
             if (string.IsNullOrWhiteSpace(content))
             {

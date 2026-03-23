@@ -71,7 +71,6 @@ Used by:
 **`MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumHost.cs`**
 
 ContinuumHost emits toasts for:
-- **Prelude guidance** (new-chat coaching toast with actions)
 - **Chronicle prompts** (action toast suggesting Chronicle when no truth exists)
 - **Chronicle lifecycle** (started/sticky, completed/replaced)
 - **Pulse lifecycle** (initiated / ready / unavailable / already-running)
@@ -102,7 +101,7 @@ Common group keys used across the system (names may vary, but the pattern is sta
 
 - `pulse` — Pulse lifecycle toasts (replace within group)
 - `chronicle` — Chronicle sticky + completion (replace within group)
-- `continuum_guidance` — Prelude/Chronicle suggestion prompts (replace within group)
+- `continuum_guidance` — Chronicle suggestion prompts
 - `op.guard` — operation guard “busy/cancelled” toasts
 
 If a toast “updates” another (e.g., Chronicle started → Chronicle completed), it should share a group key and use replace-group semantics.
@@ -123,7 +122,6 @@ Relevant web-messages:
 **Role:** Watches ChatGPT DOM and emits key interaction events.
 
 Toast-relevant events:
-- **New chat composer interaction** → triggers Prelude guidance prompt
 - **Existing chat composer interaction** → may trigger Chronicle suggestion prompt (if missing truth log)
 
 The host decides whether to show the toast (policy stays host-side).

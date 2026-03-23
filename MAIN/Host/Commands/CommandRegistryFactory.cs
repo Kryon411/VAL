@@ -14,13 +14,7 @@ namespace VAL.Host
             WebCommandNames.ContinuumSessionAttach,
             WebCommandNames.ContinuumSessionAttached,
             WebCommandNames.ContinuumCommandToggleLogging,
-
-            WebCommandNames.ContinuumUiNewChat,
-            WebCommandNames.ContinuumUiPreludePrompt,
             WebCommandNames.ContinuumUiComposerInteraction,
-
-            WebCommandNames.ContinuumCommandInjectPreamble,
-            WebCommandNames.ContinuumCommandInjectPrelude,
 
             WebCommandNames.ContinuumTruthAppend,
             WebCommandNames.TruthAppend,

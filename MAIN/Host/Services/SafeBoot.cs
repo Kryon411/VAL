@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
-using VAL.Continuum.Pipeline.Common;
 using VAL.Host.Logging;
 using VAL.Host.Options;
 
@@ -107,7 +106,7 @@ namespace VAL.Host.Services
         {
             try
             {
-                var productRoot = ContinuumContext.ResolveProductRoot();
+                var productRoot = ProductRootResolver.ResolveProductRoot();
                 if (string.IsNullOrWhiteSpace(productRoot))
                     return;
 

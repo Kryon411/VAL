@@ -64,17 +64,6 @@ namespace VAL.Continuum
         private const string Toast_ChronicleCompleted =
             "Chronicle is complete. This chat is now archived and ready for Pulse jumps.";
 
-        private const string Toast_PreludeAvailable =
-            "This chat can be prepared for continuation. If you’d like, Prelude can set things up so a future Pulse jump has the right context.";
-
-        // Prelude prompt (new chat): action toast shown when the user interacts with the blank new-chat composer.
-        // NOTE: Title includes "detected a new chat" so ToastManager.ShowActions will treat it as Sticky.
-        private const string Toast_PreludePromptTitle =
-            "Starting a new chat?";
-
-        private const string Toast_PreludePromptSubtitle =
-            "Prelude can set up this chat for continuation. If you\u2019d like, it will insert setup and instructions so a future Pulse jump has the right context.";
-
         // Chronicle prompt (existing chat without a completed Chronicle archive): timed action toast.
         private const string Toast_ChroniclePromptTitle =
             "Create an archive for future Pulse jumps?";
@@ -140,8 +129,6 @@ namespace VAL.Continuum
 
             public string? evt { get; set; }
 
-            // UI signals (best-effort)
-            public string? href { get; set; }
             public string? reason { get; set; }
 
             public string? phase { get; set; }
@@ -170,22 +157,9 @@ namespace VAL.Continuum
         // Chronicle running flag (toast suppression + sequencing only).
         private static bool _chronicleRunning;
 
-        // New chat ("/" route) prelude guidance should show once per entry.
-        private static bool _preludeAvailableShownForCurrentNewChat;
-
-        // Prelude prompt: once per new-chat root instance (href-based) to avoid spam on repeated clicks.
-        private static string _lastPreludePromptHref = string.Empty;
-
-        // Prelude seeding: if user injects Prelude on the New Chat root, the real /c/<uuid>
-        // chatId does not exist yet. Carry a one-shot marker across the next session.attach so we can
-        // suppress Chronicle prompts for that newly seeded chat.
-        private static bool _pendingPreludeSeedForNextAttach;
-        private static DateTime _pendingPreludeSeedUntilUtc = DateTime.MinValue;
-
-
-        // When Pulse opens a new chat automatically, we do NOT want to show the Prelude guidance toast.
-        private static DateTime _suppressPreludeToastUntilUtc = DateTime.MinValue;
-        private static readonly TimeSpan PreludeToastSuppressWindow = TimeSpan.FromSeconds(25);
+        // When Pulse opens a new chat automatically, suppress follow-on guidance nudges briefly.
+        private static DateTime _suppressGuidanceUntilUtc = DateTime.MinValue;
+        private static readonly TimeSpan GuidanceSuppressWindow = TimeSpan.FromSeconds(25);
 
         private static readonly TimeSpan RefreshCooldown = TimeSpan.FromSeconds(10);
 
@@ -276,31 +250,10 @@ namespace VAL.Continuum
                 return;
             }
 
-            if (type.Equals(WebCommandNames.ContinuumUiNewChat, StringComparison.OrdinalIgnoreCase))
-            {
-                // Suppressed: Prelude guidance is shown via the dedicated new-chat Prelude prompt toast.
-                return;
-            }
-
-            if (type.Equals(WebCommandNames.ContinuumUiPreludePrompt, StringComparison.OrdinalIgnoreCase))
-            {
-                HandlePreludePrompt(msg);
-                return;
-            }
-
             if (type.Equals(WebCommandNames.ContinuumUiComposerInteraction, StringComparison.OrdinalIgnoreCase))
             {
                 var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
                 HandleChronicleComposerInteraction(msg.chatId, msg.capturedTurns ?? 0, reason);
-                return;
-            }
-
-
-            if (type.Equals(WebCommandNames.ContinuumCommandInjectPreamble, StringComparison.OrdinalIgnoreCase) ||
-                type.Equals(WebCommandNames.ContinuumCommandInjectPrelude, StringComparison.OrdinalIgnoreCase))
-            {
-                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
-                HandleInjectPrelude(msg.chatId, reason);
                 return;
             }
 
@@ -323,7 +276,7 @@ namespace VAL.Continuum
                 if (r == "a" || r == "assistant") role = 'A';
                 if (r == "u" || r == "user") role = 'U';
 
-                // Detect Continuum/Pulse-seeded chats from the injected CONTINUUM CONTEXT payload.
+                // Detect Continuum/Pulse-seeded chats from the injected Pulse handoff payload.
                 // (This is what makes Chronicle prompts semantically suppressible in Pulse-created chats.)
                 if (role == 'U' && LooksLikeContinuumSeedText(txt))
                     SessionContext.MarkContinuumSeeded(cid);
@@ -375,7 +328,7 @@ namespace VAL.Continuum
 
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    // Detect Continuum/Pulse-seeded chats from the injected CONTINUUM CONTEXT payload.
+                    // Detect Continuum/Pulse-seeded chats from the injected Pulse handoff payload.
                     // NOTE: client escapes newlines as "\\n", but the marker strings remain intact.
                     if (role == 'U' && LooksLikeContinuumSeedText(text))
                         SessionContext.MarkContinuumSeeded(cid);
@@ -465,13 +418,6 @@ namespace VAL.Continuum
 
             lock (Sync)
             {
-                // Leaving the new-chat route means the Prelude toast can be shown again next time.
-                if (isValidChat)
-                    _preludeAvailableShownForCurrentNewChat = false;
-
-                if (isValidChat)
-                    _lastPreludePromptHref = string.Empty;
-
                 chronicleRunning = _chronicleRunning;
 
                 // Dedupe: the client may ping session.attach repeatedly during a short watchdog window.
@@ -489,19 +435,6 @@ namespace VAL.Continuum
 
                     // Reset toast intent gates for this attach.
                     _toastAttachToken++;
-
-                    // If Prelude was injected on the New Chat root (session-*), we won't see a marker in Truth.log
-                    // until after the first send. Carry the seed across the first real attach so Chronicle doesn't
-                    // prompt unnecessarily in freshly seeded chats.
-                    if (isValidChat &&
-                        _pendingPreludeSeedForNextAttach &&
-                        _pendingPreludeSeedUntilUtc != DateTime.MinValue &&
-                        nowUtc <= _pendingPreludeSeedUntilUtc)
-                    {
-                        SessionContext.MarkContinuumSeeded(cid);
-                        _pendingPreludeSeedForNextAttach = false;
-                        _pendingPreludeSeedUntilUtc = DateTime.MinValue;
-                    }
                     _toastAttachChatId = cid;
                     _toastAttachUtc = nowUtc;
                     _toastAttachDwellMet = false;
@@ -628,142 +561,6 @@ namespace VAL.Continuum
             ApplyLoggingSetting(enable, showToast: true, reason: reason);
         }
 
-        
-        private static void HandlePreludePrompt(Msg msg)
-        {
-            try
-            {
-                // Non-blocking, best-effort: only show on blank/new chat root.
-                // Client already gates heavily, but we still keep a safe host guard.
-                var href = (msg.href ?? string.Empty).Trim();
-
-                // If we don't have an href, we can't do "once per new-chat instance" gating safely.
-                if (string.IsNullOrWhiteSpace(href))
-                    return;
-
-                lock (Sync)
-                {
-                    if (string.Equals(_lastPreludePromptHref, href, StringComparison.Ordinal))
-                        return;
-
-                    // Don't nudge during (or right after) a Pulse cycle.
-                    var now = DateTime.UtcNow;
-                    if (_refreshInFlight) return;
-                    if (_suppressPreludeToastUntilUtc != DateTime.MinValue && now < _suppressPreludeToastUntilUtc) return;
-
-                    _lastPreludePromptHref = href;
-                }
-
-                // New-chat route has no session.attach, so clear any chat-specific toasts here.
-                try
-                {
-                    Toasts.DismissGroup("continuum_guidance");
-                    Toasts.DismissGroup("continuum.lifecycle");
-                    Toasts.DismissGroup(ToastGroup_Chronicle);
-                }
-                catch { }
-
-                // Action toast: Prelude inject (host-side) or dismiss.
-                Toasts.TryShowActions(
-                    ToastKey.PreludePrompt,
-                    new (string Label, Action OnClick)[]
-                    {
-                        ("Prelude", () =>
-                        {
-                            try { HandleInjectPrelude(null, ToastReason.DockClick); } catch { }
-                        }),
-                        ("Dismiss", () => { })
-                    },
-                    bypassLaunchQuiet: true,
-                    origin: ToastOrigin.Continuum,
-                    reason: ToastReasonParser.Parse(msg.reason, ToastReason.DockClick)
-                );
-            }
-            catch
-            {
-                // Never let UI prompting break the host.
-            }
-        }
-
-        private static void MaybeShowPreludeAvailableToast()
-        {
-            // Passive guidance toast -> honor launch quiet period.
-            if (Toasts.IsLaunchQuietPeriodActive)
-                return;
-
-            lock (Sync)
-            {
-                var now = DateTime.UtcNow;
-
-                // Avoid nudging during (or right after) a Pulse cycle.
-                if (_refreshInFlight) return;
-                if (_suppressPreludeToastUntilUtc != DateTime.MinValue && now < _suppressPreludeToastUntilUtc) return;
-
-                if (_preludeAvailableShownForCurrentNewChat)
-                    return;
-
-                _preludeAvailableShownForCurrentNewChat = true;
-            }
-
-            Toasts.TryShow(
-                ToastKey.PreludeAvailable,
-                origin: ToastOrigin.Continuum,
-                reason: ToastReason.Background);
-        }
-
-        private static void HandleInjectPrelude(string? chatId, ToastReason reason)
-        {
-            // Manual Prelude injection: drop Context.Prelude.txt into the current composer (no autosend).
-            var cid = SessionContext.ResolveChatId(chatId);
-
-            // On New Chat root there is no /c/<uuid> yet; Dock will pass a non-empty session-<...> id.
-            if (string.IsNullOrWhiteSpace(cid))
-                cid = "session-" + DateTime.UtcNow.Ticks;
-
-            var prelude = ContinuumPreamble.LoadPrelude(cid);
-            if (string.IsNullOrWhiteSpace(prelude))
-            {
-                Toasts.TryShow(
-                    ToastKey.ActionUnavailable,
-                    bypassLaunchQuiet: true,
-                    origin: ToastOrigin.Continuum,
-                    reason: reason);
-                return;
-            }
-
-            var seed = new EssenceInjectController.InjectSeed
-            {
-                ChatId = cid,
-                Mode = "Prelude",
-                EssenceText = prelude.Trim(),
-                OpenNewChat = false,
-                SourceFileName = "Prelude",
-                EssenceFileName = "Context.Prelude.txt"
-            };
-
-            InjectQueue.Enqueue(seed);
-
-            // Mark this as a seeded chat for Chronicle prompt suppression.
-            // If we're on the New Chat root, cid will be session-<...>; carry a one-shot flag until the
-            // next real session.attach provides the /c/<uuid> chatId.
-            bool isValidChat =
-                !string.IsNullOrWhiteSpace(cid) &&
-                !cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase);
-
-            lock (Sync)
-            {
-                if (isValidChat)
-                {
-                    SessionContext.MarkContinuumSeeded(cid);
-                }
-                else
-                {
-                    _pendingPreludeSeedForNextAttach = true;
-                    _pendingPreludeSeedUntilUtc = DateTime.UtcNow.AddMinutes(5);
-                }
-            }
-        }
-
         // -------------------------
         // Pulse
         // -------------------------
@@ -873,8 +670,7 @@ namespace VAL.Continuum
 
             // Keep this intentionally simple and robust.
             // We only want to classify chats that clearly contain the ESSENCE-M handoff payload.
-            bool hasContext =
-                text.Contains("CONTEXT BLOCK — READ ONLY", StringComparison.OrdinalIgnoreCase) ||
+            bool hasSeedMarkers =
                 text.Contains("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("WHERE WE LEFT OFF -- LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
@@ -888,7 +684,7 @@ namespace VAL.Continuum
                 text.Contains("WHERE WE LEFT OFF -- LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
                 text.Contains("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase);
 
-            return hasAuthoritativeSeed || hasContext;
+            return hasAuthoritativeSeed || hasSeedMarkers;
         }
 
 
@@ -997,8 +793,8 @@ namespace VAL.Continuum
 
                 _refreshInFlight = true;
 
-                // Suppress Prelude guidance during this refresh (Pulse will navigate to a new chat).
-                _suppressPreludeToastUntilUtc = DateTime.UtcNow + PreludeToastSuppressWindow;
+                // Suppress guidance nudges during this refresh while Pulse navigates into a new chat.
+                _suppressGuidanceUntilUtc = DateTime.UtcNow + GuidanceSuppressWindow;
                 return true;
             }
         }
@@ -1036,7 +832,8 @@ namespace VAL.Continuum
 
         private static void EndRefresh(string chatId)
         {
-            // JS emits "inject.success" for any injection (Pulse, Prelude, etc.).
+            // JS emits "inject.success" for injections generally. Only show Pulse completion when
+            // a Pulse refresh is actually in flight.
             // Only show Pulse completion if a refresh was actually in-flight.
             FinishRefresh(chatId, showReadyToast: true);
         }
@@ -1422,8 +1219,8 @@ namespace VAL.Continuum
 
             token.ThrowIfCancellationRequested();
 
-            var signalPrompt = (ContinuumPreamble.LoadSignalPrompt(chatId) ?? string.Empty).Trim();
-            var pulseTemplate = (ContinuumPreamble.LoadPulsePacketTemplate(chatId) ?? string.Empty).Trim();
+            var signalPrompt = (ContinuumAssetLoader.LoadSignalPrompt(chatId) ?? string.Empty).Trim();
+            var pulseTemplate = (ContinuumAssetLoader.LoadPulsePacketTemplate(chatId) ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(signalPrompt) || string.IsNullOrWhiteSpace(pulseTemplate))
             {
@@ -1496,7 +1293,7 @@ namespace VAL.Continuum
                 // Suppress while Chronicle is running.
                 bool chronicleRunning;
                 bool refreshInFlight;
-                DateTime suppressPreludeUntil;
+                DateTime suppressGuidanceUntil;
                 bool attachMatch;
                 bool attachDwellMet;
                 bool chronicleAlreadyShown;
@@ -1507,7 +1304,7 @@ namespace VAL.Continuum
                 {
                     chronicleRunning = _chronicleRunning;
                     refreshInFlight = _refreshInFlight;
-                    suppressPreludeUntil = _suppressPreludeToastUntilUtc;
+                    suppressGuidanceUntil = _suppressGuidanceUntilUtc;
 
                     attachMatch = !string.IsNullOrWhiteSpace(_toastAttachChatId) &&
                                   _toastAttachChatId.Equals(cid, StringComparison.OrdinalIgnoreCase);
@@ -1551,7 +1348,7 @@ namespace VAL.Continuum
 
                 // Suppress Chronicle nudges during Pulse/refresh and the post-Pulse suppression window.
                 if (refreshInFlight) return;
-                if (suppressPreludeUntil != DateTime.MinValue && nowUtc < suppressPreludeUntil) return;
+                if (suppressGuidanceUntil != DateTime.MinValue && nowUtc < suppressGuidanceUntil) return;
                 if (chronicleAlreadyShown) return;
 
                 // AUTHORITATIVE POLICY: suppress Chronicle prompts in Pulse/Continuum-seeded chats.

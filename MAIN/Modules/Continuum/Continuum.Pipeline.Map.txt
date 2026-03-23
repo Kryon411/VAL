@@ -30,10 +30,9 @@ Quick Refresh Flow (high level)
    - Goal: Convert restructured content into the ESSENCE-M format used for reliable rehydration.
    - Output: Essence-M.Pulse.txt (final payload)
 
-5) Preamble Injection + Queue
-   - ContinuumPreamble.InjectIntoEssence(...)
+5) Queue + Inject
    - EssenceInjectInbox.Enqueue(...)
-   - Goal: Add the context prelude / response rules and enqueue the final text for composer injection.
+   - Goal: Enqueue the final text for composer injection.
 
 Per-Session Audit Artifacts (written in the chat session folder)
 - Truth.log                (canonical transcript; append-only)

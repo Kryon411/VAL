@@ -3,9 +3,9 @@ using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using VAL.Continuum.Pipeline.Common;
 using VAL.Host.Json;
 using VAL.Host.Logging;
+using VAL.Host.Services;
 
 namespace VAL.Host.Startup
 {
@@ -20,7 +20,7 @@ namespace VAL.Host.Startup
         public StartupCrashGuard(string? productRoot = null)
         {
             _productRoot = string.IsNullOrWhiteSpace(productRoot)
-                ? ContinuumContext.ResolveProductRoot()
+                ? ProductRootResolver.ResolveProductRoot()
                 : productRoot;
 
             if (string.IsNullOrWhiteSpace(_productRoot))

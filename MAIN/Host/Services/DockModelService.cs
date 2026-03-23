@@ -152,19 +152,6 @@ namespace VAL.Host.Services
                                 },
                                 new DockItem
                                 {
-                                    Id = "prelude",
-                                    Type = "button",
-                                    Label = "Prelude",
-                                    Kind = "secondary",
-                                    Tooltip = "Add the session setup and instructions to the current chat.",
-                                    Command = new DockCommand
-                                    {
-                                        Name = WebCommandNames.ContinuumCommandInjectPreamble,
-                                        RequiresChatId = true
-                                    }
-                                },
-                                new DockItem
-                                {
                                     Id = "chronicle",
                                     Type = "button",
                                     Label = "Chronicle",
