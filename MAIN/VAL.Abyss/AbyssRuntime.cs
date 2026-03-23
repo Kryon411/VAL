@@ -233,7 +233,7 @@ namespace VAL.Host.Abyss
             {
                 foreach (var result in snapshot)
                 {
-                    var fingerprint = _abyssSearch.BuildFingerprint(result.Exchange);
+                    var fingerprint = AbyssSearchService.BuildFingerprint(result.Exchange);
                     if (string.Equals(fingerprint, id, StringComparison.OrdinalIgnoreCase))
                     {
                         selected = result;
@@ -313,10 +313,10 @@ namespace VAL.Host.Abyss
             SendEnvelope(WebMessageTypes.Command, WebCommandNames.ContinuumInjectText, new { chatId = chatId, text = text }, chatId);
         }
 
-        private string BuildInjectPayload(AbyssSearchResult result, string query)
+        private static string BuildInjectPayload(AbyssSearchResult result, string query)
         {
             var snippet = BuildSnippet(result.Exchange);
-            var (startLine, endLine) = _abyssSearch.GetLineRange(result.Exchange);
+            var (startLine, endLine) = AbyssSearchService.GetLineRange(result.Exchange);
             var rangeLabel = FormatLineRangeLabel(startLine, endLine);
 
             var sb = new StringBuilder();
@@ -350,8 +350,8 @@ namespace VAL.Host.Abyss
             {
                 var result = snapshot[i];
                 var exchange = result.Exchange;
-                var (startLine, endLine) = _abyssSearch.GetLineRange(exchange);
-                var fingerprint = _abyssSearch.BuildFingerprint(exchange);
+                var (startLine, endLine) = AbyssSearchService.GetLineRange(exchange);
+                var fingerprint = AbyssSearchService.BuildFingerprint(exchange);
                 var snippet = BuildSnippet(exchange);
                 var preview = BuildPreview(snippet);
                 var title = BuildTitle(exchange);

@@ -124,7 +124,7 @@ namespace VAL.Host.Abyss
                 .ToList();
         }
 
-        internal (int startLine, int endLine) GetLineRange(AbyssExchange exchange)
+        internal static (int startLine, int endLine) GetLineRange(AbyssExchange exchange)
         {
             if (exchange == null)
                 return (0, 0);
@@ -150,7 +150,7 @@ namespace VAL.Host.Abyss
             return (min, max);
         }
 
-        internal string BuildFingerprint(AbyssExchange exchange)
+        internal static string BuildFingerprint(AbyssExchange exchange)
         {
             if (exchange == null)
                 return string.Empty;

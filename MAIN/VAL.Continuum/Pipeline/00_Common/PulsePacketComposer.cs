@@ -9,6 +9,7 @@ namespace VAL.Continuum.Pipeline
 {
     internal static class PulsePacketComposer
     {
+        private static readonly string[] NoneBullets = { "None." };
         internal const string PreviousChatSummaryHeading = "PREVIOUS CHAT SUMMARY";
         internal const string WhereWeLeftOffHeading = "WHERE WE LEFT OFF";
         internal const string OpenLoopsHeading = "OPEN LOOPS";
@@ -115,7 +116,7 @@ namespace VAL.Continuum.Pipeline
         private static IReadOnlyList<string> EnsureBullets(IReadOnlyList<string> bullets)
         {
             if (bullets == null || bullets.Count == 0)
-                return new[] { "None." };
+                return NoneBullets;
 
             return bullets;
         }
@@ -124,7 +125,7 @@ namespace VAL.Continuum.Pipeline
         {
             if (walkbackHighlights == null || walkbackHighlights.Count == 0)
             {
-                AppendBulletSection(sb, TruthWalkbackHighlightsHeading, new[] { "None." });
+                AppendBulletSection(sb, TruthWalkbackHighlightsHeading, NoneBullets);
                 return;
             }
 

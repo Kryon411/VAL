@@ -13,6 +13,8 @@ namespace VAL.Continuum.Pipeline.Filter2
     /// </summary>
     public static class Filter2Restructure
     {
+        private static readonly string[] NoneBullets = { "None." };
+
         private static readonly Regex FileReferenceRegex =
             new(@"(?:[A-Za-z]:\\[^\r\n`""]+?\.(?:cs|js|txt|md|json|toml|csproj)|MAIN[\\/][^\r\n`""]+?\.(?:cs|js|txt|md|json|toml|csproj))",
                 RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -101,7 +103,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             };
         }
 
-        private static IReadOnlyList<PulseExchangeBlock> BuildTruthWalkbackHighlights(
+        private static List<PulseExchangeBlock> BuildTruthWalkbackHighlights(
             IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges,
             IReadOnlyList<Filter1BuildSeed.SeedExchange> pinnedTail)
         {
@@ -124,7 +126,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             return highlights;
         }
 
-        private static IReadOnlyList<string> BuildOpenLoopFacts(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
+        private static List<string> BuildOpenLoopFacts(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
             var facts = new List<string>();
 
@@ -148,7 +150,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             return DeduplicateFacts(facts);
         }
 
-        private static IReadOnlyList<string> BuildCriticalFacts(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
+        private static List<string> BuildCriticalFacts(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
             var facts = new List<string>();
 
@@ -168,7 +170,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             return DeduplicateFacts(facts);
         }
 
-        private static IReadOnlyList<string> BuildArtifactsAndReferences(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
+        private static List<string> BuildArtifactsAndReferences(IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges)
         {
             var refs = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -188,7 +190,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             return refs;
         }
 
-        private static void AddHighlight(ICollection<PulseExchangeBlock> highlights, Filter1BuildSeed.SeedExchange exchange)
+        private static void AddHighlight(List<PulseExchangeBlock> highlights, Filter1BuildSeed.SeedExchange exchange)
         {
             if (highlights == null || exchange == null)
                 return;
@@ -204,7 +206,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             });
         }
 
-        private static IEnumerable<string> ExtractOpenLoopCandidates(string text)
+        private static List<string> ExtractOpenLoopCandidates(string text)
         {
             var candidates = new List<string>();
             var lines = Normalize(text).Split('\n');
@@ -238,7 +240,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             return candidates;
         }
 
-        private static IEnumerable<string> ExtractConstraintCandidates(string text)
+        private static List<string> ExtractConstraintCandidates(string text)
         {
             var candidates = new List<string>();
             var lines = Normalize(text).Split('\n');
@@ -270,7 +272,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             return candidates;
         }
 
-        private static void CaptureFileReferences(HashSet<string> seen, ICollection<string> refs, string text)
+        private static void CaptureFileReferences(HashSet<string> seen, List<string> refs, string text)
         {
             if (refs == null || seen == null)
                 return;
@@ -297,10 +299,10 @@ namespace VAL.Continuum.Pipeline.Filter2
             }
         }
 
-        private static IReadOnlyList<string> DeduplicateFacts(IReadOnlyList<string> facts)
+        private static List<string> DeduplicateFacts(IReadOnlyList<string> facts)
         {
             if (facts == null || facts.Count == 0)
-                return Array.Empty<string>();
+                return new List<string>();
 
             var unique = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -329,7 +331,7 @@ namespace VAL.Continuum.Pipeline.Filter2
         {
             if (walkbackHighlights == null || walkbackHighlights.Count == 0)
             {
-                AppendBulletSection(sb, "TRUTH WALKBACK HIGHLIGHTS", new[] { "None." });
+                AppendBulletSection(sb, "TRUTH WALKBACK HIGHLIGHTS", NoneBullets);
                 return;
             }
 
@@ -491,9 +493,9 @@ namespace VAL.Continuum.Pipeline.Filter2
             if (string.IsNullOrWhiteSpace(line))
                 return false;
 
-            return line.EndsWith(":", StringComparison.Ordinal) &&
-                   !line.Contains("\\", StringComparison.Ordinal) &&
-                   !line.Contains("/", StringComparison.Ordinal);
+            return line.EndsWith(':') &&
+                   !line.Contains('\\') &&
+                   !line.Contains('/');
         }
 
         private static bool LooksLikeFileReference(string line)
@@ -503,7 +505,7 @@ namespace VAL.Continuum.Pipeline.Filter2
         {
             for (int i = 0; i < ConstraintKeywords.Length; i++)
             {
-                if (line.IndexOf(ConstraintKeywords[i], StringComparison.OrdinalIgnoreCase) >= 0)
+                if (line.Contains(ConstraintKeywords[i], StringComparison.OrdinalIgnoreCase))
                     return true;
             }
 
@@ -525,7 +527,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             return normalized;
         }
 
-        private static void AddRange(ICollection<string> target, IEnumerable<string> values)
+        private static void AddRange(List<string> target, List<string> values)
         {
             if (target == null || values == null)
                 return;

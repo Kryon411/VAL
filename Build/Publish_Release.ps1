@@ -41,7 +41,6 @@ Write-Host ""
 Write-Host "Verifying required content..."
 $requiredPaths = @(
     (Join-Path $outputPath "appsettings.json"),
-    (Join-Path $outputPath "appsettings.Development.json"),
     (Join-Path $outputPath "Modules"),
     (Join-Path $outputPath "Dock"),
     (Join-Path $outputPath "Icons")

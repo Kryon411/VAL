@@ -157,7 +157,7 @@ namespace VAL.Continuum.Pipeline.Signal
             return true;
         }
 
-        private static void FinalizeCurrent(ICollection<string> bullets, StringBuilder? current)
+        private static void FinalizeCurrent(List<string> bullets, StringBuilder? current)
         {
             if (current == null)
                 return;
@@ -167,7 +167,7 @@ namespace VAL.Continuum.Pipeline.Signal
                 bullets.Add(value);
         }
 
-        private static bool FinalizeParagraph(ICollection<string> bullets, StringBuilder current)
+        private static bool FinalizeParagraph(List<string> bullets, StringBuilder current)
         {
             if (current == null || current.Length == 0)
                 return false;
