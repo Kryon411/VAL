@@ -4,6 +4,13 @@ namespace VAL.Host.Services
 {
     public sealed class ProcessLauncher : IProcessLauncher
     {
+        private readonly ILog _log;
+
+        public ProcessLauncher(ILog log)
+        {
+            _log = log ?? throw new ArgumentNullException(nameof(log));
+        }
+
         public void OpenFolder(string path)
         {
             OpenPath(path);
@@ -29,7 +36,7 @@ namespace VAL.Host.Services
             }
             catch
             {
-                ValLog.Warn(nameof(ProcessLauncher), "Failed to open path.");
+                _log.Warn(nameof(ProcessLauncher), "Failed to open path.");
             }
         }
     }

@@ -34,7 +34,7 @@ namespace VAL.Tests.Truth
                 sessionContext.SetActiveChatId(chatId);
                 var truthStore = new TruthStore(NullTruthTelemetryPublisher.Instance);
 
-                var service = new TruthHealthReportService(appPaths, sessionContext, truthStore, root);
+                var service = new TruthHealthReportService(appPaths, sessionContext, truthStore, new FakeLog(), root);
                 var result = service.GetCurrentSnapshot();
 
                 Assert.True(result.HasActiveChat);
@@ -69,7 +69,7 @@ namespace VAL.Tests.Truth
                 var sessionContext = new SessionContext();
                 var truthStore = new TruthStore(NullTruthTelemetryPublisher.Instance);
 
-                var service = new TruthHealthReportService(appPaths, sessionContext, truthStore);
+                var service = new TruthHealthReportService(appPaths, sessionContext, truthStore, new FakeLog());
                 var result = service.GetCurrentSnapshot();
 
                 Assert.False(result.HasActiveChat);
@@ -92,6 +92,14 @@ namespace VAL.Tests.Truth
             });
 
             return new AppPaths(options, root);
+        }
+
+        private sealed class FakeLog : ILog
+        {
+            public void Info(string category, string message) { }
+            public void Warn(string category, string message) { }
+            public void LogError(string category, string message) { }
+            public void Verbose(string category, string message) { }
         }
     }
 }

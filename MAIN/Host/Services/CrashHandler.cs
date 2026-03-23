@@ -13,14 +13,16 @@ namespace VAL.Host.Services
     {
         private const string CrashCategory = "Crash";
         private readonly IAppPaths _appPaths;
+        private readonly ILog _log;
         private readonly IProcessLauncher _processLauncher;
         private readonly IUiThread _uiThread;
         private readonly SmokeTestSettings _smokeSettings;
         private int _handling;
 
-        public CrashHandler(IAppPaths appPaths, IProcessLauncher processLauncher, IUiThread uiThread, SmokeTestSettings smokeSettings)
+        public CrashHandler(IAppPaths appPaths, IProcessLauncher processLauncher, IUiThread uiThread, SmokeTestSettings smokeSettings, ILog log)
         {
             _appPaths = appPaths;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             _processLauncher = processLauncher;
             _uiThread = uiThread;
             _smokeSettings = smokeSettings;
@@ -58,8 +60,8 @@ namespace VAL.Host.Services
 
             try
             {
-                ValLog.Warn(CrashCategory, $"Unhandled exception from {source}.");
-                ValLog.Error(CrashCategory, details);
+                _log.Warn(CrashCategory, $"Unhandled exception from {source}.");
+                _log.LogError(CrashCategory, details);
             }
             catch
             {

@@ -18,6 +18,7 @@ namespace VAL.Host.Services
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IUiThread _uiThread;
         private readonly IContinuumInjectInbox _injectQueue;
+        private readonly ILog _log;
         private readonly RateLimiter _rateLimiter = new();
 
         private CancellationTokenSource? _pumpCts;
@@ -29,13 +30,15 @@ namespace VAL.Host.Services
             IWebMessageSender webMessageSender,
             IWebViewRuntime webViewRuntime,
             IUiThread uiThread,
-            IContinuumInjectInbox injectQueue)
+            IContinuumInjectInbox injectQueue,
+            ILog log)
         {
             _commandDispatcher = commandDispatcher;
             _webMessageSender = webMessageSender;
             _webViewRuntime = webViewRuntime;
             _uiThread = uiThread;
             _injectQueue = injectQueue;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void Start()
@@ -140,7 +143,7 @@ namespace VAL.Host.Services
                 {
                     var key = "continuum.inject.dispatch.fail";
                     if (_rateLimiter.Allow(key, LogInterval))
-                        ValLog.Warn(nameof(ContinuumPump), "Continuum dispatch failed.");
+                        _log.Warn(nameof(ContinuumPump), "Continuum dispatch failed.");
                 }
             });
 
@@ -157,7 +160,7 @@ namespace VAL.Host.Services
             if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
-            ValLog.Warn(nameof(ContinuumPump), $"Continuum inject queue backlog: {count} items.");
+            _log.Warn(nameof(ContinuumPump), $"Continuum inject queue backlog: {count} items.");
         }
 
         public void Dispose()

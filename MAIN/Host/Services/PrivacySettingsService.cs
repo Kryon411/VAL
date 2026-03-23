@@ -17,16 +17,18 @@ namespace VAL.Host.Services
         };
 
         private readonly ContinuumHost _continuumHost;
+        private readonly ILog _log;
         private readonly object _gate = new();
         private readonly string _settingsPath;
         private PrivacySettingsState _settings;
 
-        public PrivacySettingsService(IAppPaths appPaths, ContinuumHost continuumHost)
+        public PrivacySettingsService(IAppPaths appPaths, ContinuumHost continuumHost, ILog log)
         {
             ArgumentNullException.ThrowIfNull(appPaths);
             ArgumentNullException.ThrowIfNull(continuumHost);
 
             _continuumHost = continuumHost;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             _settingsPath = Path.Combine(appPaths.DataRoot, "settings.json");
             _settings = LoadSettings();
 
@@ -78,7 +80,7 @@ namespace VAL.Host.Services
             }
             catch (Exception ex)
             {
-                ValLog.Warn(nameof(PrivacySettingsService), $"Failed to load settings.json. {ex.GetType().Name}: {ex.Message}");
+                _log.Warn(nameof(PrivacySettingsService), $"Failed to load settings.json. {ex.GetType().Name}: {ex.Message}");
                 return PrivacySettingsState.CreateDefault();
             }
         }
@@ -122,7 +124,7 @@ namespace VAL.Host.Services
             }
             catch (Exception ex)
             {
-                ValLog.Warn(nameof(PrivacySettingsService), $"Failed to persist settings.json. {ex.GetType().Name}: {ex.Message}");
+                _log.Warn(nameof(PrivacySettingsService), $"Failed to persist settings.json. {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -134,7 +136,7 @@ namespace VAL.Host.Services
             }
             catch
             {
-                ValLog.Warn(nameof(PrivacySettingsService), "Failed to apply Continuum logging setting.");
+                _log.Warn(nameof(PrivacySettingsService), "Failed to apply Continuum logging setting.");
             }
         }
 

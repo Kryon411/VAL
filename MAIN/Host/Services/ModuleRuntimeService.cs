@@ -16,6 +16,7 @@ namespace VAL.Host.Services
         private readonly IWebMessageSender _webMessageSender;
         private readonly IPrivacySettingsService _privacySettingsService;
         private readonly StartupOptions _startupOptions;
+        private readonly ILog _log;
 
         private CoreWebView2? _modulesInitializedForCore;
         private int _modulesInitInFlight;
@@ -26,13 +27,15 @@ namespace VAL.Host.Services
             IWebViewRuntime webViewRuntime,
             IWebMessageSender webMessageSender,
             IPrivacySettingsService privacySettingsService,
-            StartupOptions startupOptions)
+            StartupOptions startupOptions,
+            ILog log)
         {
             _moduleLoader = moduleLoader;
             _webViewRuntime = webViewRuntime;
             _webMessageSender = webMessageSender;
             _privacySettingsService = privacySettingsService;
             _startupOptions = startupOptions;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void Start()
@@ -54,7 +57,7 @@ namespace VAL.Host.Services
                 }
                 catch
                 {
-                    ValLog.Warn(nameof(ModuleRuntimeService), "Module initialization failed after navigation.");
+                    _log.Warn(nameof(ModuleRuntimeService), "Module initialization failed after navigation.");
                 }
             };
 
@@ -88,8 +91,8 @@ namespace VAL.Host.Services
             catch (System.Exception ex)
             {
                 _modulesInitializedForCore = null;
-                ValLog.Warn(nameof(ModuleRuntimeService), $"Module initialization failed. {ex.GetType().Name}: {ex.Message}");
-                ValLog.Error(nameof(ModuleRuntimeService), ex.ToString());
+                _log.Warn(nameof(ModuleRuntimeService), $"Module initialization failed. {ex.GetType().Name}: {ex.Message}");
+                _log.LogError(nameof(ModuleRuntimeService), ex.ToString());
             }
             finally
             {
@@ -120,7 +123,7 @@ namespace VAL.Host.Services
             }
             catch
             {
-                ValLog.Warn(nameof(ModuleRuntimeService), "Failed to send privacy settings sync.");
+                _log.Warn(nameof(ModuleRuntimeService), "Failed to send privacy settings sync.");
             }
         }
     }

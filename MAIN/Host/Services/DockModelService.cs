@@ -13,6 +13,7 @@ namespace VAL.Host.Services
         private readonly IPrivacySettingsService _privacySettingsService;
         private readonly ISessionContext _sessionContext;
         private readonly IModuleLoader _moduleLoader;
+        private readonly ILog _log;
         private readonly object _sync = new();
 
         private bool _continuumLoggingEnabled = true;
@@ -25,12 +26,14 @@ namespace VAL.Host.Services
             IWebMessageSender webMessageSender,
             IPrivacySettingsService privacySettingsService,
             ISessionContext sessionContext,
-            IModuleLoader moduleLoader)
+            IModuleLoader moduleLoader,
+            ILog log)
         {
             _webMessageSender = webMessageSender;
             _privacySettingsService = privacySettingsService;
             _sessionContext = sessionContext;
             _moduleLoader = moduleLoader;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
 
             ApplyPrivacySnapshot(_privacySettingsService.GetSnapshot());
             _privacySettingsService.SettingsChanged += OnPrivacySettingsChanged;
@@ -63,7 +66,7 @@ namespace VAL.Host.Services
             }
             catch
             {
-                ValLog.Warn(nameof(DockModelService), "Failed to publish dock model.");
+                _log.Warn(nameof(DockModelService), "Failed to publish dock model.");
             }
         }
 

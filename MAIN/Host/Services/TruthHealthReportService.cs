@@ -15,21 +15,24 @@ namespace VAL.Host.Services
         private readonly IAppPaths _appPaths;
         private readonly ISessionContext _sessionContext;
         private readonly ITruthStore _truthStore;
+        private readonly ILog _log;
         private readonly string? _productRootOverride;
         private readonly RateLimiter _rateLimiter = new();
 
-        public TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore)
+        public TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore, ILog log)
         {
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
-        internal TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore, string? productRootOverride)
+        internal TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore, ILog log, string? productRootOverride)
         {
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             _productRootOverride = productRootOverride;
         }
 
@@ -175,7 +178,7 @@ namespace VAL.Host.Services
             if (!_rateLimiter.Allow("truth.health.report", LogInterval))
                 return;
 
-            ValLog.Warn(nameof(TruthHealthReportService), "Truth health report generation failed.");
+            _log.Warn(nameof(TruthHealthReportService), "Truth health report generation failed.");
         }
 
         private static TruthHealthReport ToSnapshotReport(ContinuumTruthHealthReport report)

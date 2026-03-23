@@ -11,18 +11,21 @@ namespace VAL.Host.Services
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly IPrivacySettingsService _privacySettingsService;
         private readonly IPortalRuntimeStateManager _portalRuntimeStateManager;
+        private readonly ILog _log;
         private bool _initialized;
 
         public PortalRuntimeService(
             PortalRuntime portalRuntime,
             IWebViewRuntime webViewRuntime,
             IPrivacySettingsService privacySettingsService,
-            IPortalRuntimeStateManager portalRuntimeStateManager)
+            IPortalRuntimeStateManager portalRuntimeStateManager,
+            ILog log)
         {
             _portalRuntime = portalRuntime;
             _webViewRuntime = webViewRuntime;
             _privacySettingsService = privacySettingsService;
             _portalRuntimeStateManager = portalRuntimeStateManager;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             _privacySettingsService.SettingsChanged += OnPrivacySettingsChanged;
         }
 
@@ -42,7 +45,7 @@ namespace VAL.Host.Services
                         }
                         catch
                         {
-                            ValLog.Warn(nameof(PortalRuntimeService), "Focus callback failed.");
+                            _log.Warn(nameof(PortalRuntimeService), "Focus callback failed.");
                         }
 
                         _ = _webViewRuntime.ExecuteScriptAsync(FocusScript);
@@ -54,7 +57,7 @@ namespace VAL.Host.Services
             }
             catch
             {
-                ValLog.Warn(nameof(PortalRuntimeService), "Portal runtime initialization failed.");
+                _log.Warn(nameof(PortalRuntimeService), "Portal runtime initialization failed.");
             }
         }
 
@@ -69,7 +72,7 @@ namespace VAL.Host.Services
             }
             catch
             {
-                ValLog.Warn(nameof(PortalRuntimeService), "Failed to attach portal window.");
+                _log.Warn(nameof(PortalRuntimeService), "Failed to attach portal window.");
             }
         }
 
@@ -86,7 +89,7 @@ namespace VAL.Host.Services
             }
             catch
             {
-                ValLog.Warn(nameof(PortalRuntimeService), "Failed to apply portal privacy settings.");
+                _log.Warn(nameof(PortalRuntimeService), "Failed to apply portal privacy settings.");
             }
         }
     }
