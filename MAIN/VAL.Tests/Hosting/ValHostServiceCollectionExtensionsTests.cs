@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VAL.Contracts;
+using VAL.Host;
 using VAL.Host.Commands;
 using VAL.Host.Hosting;
 using VAL.Host.Services;
@@ -63,6 +64,7 @@ namespace VAL.Tests.Hosting
             Assert.Same(startupOptions, provider.GetRequiredService<StartupOptions>());
             Assert.Same(smokeSettings, provider.GetRequiredService<SmokeTestSettings>());
             Assert.NotNull(provider.GetRequiredService<SmokeTestState>());
+            Assert.NotNull(provider.GetRequiredService<ILog>());
         }
 
         [Fact]

@@ -11,6 +11,7 @@ namespace VAL.Host.Commands
         private readonly ITruthHealthWindowService _truthHealthWindowService;
         private readonly IDiagnosticsWindowService _diagnosticsWindowService;
         private readonly ICommandDiagnosticsReporter _diagnosticsReporter;
+        private readonly ILog _log;
         private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
 
@@ -18,12 +19,14 @@ namespace VAL.Host.Commands
             IUiThread uiThread,
             ITruthHealthWindowService truthHealthWindowService,
             IDiagnosticsWindowService diagnosticsWindowService,
-            ICommandDiagnosticsReporter diagnosticsReporter)
+            ICommandDiagnosticsReporter diagnosticsReporter,
+            ILog log)
         {
             _uiThread = uiThread ?? throw new ArgumentNullException(nameof(uiThread));
             _truthHealthWindowService = truthHealthWindowService ?? throw new ArgumentNullException(nameof(truthHealthWindowService));
             _diagnosticsWindowService = diagnosticsWindowService ?? throw new ArgumentNullException(nameof(diagnosticsWindowService));
             _diagnosticsReporter = diagnosticsReporter ?? throw new ArgumentNullException(nameof(diagnosticsReporter));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void Register(CommandRegistry registry)
@@ -58,7 +61,7 @@ namespace VAL.Host.Commands
         {
             try
             {
-                ValLog.Info(nameof(ToolsCommandHandlers), "Tools: Diagnostics requested");
+                _log.Info(nameof(ToolsCommandHandlers), "Tools: Diagnostics requested");
                 _uiThread.Invoke(_diagnosticsWindowService.ShowDiagnostics);
             }
             catch (Exception ex)
@@ -74,7 +77,7 @@ namespace VAL.Host.Commands
                 return;
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";
-            ValLog.Warn(nameof(ToolsCommandHandlers),
+            _log.Warn(nameof(ToolsCommandHandlers),
                 $"Tools command failed ({action}) for {cmd.Type} (source: {sourceHost}). {LogSanitizer.Sanitize(ex.ToString())}");
         }
     }

@@ -9,11 +9,13 @@ namespace VAL.Host.Commands
     internal sealed class CommandDiagnosticsReporter : ICommandDiagnosticsReporter
     {
         private int _diagnosticsFailureToastShown;
+        private readonly ILog _log;
         private readonly IToastService _toastService;
 
-        public CommandDiagnosticsReporter(IToastService toastService)
+        public CommandDiagnosticsReporter(IToastService toastService, ILog log)
         {
             _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void ReportDiagnosticsFailure(HostCommand? cmd, Exception? exception, string reason)
@@ -23,7 +25,7 @@ namespace VAL.Host.Commands
             var detail = exception != null
                 ? LogSanitizer.Sanitize(exception.ToString())
                 : "No exception details.";
-            ValLog.Warn(nameof(CommandDiagnosticsReporter),
+            _log.Warn(nameof(CommandDiagnosticsReporter),
                 $"Diagnostics command failed ({reason}) for {cmdType} (source: {sourceHost}). {detail}");
             ShowDiagnosticsFailureToast();
         }

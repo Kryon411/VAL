@@ -9,12 +9,14 @@ namespace VAL.Host.Commands
     {
         private static readonly string[] RequiredEnabled = { "enabled" };
         private readonly IPortalRuntimeStateManager _runtimeStateManager;
+        private readonly ILog _log;
         private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
 
-        public PortalCommandHandlers(IPortalRuntimeStateManager runtimeStateManager)
+        public PortalCommandHandlers(IPortalRuntimeStateManager runtimeStateManager, ILog log)
         {
             _runtimeStateManager = runtimeStateManager ?? throw new ArgumentNullException(nameof(runtimeStateManager));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void Register(CommandRegistry registry)
@@ -101,7 +103,7 @@ namespace VAL.Host.Commands
                 return;
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";
-            ValLog.Warn(nameof(PortalCommandHandlers),
+            _log.Warn(nameof(PortalCommandHandlers),
                 $"Portal command failed ({action}) for {cmd.Type} (source: {sourceHost}). {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
         }
     }

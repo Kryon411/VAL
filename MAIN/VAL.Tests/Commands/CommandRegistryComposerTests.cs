@@ -52,24 +52,26 @@ namespace VAL.Tests.Commands
         {
             var contributors = new ICommandRegistryContributor[]
             {
-                new ContinuumCommandHandlers(CreateUninitialized<ContinuumHost>()),
+                new ContinuumCommandHandlers(CreateUninitialized<ContinuumHost>(), new FakeLog()),
                 new VoidCommandHandlers(new FakeToastHub()),
-                new PortalCommandHandlers(new FakePortalRuntimeStateManager()),
+                new PortalCommandHandlers(new FakePortalRuntimeStateManager(), new FakeLog()),
                 new PrivacyCommandHandlers(
                     new FakePrivacySettingsService(),
                     new FakeAppPaths(),
                     new FakeProcessLauncher(),
                     new FakeDataWipeService(),
                     new FakeToastHub(),
-                    new FakeWebMessageSender()),
+                    new FakeWebMessageSender(),
+                    new FakeLog()),
                 new ToolsCommandHandlers(
                     new FakeUiThread(),
                     new FakeTruthHealthWindowService(),
                     new FakeDiagnosticsWindowService(),
-                    new FakeCommandDiagnosticsReporter()),
+                    new FakeCommandDiagnosticsReporter(),
+                    new FakeLog()),
                 new NavigationCommandHandlers(webViewRuntime ?? new FakeWebViewRuntime(), new FakeToastHub()),
-                new DockCommandHandlers(new FakeDockModelService(), new FakeDockUiStateStore(), new FakeWebMessageSender()),
-                new AbyssCommandHandlers(CreateUninitialized<AbyssRuntime>()),
+                new DockCommandHandlers(new FakeDockModelService(), new FakeDockUiStateStore(), new FakeWebMessageSender(), new FakeLog()),
+                new AbyssCommandHandlers(CreateUninitialized<AbyssRuntime>(), new FakeLog()),
             };
 
             return new CommandRegistryComposer(contributors);
@@ -225,6 +227,14 @@ namespace VAL.Tests.Commands
         private sealed class FakeCommandDiagnosticsReporter : ICommandDiagnosticsReporter
         {
             public void ReportDiagnosticsFailure(HostCommand? cmd, Exception? exception, string reason) { }
+        }
+
+        private sealed class FakeLog : ILog
+        {
+            public void Info(string category, string message) { }
+            public void Warn(string category, string message) { }
+            public void LogError(string category, string message) { }
+            public void Verbose(string category, string message) { }
         }
 
         private sealed class FakeWebViewRuntime : IWebViewRuntime

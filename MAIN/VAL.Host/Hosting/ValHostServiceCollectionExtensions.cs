@@ -85,6 +85,7 @@ namespace VAL.Host.Hosting
 
             services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
             services.AddSingleton<IWebMessageSender, WebMessageSender>();
+            services.AddSingleton<ILog>(_ => ValLog.Instance);
             services.AddSingleton<IAppPaths, AppPaths>();
             services.AddSingleton<IProcessLauncher, ProcessLauncher>();
             services.AddSingleton<IUiThread, UiThread>();

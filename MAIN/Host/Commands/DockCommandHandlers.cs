@@ -11,15 +11,18 @@ namespace VAL.Host.Commands
         private readonly IDockModelService _modelService;
         private readonly IDockUiStateStore _stateStore;
         private readonly IWebMessageSender _webMessageSender;
+        private readonly ILog _log;
 
         public DockCommandHandlers(
             IDockModelService modelService,
             IDockUiStateStore stateStore,
-            IWebMessageSender webMessageSender)
+            IWebMessageSender webMessageSender,
+            ILog log)
         {
             _modelService = modelService ?? throw new ArgumentNullException(nameof(modelService));
             _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
             _webMessageSender = webMessageSender ?? throw new ArgumentNullException(nameof(webMessageSender));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void Register(CommandRegistry registry)
@@ -51,7 +54,7 @@ namespace VAL.Host.Commands
             }
             catch
             {
-                ValLog.Warn(nameof(DockCommandHandlers), "Failed to publish dock model.");
+                _log.Warn(nameof(DockCommandHandlers), "Failed to publish dock model.");
             }
         }
 
@@ -73,7 +76,7 @@ namespace VAL.Host.Commands
             }
             catch
             {
-                ValLog.Warn(nameof(DockCommandHandlers), "Failed to get dock UI state.");
+                _log.Warn(nameof(DockCommandHandlers), "Failed to get dock UI state.");
             }
         }
 
@@ -105,7 +108,7 @@ namespace VAL.Host.Commands
             }
             catch
             {
-                ValLog.Warn(nameof(DockCommandHandlers), "Failed to set dock UI state.");
+                _log.Warn(nameof(DockCommandHandlers), "Failed to set dock UI state.");
             }
         }
 

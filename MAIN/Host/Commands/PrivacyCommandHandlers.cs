@@ -16,6 +16,7 @@ namespace VAL.Host.Commands
         private readonly IDataWipeService _dataWipeService;
         private readonly IToastHub _toastHub;
         private readonly IWebMessageSender _webMessageSender;
+        private readonly ILog _log;
         private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
 
@@ -25,7 +26,8 @@ namespace VAL.Host.Commands
             IProcessLauncher processLauncher,
             IDataWipeService dataWipeService,
             IToastHub toastHub,
-            IWebMessageSender webMessageSender)
+            IWebMessageSender webMessageSender,
+            ILog log)
         {
             _privacySettingsService = privacySettingsService ?? throw new ArgumentNullException(nameof(privacySettingsService));
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
@@ -33,6 +35,7 @@ namespace VAL.Host.Commands
             _dataWipeService = dataWipeService ?? throw new ArgumentNullException(nameof(dataWipeService));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
             _webMessageSender = webMessageSender ?? throw new ArgumentNullException(nameof(webMessageSender));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void Register(CommandRegistry registry)
@@ -164,7 +167,7 @@ namespace VAL.Host.Commands
             }
             catch
             {
-                ValLog.Warn(nameof(PrivacyCommandHandlers), "Failed to send privacy settings sync.");
+                _log.Warn(nameof(PrivacyCommandHandlers), "Failed to send privacy settings sync.");
             }
         }
 
@@ -175,7 +178,7 @@ namespace VAL.Host.Commands
                 return;
 
             var sourceHost = cmd.SourceUri?.Host ?? "unknown";
-            ValLog.Warn(nameof(PrivacyCommandHandlers),
+            _log.Warn(nameof(PrivacyCommandHandlers),
                 $"Privacy command failed ({action}) for {cmd.Type} (source: {sourceHost}). {LogSanitizer.Sanitize(ex.Message)}");
         }
     }
