@@ -24,9 +24,7 @@ namespace VAL.Host.Services
             TryDeleteDirectory(Path.Combine(_appPaths.DataRoot, "Snapshots"), "Snapshots", ref deleted, ref failed);
             TryDeleteDirectory(Path.Combine(_appPaths.DataRoot, "Staging"), "Staging", ref deleted, ref failed);
 
-            var memoryRoot = ResolveMemoryRoot();
-            if (!string.IsNullOrWhiteSpace(memoryRoot))
-                TryDeleteDirectory(memoryRoot, "Continuum memory", ref deleted, ref failed);
+            TryDeleteDirectory(_appPaths.MemoryChatsRoot, "Continuum memory", ref deleted, ref failed);
 
             try
             {
@@ -82,51 +80,5 @@ namespace VAL.Host.Services
             }
         }
 
-        private static string ResolveMemoryRoot()
-        {
-            try
-            {
-                var root = ResolveProductRoot();
-                return Path.Combine(root, "Memory", "Chats");
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private static string ResolveProductRoot()
-        {
-            string bundleDir;
-            try
-            {
-                var p = Environment.ProcessPath;
-                bundleDir = !string.IsNullOrWhiteSpace(p)
-                    ? (Path.GetDirectoryName(p) ?? AppContext.BaseDirectory)
-                    : AppContext.BaseDirectory;
-            }
-            catch
-            {
-                bundleDir = AppContext.BaseDirectory;
-            }
-
-            if (Directory.Exists(Path.Combine(bundleDir, "Modules")) ||
-                Directory.Exists(Path.Combine(bundleDir, "Dock")))
-                return bundleDir;
-
-            var productDir = Path.Combine(bundleDir, "PRODUCT");
-            if (Directory.Exists(Path.Combine(productDir, "Modules")) ||
-                Directory.Exists(Path.Combine(productDir, "Dock")))
-                return productDir;
-
-            var mainDir = Path.Combine(bundleDir, "MAIN");
-            if (Directory.Exists(Path.Combine(mainDir, "Modules")))
-            {
-                var devProduct = Path.Combine(mainDir, "PRODUCT");
-                return Directory.Exists(devProduct) ? devProduct : bundleDir;
-            }
-
-            return bundleDir;
-        }
     }
 }

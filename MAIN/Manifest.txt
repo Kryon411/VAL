@@ -175,6 +175,7 @@ MAIN/VAL.Host/Security/WebMessageOriginGuard.cs
 MAIN/VAL.Host/Security/WebMessageType.cs
 MAIN/VAL.Host/Security/WebOriginPolicy.cs
 MAIN/VAL.Host/Security/WebViewSessionNonce.cs
+MAIN/VAL.Host/Services/AppPathLayout.cs
 MAIN/VAL.Host/Services/AppPaths.cs
 MAIN/VAL.Host/Services/BuildInfo.cs
 MAIN/VAL.Host/Services/IAppPaths.cs
@@ -218,6 +219,7 @@ MAIN/VAL.Tests/Commands/HostCommandRouterTests.cs
 MAIN/VAL.Tests/Abyss/AbyssSearchServiceTests.cs
 MAIN/VAL.Tests/Continuum/QuickRefreshServiceTests.cs
 MAIN/VAL.Tests/Continuum/ContinuumInjectInboxTests.cs
+MAIN/VAL.Tests/Hosting/AppPathsTests.cs
 MAIN/VAL.Tests/Hosting/ValHostServiceCollectionExtensionsTests.cs
 MAIN/VAL.Tests/Logging/RateLimiterTests.cs
 MAIN/VAL.Tests/Logging/RollingFileLogSinkTests.cs

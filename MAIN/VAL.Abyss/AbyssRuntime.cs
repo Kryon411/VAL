@@ -39,6 +39,7 @@ namespace VAL.Host.Abyss
         private readonly IWebMessageSender _messageSender;
         private readonly IToastHub _toastHub;
         private readonly ISessionContext _sessionContext;
+        private readonly IAppPaths _appPaths;
         private readonly ITruthStore _truthStore;
         private List<AbyssSearchResult> _lastResults = new();
         private string? _lastQuery;
@@ -51,12 +52,14 @@ namespace VAL.Host.Abyss
             IWebMessageSender messageSender,
             IToastHub toastHub,
             ISessionContext sessionContext,
+            IAppPaths appPaths,
             ITruthStore truthStore)
         {
             _abyssSearch = abyssSearch ?? throw new ArgumentNullException(nameof(abyssSearch));
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
+            _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
         }
 
@@ -83,7 +86,7 @@ namespace VAL.Host.Abyss
             {
                 try
                 {
-                    var memoryRoot = ResolveMemoryRoot();
+                    var memoryRoot = _appPaths.MemoryChatsRoot;
                     TrackQuery(query, queryOriginal);
                     if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                     {
@@ -151,7 +154,7 @@ namespace VAL.Host.Abyss
 
             Task.Run(() =>
             {
-                var memoryRoot = ResolveMemoryRoot();
+                var memoryRoot = _appPaths.MemoryChatsRoot;
                 TrackQuery("(Last)", null);
                 if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 {
@@ -277,7 +280,7 @@ namespace VAL.Host.Abyss
             if (string.IsNullOrWhiteSpace(chatId))
                 return;
 
-            if (!SafePathResolver.TryResolveChatTruthPath(ResolveProductRoot(), chatId, out var truthPath, out var chatDir))
+            if (!SafePathResolver.TryResolveChatTruthPath(_appPaths.ProductRoot, chatId, out var truthPath, out var chatDir))
                 return;
 
             try
@@ -626,46 +629,6 @@ namespace VAL.Host.Abyss
             }
 
             return null;
-        }
-
-        private static string ResolveMemoryRoot()
-        {
-            var root = ResolveProductRoot();
-            return Path.Combine(root, "Memory", "Chats");
-        }
-
-        private static string ResolveProductRoot()
-        {
-            string bundleDir;
-            try
-            {
-                var p = Environment.ProcessPath;
-                bundleDir = !string.IsNullOrWhiteSpace(p)
-                    ? (Path.GetDirectoryName(p) ?? AppContext.BaseDirectory)
-                    : AppContext.BaseDirectory;
-            }
-            catch
-            {
-                bundleDir = AppContext.BaseDirectory;
-            }
-
-            if (Directory.Exists(Path.Combine(bundleDir, "Modules")) ||
-                Directory.Exists(Path.Combine(bundleDir, "Dock")))
-                return bundleDir;
-
-            var productDir = Path.Combine(bundleDir, "PRODUCT");
-            if (Directory.Exists(Path.Combine(productDir, "Modules")) ||
-                Directory.Exists(Path.Combine(productDir, "Dock")))
-                return productDir;
-
-            var mainDir = Path.Combine(bundleDir, "MAIN");
-            if (Directory.Exists(Path.Combine(mainDir, "Modules")))
-            {
-                var devProduct = Path.Combine(mainDir, "PRODUCT");
-                return Directory.Exists(devProduct) ? devProduct : bundleDir;
-            }
-
-            return bundleDir;
         }
 
         public void Dispose()

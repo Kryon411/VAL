@@ -12,19 +12,22 @@ namespace VAL.Host.Services
         internal const int WarnMb = 50;
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(20);
 
+        private readonly IAppPaths _appPaths;
         private readonly ISessionContext _sessionContext;
         private readonly ITruthStore _truthStore;
         private readonly string? _productRootOverride;
         private readonly RateLimiter _rateLimiter = new();
 
-        public TruthHealthReportService(ISessionContext sessionContext, ITruthStore truthStore)
+        public TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore)
         {
+            _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
         }
 
-        internal TruthHealthReportService(ISessionContext sessionContext, ITruthStore truthStore, string? productRootOverride)
+        internal TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore, string? productRootOverride)
         {
+            _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
             _productRootOverride = productRootOverride;
@@ -39,8 +42,8 @@ namespace VAL.Host.Services
         {
             var chatId = _sessionContext.ActiveChatId;
             var hasChatId = !string.IsNullOrWhiteSpace(chatId) && Guid.TryParse(chatId, out _);
-            var productRoot = ResolveProductRoot(chatId);
-            var reports = BuildReports(productRoot);
+            var memoryChatsRoot = ResolveMemoryChatsRoot();
+            var reports = BuildReports(memoryChatsRoot);
 
             if (!hasChatId)
             {
@@ -102,19 +105,18 @@ namespace VAL.Host.Services
             }
         }
 
-        private System.Collections.Generic.List<TruthHealthSnapshot> BuildReports(string? productRoot)
+        private System.Collections.Generic.List<TruthHealthSnapshot> BuildReports(string? memoryChatsRoot)
         {
             var reports = new System.Collections.Generic.List<TruthHealthSnapshot>();
-            if (string.IsNullOrWhiteSpace(productRoot))
+            if (string.IsNullOrWhiteSpace(memoryChatsRoot))
                 return reports;
 
             try
             {
-                var chatsRoot = Path.Combine(productRoot, "Memory", "Chats");
-                if (!Directory.Exists(chatsRoot))
+                if (!Directory.Exists(memoryChatsRoot))
                     return reports;
 
-                var chatDirs = Directory.GetDirectories(chatsRoot);
+                var chatDirs = Directory.GetDirectories(memoryChatsRoot);
                 Array.Sort(chatDirs, StringComparer.OrdinalIgnoreCase);
 
                 foreach (var chatDir in chatDirs)
@@ -139,26 +141,12 @@ namespace VAL.Host.Services
             return reports;
         }
 
-        private string? ResolveProductRoot(string? chatId)
+        private string? ResolveMemoryChatsRoot()
         {
             if (!string.IsNullOrWhiteSpace(_productRootOverride))
-                return _productRootOverride;
+                return AppPathLayout.ResolveMemoryChatsRoot(_productRootOverride);
 
-            if (string.IsNullOrWhiteSpace(chatId))
-                return null;
-
-            try
-            {
-                var chatDir = _truthStore.GetChatDir(chatId);
-                var chatsRoot = Directory.GetParent(chatDir);
-                var memoryRoot = chatsRoot?.Parent;
-                var productRoot = memoryRoot?.Parent;
-                return productRoot?.FullName;
-            }
-            catch
-            {
-                return null;
-            }
+            return _appPaths.MemoryChatsRoot;
         }
 
         private bool TryResolvePaths(string chatId, out string truthPath, out string repairLogPath, out string relativePath)

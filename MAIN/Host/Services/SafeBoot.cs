@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
-using VAL.Continuum.Pipeline.Common;
 using VAL.Host.Logging;
 using VAL.Host.Options;
 
@@ -24,7 +23,7 @@ namespace VAL.Host.Services
 
         public void LogStartupInfo(IBuildInfo buildInfo, IAppPaths appPaths, WebViewOptions webViewOptions)
         {
-            InitializeDiagnostics(buildInfo);
+            InitializeDiagnostics(buildInfo, appPaths);
             EnsureDirectory(appPaths.DataRoot);
             EnsureDirectory(appPaths.LogsRoot);
             EnsureDirectory(appPaths.ProfileRoot);
@@ -103,17 +102,15 @@ namespace VAL.Host.Services
             }
         }
 
-        private static void InitializeDiagnostics(IBuildInfo buildInfo)
+        private static void InitializeDiagnostics(IBuildInfo buildInfo, IAppPaths appPaths)
         {
             try
             {
-                var productRoot = ContinuumContext.ResolveProductRoot();
-                if (string.IsNullOrWhiteSpace(productRoot))
+                if (appPaths == null || string.IsNullOrWhiteSpace(appPaths.LogsRoot))
                     return;
 
-                var logsRoot = Path.Combine(productRoot, "Logs");
-                Directory.CreateDirectory(logsRoot);
-                var logPath = Path.Combine(logsRoot, "VAL.log");
+                Directory.CreateDirectory(appPaths.LogsRoot);
+                var logPath = Path.Combine(appPaths.LogsRoot, "VAL.log");
                 ValLog.AddSink(new RollingFileLogSink(logPath));
 
                 var version = buildInfo?.Version ?? "unknown";

@@ -105,21 +105,6 @@ namespace VAL.Host.Services
             return exception.Message;
         }
 
-        private static string ResolveContentRoot()
-        {
-            try
-            {
-                var exePath = Environment.ProcessPath;
-                var exeDir = string.IsNullOrWhiteSpace(exePath) ? null : Path.GetDirectoryName(exePath);
-                var candidate = exeDir ?? AppContext.BaseDirectory;
-                return Path.GetFullPath(candidate);
-            }
-            catch
-            {
-                return AppContext.BaseDirectory;
-            }
-        }
-
         private static readonly SearchValues<char> MetadataSeparators = SearchValues.Create("-+");
 
         private static Version? ParseVersion(string? version)
@@ -153,10 +138,11 @@ namespace VAL.Host.Services
                 : null;
 
             var resolvedContentRoot = string.IsNullOrWhiteSpace(contentRoot)
-                ? ResolveContentRoot()
+                ? AppPathLayout.ResolveContentRoot()
                 : contentRoot;
+            var resolvedProductRoot = AppPathLayout.ResolveProductRoot(resolvedContentRoot);
             var resolvedModulesRoot = string.IsNullOrWhiteSpace(modulesRoot)
-                ? Path.Combine(resolvedContentRoot, "Modules")
+                ? Path.Combine(resolvedProductRoot, "Modules")
                 : modulesRoot;
 
             ValLog.Info("ModuleLoader", $"Resolved ModulesRoot: {resolvedModulesRoot}");
@@ -166,7 +152,7 @@ namespace VAL.Host.Services
             //  - Modules\**\*.module.json (feature modules)
             var rootsToScan = new List<string>
             {
-                Path.Combine(resolvedContentRoot, "Dock"),
+                Path.Combine(resolvedProductRoot, "Dock"),
                 resolvedModulesRoot
             };
 
