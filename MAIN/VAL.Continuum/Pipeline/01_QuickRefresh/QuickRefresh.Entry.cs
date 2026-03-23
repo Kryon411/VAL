@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using VAL.Continuum.Pipeline.Inject;
 
 namespace VAL.Continuum.Pipeline.QuickRefresh
 {
@@ -9,20 +10,20 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
     /// </summary>
     public static class QuickRefreshEntry
     {
-        public static void Run(string chatId)
+        public static void Run(string chatId, IContinuumInjectInbox injectInbox)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
 
-            QuickRefreshFlow.Run(chatId, CancellationToken.None);
+            QuickRefreshFlow.Run(chatId, injectInbox, CancellationToken.None);
         }
 
-        public static void Run(string chatId, CancellationToken token)
+        public static void Run(string chatId, IContinuumInjectInbox injectInbox, CancellationToken token)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
 
-            QuickRefreshFlow.Run(chatId, token);
+            QuickRefreshFlow.Run(chatId, injectInbox, token);
         }
     }
 }

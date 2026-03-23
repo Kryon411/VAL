@@ -11,19 +11,20 @@ namespace VAL.Continuum.Pipeline.QuickRefresh
 {
     public static class QuickRefreshFlow
     {
-        public static void Run(string chatId)
+        public static void Run(string chatId, IContinuumInjectInbox injectInbox)
         {
-            Run(chatId, CancellationToken.None);
+            Run(chatId, injectInbox, CancellationToken.None);
         }
 
-        public static void Run(string chatId, CancellationToken token)
+        public static void Run(string chatId, IContinuumInjectInbox injectInbox, CancellationToken token)
         {
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
+            ArgumentNullException.ThrowIfNull(injectInbox);
 
             var injectSeed = BuildLegacyPulseSeed(chatId, token);
             token.ThrowIfCancellationRequested();
-            EssenceInjectInbox.Enqueue(injectSeed);
+            injectInbox.Enqueue(injectSeed);
         }
 
         public static EssenceInjectController.InjectSeed BuildLegacyPulseSeed(string chatId, CancellationToken token)

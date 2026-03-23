@@ -94,7 +94,6 @@ MAIN/Modules/Continuum/Pipeline/04_Filter2/Filter2.Restructure.cs
 MAIN/Modules/Continuum/Pipeline/04_Filter2/Filter2.Rules.cs
 MAIN/Modules/Continuum/Pipeline/05_Inject/ContinuumInjectInbox.cs
 MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Controller.cs
-MAIN/Modules/Continuum/Pipeline/05_Inject/Essence.Inject.Inbox.cs
 MAIN/Modules/Continuum/Pipeline/05_Inject/IContinuumInjectInbox.cs
 MAIN/Modules/Continuum/Pipeline/06_Telemetry/Telemetry.ThresholdMonitor.cs
 MAIN/Modules/Portal/Portal.main.js
@@ -214,6 +213,7 @@ MAIN/VAL.Host/WebMessaging/WebMessageSender.cs
 MAIN/VAL.Tests/Commands/CommandRegistryFactoryTests.cs
 MAIN/VAL.Tests/Commands/CommandRegistryTests.cs
 MAIN/VAL.Tests/Commands/HostCommandRouterTests.cs
+MAIN/VAL.Tests/Continuum/ContinuumInjectInboxTests.cs
 MAIN/VAL.Tests/Hosting/ValHostServiceCollectionExtensionsTests.cs
 MAIN/VAL.Tests/Logging/RateLimiterTests.cs
 MAIN/VAL.Tests/Logging/RollingFileLogSinkTests.cs

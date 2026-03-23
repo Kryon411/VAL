@@ -32,7 +32,7 @@ Quick Refresh Flow (high level)
 
 5) Preamble Injection + Queue
    - ContinuumPreamble.InjectIntoEssence(...)
-   - EssenceInjectInbox.Enqueue(...)
+   - IContinuumInjectInbox.Enqueue(...)
    - Goal: Add the context prelude / response rules and enqueue the final text for composer injection.
 
 Per-Session Audit Artifacts (written in the chat session folder)
