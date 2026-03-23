@@ -1,13 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using VAL.Contracts;
 using VAL.Host.Abyss;
 using VAL.Host.Logging;
 
 namespace VAL.Host.Commands
 {
-    internal sealed class AbyssCommandHandlers
+    internal sealed class AbyssCommandHandlers : ICommandRegistryContributor
     {
+        private static readonly string[] RequiredIndices = { "indices" };
         private readonly AbyssRuntime _abyssRuntime;
         private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
@@ -16,6 +18,72 @@ namespace VAL.Host.Commands
         public AbyssCommandHandlers(AbyssRuntime abyssRuntime)
         {
             _abyssRuntime = abyssRuntime ?? throw new ArgumentNullException(nameof(abyssRuntime));
+        }
+
+        public void Register(CommandRegistry registry)
+        {
+            ArgumentNullException.ThrowIfNull(registry);
+
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandOpenQueryUi,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleOpenQueryUi));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandSearch,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleSearch));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandRetryLast,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleRetryLast));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandInjectResult,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleInjectResult));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandInjectResults,
+                "Abyss",
+                RequiredIndices,
+                HandleInjectResults));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandLast,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleLast));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandOpenSource,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleOpenSource));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandClearResults,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleClearResults));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandDisregard,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleDisregard));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandGetResults,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleGetResults));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandInjectPrompt,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleInjectPrompt));
+            registry.Register(new CommandSpec(
+                WebCommandNames.AbyssCommandInject,
+                "Abyss",
+                Array.Empty<string>(),
+                HandleInject));
         }
 
         public void HandleSearch(HostCommand cmd)

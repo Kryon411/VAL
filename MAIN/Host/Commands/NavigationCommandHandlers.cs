@@ -1,9 +1,10 @@
 using System;
+using VAL.Contracts;
 using VAL.Host.Services;
 
 namespace VAL.Host.Commands
 {
-    internal sealed class NavigationCommandHandlers
+    internal sealed class NavigationCommandHandlers : ICommandRegistryContributor
     {
         private const string ChatHomeUrl = "https://chatgpt.com/";
         private readonly IWebViewRuntime _webViewRuntime;
@@ -13,6 +14,22 @@ namespace VAL.Host.Commands
         {
             _webViewRuntime = webViewRuntime ?? throw new ArgumentNullException(nameof(webViewRuntime));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
+        }
+
+        public void Register(CommandRegistry registry)
+        {
+            ArgumentNullException.ThrowIfNull(registry);
+
+            registry.Register(new CommandSpec(
+                WebCommandNames.NavCommandGoChat,
+                "Navigation",
+                Array.Empty<string>(),
+                HandleGoChat));
+            registry.Register(new CommandSpec(
+                WebCommandNames.NavCommandGoBack,
+                "Navigation",
+                Array.Empty<string>(),
+                HandleGoBack));
         }
 
         public void HandleGoChat(HostCommand cmd)

@@ -48,15 +48,23 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<ICommandDiagnosticsReporter, CommandDiagnosticsReporter>();
             builder.Services.AddSingleton<ContinuumHost>();
             builder.Services.AddSingleton<ContinuumCommandHandlers>();
+            builder.Services.AddSingleton<ICommandRegistryContributor>(sp => sp.GetRequiredService<ContinuumCommandHandlers>());
             builder.Services.AddSingleton<VoidCommandHandlers>();
+            builder.Services.AddSingleton<ICommandRegistryContributor>(sp => sp.GetRequiredService<VoidCommandHandlers>());
             builder.Services.AddSingleton<PortalCommandHandlers>();
+            builder.Services.AddSingleton<ICommandRegistryContributor>(sp => sp.GetRequiredService<PortalCommandHandlers>());
             builder.Services.AddSingleton<PrivacyCommandHandlers>();
+            builder.Services.AddSingleton<ICommandRegistryContributor>(sp => sp.GetRequiredService<PrivacyCommandHandlers>());
             builder.Services.AddSingleton<ToolsCommandHandlers>();
+            builder.Services.AddSingleton<ICommandRegistryContributor>(sp => sp.GetRequiredService<ToolsCommandHandlers>());
             builder.Services.AddSingleton<NavigationCommandHandlers>();
+            builder.Services.AddSingleton<ICommandRegistryContributor>(sp => sp.GetRequiredService<NavigationCommandHandlers>());
             builder.Services.AddSingleton<DockCommandHandlers>();
+            builder.Services.AddSingleton<ICommandRegistryContributor>(sp => sp.GetRequiredService<DockCommandHandlers>());
             builder.Services.AddSingleton<AbyssSearchService>();
             builder.Services.AddSingleton<AbyssRuntime>();
             builder.Services.AddSingleton<AbyssCommandHandlers>();
+            builder.Services.AddSingleton<ICommandRegistryContributor>(sp => sp.GetRequiredService<AbyssCommandHandlers>());
             builder.Services.AddSingleton<CommandRegistryComposer>();
             builder.CommandRegistryConfigurators.Add((serviceProvider, registry) =>
                 serviceProvider.GetRequiredService<CommandRegistryComposer>().Register(registry));

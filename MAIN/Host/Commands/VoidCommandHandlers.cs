@@ -1,15 +1,28 @@
 using System;
+using VAL.Contracts;
 
 namespace VAL.Host.Commands
 {
-    internal sealed class VoidCommandHandlers
+    internal sealed class VoidCommandHandlers : ICommandRegistryContributor
     {
+        private static readonly string[] RequiredEnabled = { "enabled" };
         private bool? _lastEnabledState;
         private readonly IToastHub _toastHub;
 
         public VoidCommandHandlers(IToastHub toastHub)
         {
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
+        }
+
+        public void Register(CommandRegistry registry)
+        {
+            ArgumentNullException.ThrowIfNull(registry);
+
+            registry.Register(new CommandSpec(
+                WebCommandNames.VoidCommandSetEnabled,
+                "Void",
+                RequiredEnabled,
+                HandleSetEnabled));
         }
 
         public void HandleSetEnabled(HostCommand cmd)

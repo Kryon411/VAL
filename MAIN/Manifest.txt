@@ -22,7 +22,6 @@ MAIN/Dock/Dock.styles.css
 MAIN/Host/Abyss/AbyssToastBridge.cs
 MAIN/Host/Commands/AbyssCommandHandlers.cs
 MAIN/Host/Commands/CommandDiagnosticsReporter.cs
-MAIN/Host/Commands/CommandRegistryFactory.cs
 MAIN/Host/Commands/ContinuumCommandHandlers.cs
 MAIN/Host/Commands/DockCommandHandlers.cs
 MAIN/Host/Commands/HostCommandRegistryguide.md
@@ -149,6 +148,7 @@ MAIN/VAL.Host/Commands/HostCommand.cs
 MAIN/VAL.Host/Commands/HostCommandExecutionResult.cs
 MAIN/VAL.Host/Commands/HostCommandRouter.cs
 MAIN/VAL.Host/Commands/ICommandDiagnosticsReporter.cs
+MAIN/VAL.Host/Commands/ICommandRegistryContributor.cs
 MAIN/VAL.Host/Hosting/ValHostBuilder.cs
 MAIN/VAL.Host/Hosting/ValHostServiceCollectionExtensions.cs
 MAIN/VAL.Host/HostMarker.cs
@@ -213,7 +213,7 @@ MAIN/VAL.Host/WebMessaging/IWebMessageSender.cs
 MAIN/VAL.Host/WebMessaging/MessageEnvelope.cs
 MAIN/VAL.Host/WebMessaging/WebMessageEnvelope.cs
 MAIN/VAL.Host/WebMessaging/WebMessageSender.cs
-MAIN/VAL.Tests/Commands/CommandRegistryFactoryTests.cs
+MAIN/VAL.Tests/Commands/CommandRegistryComposerTests.cs
 MAIN/VAL.Tests/Commands/CommandRegistryTests.cs
 MAIN/VAL.Tests/Commands/HostCommandRouterTests.cs
 MAIN/VAL.Tests/Abyss/AbyssSearchServiceTests.cs

@@ -6,7 +6,7 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Commands
 {
-    internal sealed class DockCommandHandlers
+    internal sealed class DockCommandHandlers : ICommandRegistryContributor
     {
         private readonly IDockModelService _modelService;
         private readonly IDockUiStateStore _stateStore;
@@ -20,6 +20,27 @@ namespace VAL.Host.Commands
             _modelService = modelService ?? throw new ArgumentNullException(nameof(modelService));
             _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
             _webMessageSender = webMessageSender ?? throw new ArgumentNullException(nameof(webMessageSender));
+        }
+
+        public void Register(CommandRegistry registry)
+        {
+            ArgumentNullException.ThrowIfNull(registry);
+
+            registry.Register(new CommandSpec(
+                WebCommandNames.DockCommandRequestModel,
+                "Dock",
+                Array.Empty<string>(),
+                HandleRequestModel));
+            registry.Register(new CommandSpec(
+                WebCommandNames.DockUiStateGet,
+                "Dock",
+                Array.Empty<string>(),
+                HandleUiStateGet));
+            registry.Register(new CommandSpec(
+                WebCommandNames.DockUiStateSet,
+                "Dock",
+                Array.Empty<string>(),
+                HandleUiStateSet));
         }
 
         public void HandleRequestModel(HostCommand cmd)

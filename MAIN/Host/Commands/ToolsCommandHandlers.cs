@@ -1,10 +1,11 @@
 using System;
+using VAL.Contracts;
 using VAL.Host.Logging;
 using VAL.Host.Services;
 
 namespace VAL.Host.Commands
 {
-    internal sealed class ToolsCommandHandlers
+    internal sealed class ToolsCommandHandlers : ICommandRegistryContributor
     {
         private readonly IUiThread _uiThread;
         private readonly ITruthHealthWindowService _truthHealthWindowService;
@@ -23,6 +24,22 @@ namespace VAL.Host.Commands
             _truthHealthWindowService = truthHealthWindowService ?? throw new ArgumentNullException(nameof(truthHealthWindowService));
             _diagnosticsWindowService = diagnosticsWindowService ?? throw new ArgumentNullException(nameof(diagnosticsWindowService));
             _diagnosticsReporter = diagnosticsReporter ?? throw new ArgumentNullException(nameof(diagnosticsReporter));
+        }
+
+        public void Register(CommandRegistry registry)
+        {
+            ArgumentNullException.ThrowIfNull(registry);
+
+            registry.Register(new CommandSpec(
+                WebCommandNames.ToolsOpenTruthHealth,
+                "Tools",
+                Array.Empty<string>(),
+                HandleOpenTruthHealth));
+            registry.Register(new CommandSpec(
+                WebCommandNames.ToolsOpenDiagnostics,
+                "Tools",
+                Array.Empty<string>(),
+                HandleOpenDiagnostics));
         }
 
         public void HandleOpenTruthHealth(HostCommand cmd)

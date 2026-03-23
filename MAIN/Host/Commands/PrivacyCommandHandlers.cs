@@ -7,7 +7,9 @@ using VAL.Host.WebMessaging;
 namespace VAL.Host.Commands
 {
     internal sealed class PrivacyCommandHandlers
+        : ICommandRegistryContributor
     {
+        private static readonly string[] RequiredEnabled = { "enabled" };
         private readonly IPrivacySettingsService _privacySettingsService;
         private readonly IAppPaths _appPaths;
         private readonly IProcessLauncher _processLauncher;
@@ -31,6 +33,32 @@ namespace VAL.Host.Commands
             _dataWipeService = dataWipeService ?? throw new ArgumentNullException(nameof(dataWipeService));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
             _webMessageSender = webMessageSender ?? throw new ArgumentNullException(nameof(webMessageSender));
+        }
+
+        public void Register(CommandRegistry registry)
+        {
+            ArgumentNullException.ThrowIfNull(registry);
+
+            registry.Register(new CommandSpec(
+                WebCommandNames.PrivacyCommandSetContinuumLogging,
+                "Privacy",
+                RequiredEnabled,
+                HandleSetContinuumLogging));
+            registry.Register(new CommandSpec(
+                WebCommandNames.PrivacyCommandSetPortalCapture,
+                "Privacy",
+                RequiredEnabled,
+                HandleSetPortalCapture));
+            registry.Register(new CommandSpec(
+                WebCommandNames.PrivacyCommandOpenDataFolder,
+                "Privacy",
+                Array.Empty<string>(),
+                HandleOpenDataFolder));
+            registry.Register(new CommandSpec(
+                WebCommandNames.PrivacyCommandWipeData,
+                "Privacy",
+                Array.Empty<string>(),
+                HandleWipeData));
         }
 
         public void HandleSetContinuumLogging(HostCommand cmd)
