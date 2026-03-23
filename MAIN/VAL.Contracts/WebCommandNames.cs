@@ -19,11 +19,7 @@ namespace VAL.Contracts
         public const string ContinuumSessionAttach = "continuum.session.attach";
         public const string ContinuumSessionAttached = "continuum.session.attached";
         public const string ContinuumCommandToggleLogging = "continuum.command.toggle_logging";
-        public const string ContinuumUiNewChat = "continuum.ui.new_chat";
-        public const string ContinuumUiPreludePrompt = "continuum.ui.prelude_prompt";
         public const string ContinuumUiComposerInteraction = "continuum.ui.composer_interaction";
-        public const string ContinuumCommandInjectPreamble = "continuum.command.inject_preamble";
-        public const string ContinuumCommandInjectPrelude = "continuum.command.inject_prelude";
         public const string ContinuumTruthAppend = "continuum.truth.append";
         public const string TruthAppend = "truth.append";
         public const string ContinuumTruth = "continuum.truth";

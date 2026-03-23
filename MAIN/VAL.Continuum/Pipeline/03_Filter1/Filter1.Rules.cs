@@ -12,8 +12,7 @@ namespace VAL.Continuum.Pipeline.Filter1
     /// Design intent:
     /// - Deterministic + boring (no semantic inference).
     /// - Prefer preserving continuity over preserving verbatim bulk.
-    /// - When assistant markers exist, slice around them.
-    /// - When no markers exist, fall back to head+tail slicing (~1.5k total), sentence-safe.
+    /// - Slice long assistant turns with head+tail extraction (~1.5k total), sentence-safe.
     /// </summary>
     internal static class Filter1Rules
     {
@@ -32,31 +31,12 @@ namespace VAL.Continuum.Pipeline.Filter1
         // Hard guardrail: if anything still explodes, don't let a single exchange dominate Filter 2's 28k pack.
         public const int MaxExchangeChars = 12_000;
 
-        // ---- Marker detection ----
-        // Marker tokens are single words in parentheses: (checkpoint) (goal) (milestone)
-        // Tags SHOULD appear at end of a sentence, but we detect them anywhere to be tolerant.
-        //
-        // The ChatGPT UI may append a page counter (e.g. "(checkpoint)2/2"); tolerate it.
-        private static readonly Regex MarkerRegex =
-            new(@"\((checkpoint|goal|milestone)\)(?:\s*\d+\s*/\s*\d+)?\s*(?=$|\n)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-        // ---- UI page-counter cleanup ----
-        // Remove "2/2" (or similar) if it is glued to a marker token.
-        private static readonly Regex MarkerPageCounterInlineRegex =
-            new(@"\((checkpoint|goal|milestone)\)\s*\d+\s*/\s*\d+\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-        private static readonly Regex StandalonePageCounterLineRegex =
-            new(@"^\s*\d+\s*/\s*\d+\s*$", RegexOptions.Compiled);
-
-        private static readonly Regex MarkerAtLineEndRegex =
-            new(@"\((checkpoint|goal|milestone)\)\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
         // ---- Noise stubs ----
         // Stub fenced code blocks (never include raw code in Seed.log by default).
         private static readonly Regex CodeFenceRegex = new(@"```.*?```", RegexOptions.Singleline | RegexOptions.Compiled);
 
-        // Detect injected preambles / prior seeds that often get pasted into chat.
-        private static readonly Regex LargePreambleRegex =
+        // Detect injected legacy seed blocks / prior packets that often get pasted into chat.
+        private static readonly Regex LargeSeedPasteRegex =
             new(@"^\s*(Continuing\s+an\s+ongoing\s+working\s+session\s+with\s+VAL|CONTEXT\s+BLOCK\s+[—\-]\s+READ\s+ONLY|ESSENCE[\-\u2011]M\s+SNAPSHOT\s*\(AUTHORITATIVE\)|WHERE\s+WE\s+LEFT\s+OFF\s+[—\-]\s+LAST\s+COMPLETE\s+EXCHANGE\s*\(AUTHORITATIVE\)|CONTEXT\s+FILLER\s*\(REFERENCE\s+ONLY\s+[—\-]\s+DO\s+NOT\s+ADVANCE\s+FROM\s+HERE\))\b",
                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex EssenceHeaderRegex =
@@ -81,13 +61,6 @@ namespace VAL.Continuum.Pipeline.Filter1
             "PDF Document"
         };
 
-        public static IReadOnlyList<Match> FindMarkers(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return Array.Empty<Match>();
-            try { return MarkerRegex.Matches(text).Cast<Match>().Where(m => m.Success).ToList(); }
-            catch { return Array.Empty<Match>(); }
-        }
-
         public static string FilterUser(string text) => FilterAndSlice(text, isAssistant: false, slice: true);
         public static string FilterAssistant(string text) => FilterAndSlice(text, isAssistant: true, slice: true);
 
@@ -99,77 +72,33 @@ namespace VAL.Continuum.Pipeline.Filter1
             var s = (text ?? string.Empty).Replace("\r\n", "\n").Trim();
             if (string.IsNullOrWhiteSpace(s)) return string.Empty;
 
-            // 0) Strip known UI leakage (page counters after markers, etc.).
-            s = StripMarkerPageCounters(s);
-
-            // 1) Strip upload card prefixes (filename + descriptor lines).
+            // 0) Strip upload card prefixes (filename + descriptor lines).
             s = StripUploadCardPrefix(s);
 
-            // 2) Stub giant preamble/seed pastes (they are usually not needed in handoff history).
-            if (LargePreambleRegex.IsMatch(s))
-                return "[PASTE OMITTED: Context / preamble]";
+            // 1) Stub giant legacy seed pastes (they are usually not needed in handoff history).
+            if (LargeSeedPasteRegex.IsMatch(s))
+                return "[PASTE OMITTED: Legacy handoff block]";
 
             if (EssenceHeaderRegex.IsMatch(s))
                 return "[PASTE OMITTED: Prior Essence-M seed]";
 
-            // 3) Stub code fences.
+            // 2) Stub code fences.
             s = StubCodeFences(s);
 
-            // 4) Mechanical whitespace compaction.
+            // 3) Mechanical whitespace compaction.
             s = CollapseBlankLines(s);
 
-            // 5) Collapse accidental repeated blocks (prevents "stutter" output).
+            // 4) Collapse accidental repeated blocks (prevents "stutter" output).
             s = CollapseConsecutiveDuplicateParagraphs(s);
 
             if (!slice)
                 return s;
 
-            // 6) Slice if needed.
+            // 5) Slice if needed.
             if (isAssistant)
                 return SliceAssistant(s);
 
             return SliceUser(s);
-        }
-
-        private static string StripMarkerPageCounters(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return string.Empty;
-
-            try
-            {
-                // Inline: "... (goal)2/2" or "... (goal) 2 / 2" -> "... (goal)"
-                s = MarkerPageCounterInlineRegex.Replace(s, m =>
-                {
-                    var tag = m.Groups.Count >= 2 ? m.Groups[1].Value : "goal";
-                    return $"({tag})";
-                });
-
-                // Trailing line: if the last non-empty line is "2/2" and the previous non-empty line ends
-                // with a marker token, drop the page-counter line.
-                var lines = s.Split('\n').ToList();
-                int last = lines.Count - 1;
-
-                int i = last;
-                while (i >= 0 && string.IsNullOrWhiteSpace(lines[i])) i--;
-
-                if (i >= 0 && StandalonePageCounterLineRegex.IsMatch(lines[i]))
-                {
-                    int j = i - 1;
-                    while (j >= 0 && string.IsNullOrWhiteSpace(lines[j])) j--;
-
-                    if (j >= 0 && MarkerAtLineEndRegex.IsMatch((lines[j] ?? string.Empty).TrimEnd()))
-                    {
-                        lines.RemoveAt(i);
-                        s = string.Join("\n", lines);
-                    }
-                }
-
-                return s;
-            }
-            catch
-            {
-                return s;
-            }
         }
 
         private static string StripUploadCardPrefix(string s)
@@ -347,20 +276,6 @@ namespace VAL.Continuum.Pipeline.Filter1
             if (s.Length <= maxFull)
                 return s;
 
-            var markers = FindMarkers(s);
-
-            // Tagging guidelines: at most ONE marker sentence per response.
-            // If we detect many markers (often from meta-discussion), fall back to head+tail.
-            if (markers.Count > 0)
-            {
-                if (markers.Count > 4)
-                    return SliceHeadTail(s, AssistantSliceSideChars, AssistantSentenceOverflowMaxChars);
-
-                // Keep the last marker (most likely the real end-of-sentence tag).
-                var chosen = markers.Skip(Math.Max(0, markers.Count - 1)).ToList();
-                return SliceAroundMarkers(s, chosen, AssistantSliceSideChars, AssistantSentenceOverflowMaxChars);
-            }
-
             return SliceHeadTail(s, AssistantSliceSideChars, AssistantSentenceOverflowMaxChars);
         }
 
@@ -397,47 +312,6 @@ namespace VAL.Continuum.Pipeline.Filter1
             sb.Append(tailText.TrimStart());
 
             return sb.ToString().Trim();
-        }
-
-        private static string SliceAroundMarkers(string s, IReadOnlyList<Match> markers, int sideChars, int overflow)
-        {
-            if (markers.Count == 0) return s;
-
-            var sb = new StringBuilder();
-            for (int i = 0; i < markers.Count; i++)
-            {
-                var m = markers[i];
-                int anchorStart = m.Index;
-                int anchorEnd = m.Index + m.Length;
-
-                int left = Math.Max(0, anchorStart - sideChars);
-                int right = Math.Min(s.Length, anchorEnd + sideChars);
-
-                // Prevent overlap: if the next marker sits inside our right window, stop at its start.
-                if (i + 1 < markers.Count)
-                {
-                    int nextStart = markers[i + 1].Index;
-                    if (right > nextStart)
-                        right = nextStart;
-                }
-
-                var snippet = SliceWindowSentenceSafe(s, left, right, overflow);
-                if (string.IsNullOrWhiteSpace(snippet))
-                    continue;
-
-                if (sb.Length > 0)
-                {
-                    sb.AppendLine();
-                    sb.AppendLine();
-                }
-
-                if (left > 0) sb.Append("...");
-                sb.Append(snippet.Trim());
-                if (right < s.Length) sb.Append("...");
-            }
-
-            var ret = sb.ToString().Trim();
-            return string.IsNullOrWhiteSpace(ret) ? s : ret;
         }
 
         private static string SliceWindowSentenceSafe(string s, int left, int right, int overflow)

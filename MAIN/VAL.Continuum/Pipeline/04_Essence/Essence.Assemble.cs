@@ -11,7 +11,7 @@ namespace VAL.Continuum.Pipeline.Essence
             if (string.IsNullOrWhiteSpace(cleanedWorkingSet))
                 return string.Empty;
 
-            // The Essence payload is a plain-text snapshot. Context.txt is injected separately.
+            // The Essence payload is a plain-text snapshot. Final Pulse packet assembly happens downstream.
             return cleanedWorkingSet;
         }
     }

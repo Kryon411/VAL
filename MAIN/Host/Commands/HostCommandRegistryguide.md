@@ -103,7 +103,7 @@ Pick a consistent naming pattern:
 Examples:
 - `void.command.set_enabled`
 - `continuum.command.pulse`
-- `continuum.ui.prelude_prompt`
+- `continuum.ui.composer_interaction`
 
 ### Step 2 — Create (or choose) a handler class
 

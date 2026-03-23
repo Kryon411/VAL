@@ -52,12 +52,12 @@ namespace VAL.Tests.Continuum
 
             var rendered = PulsePacketComposer.Compose(snapshot, sections, signalSummary: null);
 
-            Assert.Contains("The following is a guide and carried context from an earlier chat in this workstream.", rendered);
             Assert.Contains("THREAD STATE SUMMARY", rendered);
             Assert.Contains("WHERE WE LEFT OFF", rendered);
             Assert.Contains("USER:", rendered);
             Assert.Contains("ASSISTANT:", rendered);
             Assert.Contains("TRUTH WALKBACK HIGHLIGHTS", rendered);
+            Assert.DoesNotContain("The following is a guide and carried context from an earlier chat in this workstream.", rendered);
         }
 
         [Fact]

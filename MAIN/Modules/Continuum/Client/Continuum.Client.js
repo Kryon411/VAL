@@ -599,7 +599,6 @@ try {
       state.attachedChatId = null;
       state.hostAttachedChatId = null;
       clearSignalAwaiting();
-      try { if (state.prelude) state.prelude.lastRootHrefSent = null; } catch (_) {}
       stopAttachWatchdog();
       ensureAttachedIfReady();
       startAttachWatchdog();
@@ -874,142 +873,6 @@ try {
       });
       return false;
     }
-  }
-
-
-  // -----------------------------
-  // Prelude prompt (new chat root) — non-blocking
-  // -----------------------------
-  // Goal: When the user interacts with the real composer on a blank new chat,
-  // emit a single best-effort signal to the host so it can show a sticky Prelude toast
-  // with actions (Prelude / Dismiss). This must never block other features.
-  //
-  // IMPORTANT: We reuse composerReady() as the single source of truth, because Prelude injection
-  // depends on it and it is already proven stable on your current ChatGPT DOM.
-  state.prelude = {
-    lastRootHrefSent: null
-  };
-
-  function isComposerBlankNow() {
-    try {
-      const c = composerReady();
-      if (!c || !c.el) return false;
-
-      if (c.kind === "prosemirror") {
-        const txt = (c.el.textContent || "").trim();
-        return txt.length === 0;
-      }
-      const v = (c.el.value || "").trim();
-      return v.length === 0;
-    } catch (_) {}
-    return false;
-  }
-
-  function getRootTurnCount() {
-    try {
-      const els = document.querySelectorAll(TURN_SELECTOR);
-      return els ? els.length : 0;
-    } catch (_) { return 0; }
-  }
-
-  function isBlankNewChatRoot() {
-    try {
-      if (!isLikelyNewChatRoot()) return false;
-
-      // On root, chatId is not available yet. Use DOM turn count + blank composer.
-      const turns = getRootTurnCount();
-      if (turns > 1) return false;
-
-      if (!composerReady()) return false;
-      if (!isComposerBlankNow()) return false;
-
-      return true;
-    } catch (_) { return false; }
-  }
-
-  function isComposerInteractionTarget(target) {
-    try {
-      const c = composerReady();
-      if (!c || !c.el) return false;
-
-      if (target && c.el.contains && c.el.contains(target)) return true;
-
-      const ae = document.activeElement;
-      if (ae && c.el.contains && c.el.contains(ae)) return true;
-
-      return false;
-    } catch (_) { return false; }
-  }
-
-  function isComposerDirectTarget(target) {
-    try {
-      if (!target) return false;
-
-      // Tight guard: require the event target (or its ancestors) to match the actual editor element.
-      // This avoids false positives from focus/animation/overlay clicks near the composer.
-      const hit = target.closest
-        ? target.closest("#prompt-textarea.ProseMirror[contenteditable='true'], #prompt-textarea.ProseMirror")
-        : null;
-
-      if (!hit) return false;
-
-      // Sanity: ensure the matched editor is the one composerReady() resolves (if available).
-      const c = composerReady();
-      if (c && c.el && hit !== c.el) {
-        // If ChatGPT swapped nodes, accept only if it's still within the resolved composer.
-        if (c.el.contains && c.el.contains(hit)) return true;
-        return false;
-      }
-
-      return true;
-    } catch (_) { return false; }
-  }
-
-
-  function emitPreludePromptSignal(reason) {
-    try {
-      const href = (location && location.href) ? location.href : "";
-      if (!href) return;
-
-      // Only once per root href (new chat instance). Leaving root resets this naturally.
-      if (state.prelude && state.prelude.lastRootHrefSent === href) return;
-      state.prelude.lastRootHrefSent = href;
-
-      post({
-        type: "continuum.ui.prelude_prompt",
-        href,
-        reason: reason || ""
-      });
-    } catch (_) {}
-  }
-
-  function startPreludePromptSignals() {
-    try {
-      // Capture-phase so nested ProseMirror nodes still trigger.
-      document.addEventListener("pointerdown", (e) => {
-        try {
-          if (!e || e.defaultPrevented) return;
-          if (e.isTrusted === false) return;
-          if (!isComposerDirectTarget(e.target)) return;
-          if (!isBlankNewChatRoot()) return;
-
-          emitPreludePromptSignal("pointerdown");
-        } catch (_) {}
-      }, true);
-
-      document.addEventListener("keydown", (e) => {
-        try {
-          if (!e || e.defaultPrevented) return;
-          if (e.isTrusted === false) return;
-
-          // If keyboard focus is inside composer, treat as interaction.
-          if (!isComposerInteractionTarget(document.activeElement)) return; // keyboard-only path
-          if (!isBlankNewChatRoot()) return;
-
-          emitPreludePromptSignal("keydown");
-        } catch (_) {}
-      }, true);
-    } catch (_) {}
   }
 
   // -----------------------------
@@ -1735,7 +1598,6 @@ function handleHostMessage(event) {
     startAttachWatchdog();
     startSendSafetyHooks();
     attachHostListener();
-    startPreludePromptSignals();
     startComposerInteractionSignals();
     startObserver();
     startNavigationWatch();

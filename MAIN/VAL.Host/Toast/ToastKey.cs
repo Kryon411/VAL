@@ -11,8 +11,6 @@ namespace VAL.Host
         ContinuumArchivingPaused,
 
         // Continuum guidance
-        PreludeAvailable,
-        PreludePrompt,
         ChroniclePrompt,
         ChronicleSuggested,
 

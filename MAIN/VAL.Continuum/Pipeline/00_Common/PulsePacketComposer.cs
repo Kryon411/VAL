@@ -22,7 +22,6 @@ namespace VAL.Continuum.Pipeline
             ArgumentNullException.ThrowIfNull(deterministicSections);
 
             var sb = new StringBuilder();
-            AppendBlock(sb, ContinuumPreamble.BuildPulseContinuityPreamble());
             AppendBulletSection(sb, ThreadStateSummaryHeading, ComposeThreadStateSummary(snapshot, deterministicSections, signalSummary));
             AppendExchangeSection(sb, WhereWeLeftOffHeading, deterministicSections.WhereWeLeftOff);
             AppendBulletSection(sb, OpenLoopsHeading, ComposeOpenLoops(deterministicSections));

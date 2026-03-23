@@ -22,7 +22,7 @@ namespace VAL.Host.Startup
         {
             _log = log ?? throw new ArgumentNullException(nameof(log));
             _productRoot = string.IsNullOrWhiteSpace(productRoot)
-                ? AppPathLayout.ResolveProductRoot()
+                ? ProductRootResolver.ResolveProductRoot()
                 : productRoot;
 
             if (string.IsNullOrWhiteSpace(_productRoot))

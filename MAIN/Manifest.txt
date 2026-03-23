@@ -71,14 +71,11 @@ MAIN/Modules/Abyss/Abyss.module.json
 MAIN/Modules/Abyss/Abyss.styles.css
 MAIN/Modules/Continuum/Client/Continuum.Client.js
 MAIN/Modules/Continuum/Client/Continuum.Client.module.json
-MAIN/Modules/Continuum/Context.Prelude.txt
-MAIN/Modules/Continuum/Context.txt
 MAIN/Modules/Continuum/Pulse.Packet.Template.vNext.txt
 MAIN/Modules/Continuum/Signal.Prompt.v1.txt
 MAIN/Modules/Continuum/Continuum.Pipeline.Map.txt
-MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumContext.cs
 MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumHost.cs
-MAIN/Modules/Continuum/Pipeline/00_Common/ContinuumPreamble.cs
+MAIN/VAL.Continuum/Pipeline/00_Common/ContinuumAssetLoader.cs
 MAIN/VAL.Continuum/Pipeline/00_Common/IToastLedger.cs
 MAIN/VAL.Continuum/Pipeline/00_Common/ToastLedgerService.cs
 MAIN/Modules/Continuum/Pipeline/01_QuickRefresh/QuickRefresh.Commands.cs

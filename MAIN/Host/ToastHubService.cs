@@ -109,36 +109,6 @@ namespace VAL.Host
                 // Continuum guidance
                 // -----------------
                 {
-                    ToastKey.PreludeAvailable,
-                    new ToastDef(
-                        ToastKey.PreludeAvailable,
-                        "This chat can be prepared for continuation. If you’d like, Prelude can set things up so a future Pulse jump has the right context.",
-                        null,
-                        ToastDuration.L,
-                        "continuum_guidance",
-                        ReplaceGroup: false,
-                        BypassBurstDedupe: false,
-                        IsPassive: true,
-                        OncePerChat: false,
-                        LedgerId: null,
-                        Cooldown: TimeSpan.Zero)
-                },
-                {
-                    ToastKey.PreludePrompt,
-                    new ToastDef(
-                        ToastKey.PreludePrompt,
-                        "Starting a new chat?",
-                        "Prelude can set up this chat for continuation. If you’d like, it will insert setup and instructions so a future Pulse jump has the right context.",
-                        ToastDuration.Sticky, // ShowActions controls duration; keep a sane default.
-                        "continuum_guidance",
-                        ReplaceGroup: true,
-                        BypassBurstDedupe: false,
-                        IsPassive: false,
-                        OncePerChat: false,
-                        LedgerId: null,
-                        Cooldown: TimeSpan.FromSeconds(3))
-                },
-                {
                     ToastKey.ChroniclePrompt,
                     new ToastDef(
                         ToastKey.ChroniclePrompt,
