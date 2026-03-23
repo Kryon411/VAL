@@ -35,12 +35,12 @@ namespace VAL.Host.Abyss
         public int Score { get; init; }
     }
 
-    internal static class AbyssSearch
+    public sealed class AbyssSearchService
     {
-        private static readonly RateLimiter RateLimiter = new();
+        private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
-        private static readonly object CacheGate = new();
-        private static readonly Dictionary<string, TruthLogCache> CacheByRoot = new(StringComparer.OrdinalIgnoreCase);
+        private readonly object _cacheGate = new();
+        private readonly Dictionary<string, TruthLogCache> _cacheByRoot = new(StringComparer.OrdinalIgnoreCase);
 
         private sealed class TruthLogCache
         {
@@ -60,12 +60,12 @@ namespace VAL.Host.Abyss
             public List<AbyssExchange> Exchanges { get; init; } = new();
         }
 
-        public static List<AbyssSearchResult> Search(string memoryRoot, string query, int maxResults, IReadOnlyCollection<string>? excludeFingerprints = null)
-        {
-            return Search(memoryRoot, query, maxResults, CancellationToken.None, excludeFingerprints);
-        }
-
-        public static List<AbyssSearchResult> Search(string memoryRoot, string query, int maxResults, CancellationToken cancellationToken, IReadOnlyCollection<string>? excludeFingerprints = null)
+        internal List<AbyssSearchResult> Search(
+            string memoryRoot,
+            string query,
+            int maxResults,
+            IReadOnlyCollection<string>? excludeFingerprints = null,
+            CancellationToken cancellationToken = default)
         {
             var results = new List<AbyssSearchResult>();
             var tokens = Tokenize(query);
@@ -118,7 +118,7 @@ namespace VAL.Host.Abyss
                 .ToList();
         }
 
-        public static (int startLine, int endLine) GetLineRange(AbyssExchange exchange)
+        internal (int startLine, int endLine) GetLineRange(AbyssExchange exchange)
         {
             if (exchange == null)
                 return (0, 0);
@@ -144,7 +144,7 @@ namespace VAL.Host.Abyss
             return (min, max);
         }
 
-        public static string BuildFingerprint(AbyssExchange exchange)
+        internal string BuildFingerprint(AbyssExchange exchange)
         {
             if (exchange == null)
                 return string.Empty;
@@ -153,7 +153,7 @@ namespace VAL.Host.Abyss
             return $"{exchange.ChatId}:{startLine}-{endLine}";
         }
 
-        public static List<AbyssExchange> GetLastFromMostRecent(string memoryRoot, int count)
+        internal List<AbyssExchange> GetLastFromMostRecent(string memoryRoot, int count)
         {
             var list = new List<AbyssExchange>();
             if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
@@ -190,7 +190,7 @@ namespace VAL.Host.Abyss
                 .Replace("\\\"", "\"");
         }
 
-        private static IEnumerable<string> EnumerateTruthLogs(string memoryRoot, CancellationToken cancellationToken)
+        private IEnumerable<string> EnumerateTruthLogs(string memoryRoot, CancellationToken cancellationToken)
         {
             try
             {
@@ -214,7 +214,7 @@ namespace VAL.Host.Abyss
             }
         }
 
-        private static TruthLogSnapshot? GetMostRecentTruthLog(string memoryRoot)
+        private TruthLogSnapshot? GetMostRecentTruthLog(string memoryRoot)
         {
             TruthLogSnapshot? latest = null;
 
@@ -227,7 +227,7 @@ namespace VAL.Host.Abyss
             return latest;
         }
 
-        private static List<TruthLogSnapshot> GetTruthLogSnapshots(string memoryRoot, CancellationToken cancellationToken)
+        private List<TruthLogSnapshot> GetTruthLogSnapshots(string memoryRoot, CancellationToken cancellationToken)
         {
             var paths = EnumerateTruthLogs(memoryRoot, cancellationToken).ToList();
             var snapshots = new List<TruthLogSnapshot>(paths.Count);
@@ -252,12 +252,12 @@ namespace VAL.Host.Abyss
                 TruthLogEntry? cachedEntry = null;
                 var useCache = false;
 
-                lock (CacheGate)
+                lock (_cacheGate)
                 {
-                    if (!CacheByRoot.TryGetValue(memoryRoot, out var cache))
+                    if (!_cacheByRoot.TryGetValue(memoryRoot, out var cache))
                     {
                         cache = new TruthLogCache();
-                        CacheByRoot[memoryRoot] = cache;
+                        _cacheByRoot[memoryRoot] = cache;
                     }
 
                     if (cache.Entries.TryGetValue(truthPath, out cachedEntry) &&
@@ -276,9 +276,9 @@ namespace VAL.Host.Abyss
                 {
                     exchanges = ReadExchanges(truthPath, lastWriteUtc, cancellationToken);
 
-                    lock (CacheGate)
+                    lock (_cacheGate)
                     {
-                        if (CacheByRoot.TryGetValue(memoryRoot, out var cache))
+                        if (_cacheByRoot.TryGetValue(memoryRoot, out var cache))
                         {
                             cache.Entries[truthPath] = new TruthLogEntry
                             {
@@ -297,9 +297,9 @@ namespace VAL.Host.Abyss
                 });
             }
 
-            lock (CacheGate)
+            lock (_cacheGate)
             {
-                if (CacheByRoot.TryGetValue(memoryRoot, out var cache))
+                if (_cacheByRoot.TryGetValue(memoryRoot, out var cache))
                 {
                     var stale = cache.Entries.Keys.Where(path => !seen.Contains(path)).ToList();
                     foreach (var path in stale)
@@ -365,13 +365,13 @@ namespace VAL.Host.Abyss
             return exchanges;
         }
 
-        private static void LogFileFailure(string action, Exception ex)
+        private void LogFileFailure(string action, Exception ex)
         {
             var key = $"file.fail.abyss.{action}";
-            if (!RateLimiter.Allow(key, LogInterval))
+            if (!_rateLimiter.Allow(key, LogInterval))
                 return;
 
-            ValLog.Warn(nameof(AbyssSearch), $"Abyss file operation failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+            ValLog.Warn(nameof(AbyssSearchService), $"Abyss file operation failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
         }
 
         private static int ScoreExchange(AbyssExchange exchange, IReadOnlyList<string> tokens)

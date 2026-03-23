@@ -112,7 +112,7 @@ MAIN/Tools/TruthDoctor/TruthDoctor.csproj
 MAIN/Tools/TruthStress/Program.cs
 MAIN/Tools/TruthStress/TruthStress.csproj
 MAIN/VAL.Abyss/AbyssRuntime.cs
-MAIN/VAL.Abyss/AbyssSearch.cs
+MAIN/VAL.Abyss/AbyssSearchService.cs
 MAIN/VAL.Abyss/AbyssToastRequest.cs
 MAIN/VAL.Abyss/Properties/InternalsVisibleTo.cs
 MAIN/VAL.Abyss/VAL.Abyss.csproj
@@ -215,6 +215,7 @@ MAIN/VAL.Host/WebMessaging/WebMessageSender.cs
 MAIN/VAL.Tests/Commands/CommandRegistryFactoryTests.cs
 MAIN/VAL.Tests/Commands/CommandRegistryTests.cs
 MAIN/VAL.Tests/Commands/HostCommandRouterTests.cs
+MAIN/VAL.Tests/Abyss/AbyssSearchServiceTests.cs
 MAIN/VAL.Tests/Continuum/QuickRefreshServiceTests.cs
 MAIN/VAL.Tests/Continuum/ContinuumInjectInboxTests.cs
 MAIN/VAL.Tests/Hosting/ValHostServiceCollectionExtensionsTests.cs

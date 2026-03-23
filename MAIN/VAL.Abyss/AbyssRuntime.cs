@@ -35,6 +35,7 @@ namespace VAL.Host.Abyss
         private readonly object _gate = new();
         private static readonly int[] DefaultInjectIndices = { 1 };
         private static readonly string[] SnippetLineSeparators = { "\r\n", "\n" };
+        private readonly AbyssSearchService _abyssSearch;
         private readonly IWebMessageSender _messageSender;
         private readonly IToastHub _toastHub;
         private readonly ISessionContext _sessionContext;
@@ -45,8 +46,14 @@ namespace VAL.Host.Abyss
         private string? _lastGeneratedUtc;
         private CancellationTokenSource? _searchCts;
 
-        public AbyssRuntime(IWebMessageSender messageSender, IToastHub toastHub, ISessionContext sessionContext, ITruthStore truthStore)
+        public AbyssRuntime(
+            AbyssSearchService abyssSearch,
+            IWebMessageSender messageSender,
+            IToastHub toastHub,
+            ISessionContext sessionContext,
+            ITruthStore truthStore)
         {
+            _abyssSearch = abyssSearch ?? throw new ArgumentNullException(nameof(abyssSearch));
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
@@ -88,7 +95,7 @@ namespace VAL.Host.Abyss
 
                     token.ThrowIfCancellationRequested();
 
-                    var results = AbyssSearch.Search(memoryRoot, query, maxResults, token, excludeFingerprints);
+                    var results = _abyssSearch.Search(memoryRoot, query, maxResults, excludeFingerprints, token);
                     token.ThrowIfCancellationRequested();
 
                     lock (_gate)
@@ -154,13 +161,13 @@ namespace VAL.Host.Abyss
                     return;
                 }
 
-                var exchanges = AbyssSearch.GetLastFromMostRecent(memoryRoot, count);
+                var exchanges = _abyssSearch.GetLastFromMostRecent(memoryRoot, count);
                 var results = exchanges.Select(ex => new AbyssSearchResult { Exchange = ex, Score = 0 }).ToList();
 
-                    lock (_gate)
-                    {
-                        _lastResults = results;
-                    }
+                lock (_gate)
+                {
+                    _lastResults = results;
+                }
 
                 if (results.Count == 0)
                 {
@@ -223,7 +230,7 @@ namespace VAL.Host.Abyss
             {
                 foreach (var result in snapshot)
                 {
-                    var fingerprint = AbyssSearch.BuildFingerprint(result.Exchange);
+                    var fingerprint = _abyssSearch.BuildFingerprint(result.Exchange);
                     if (string.Equals(fingerprint, id, StringComparison.OrdinalIgnoreCase))
                     {
                         selected = result;
@@ -303,10 +310,10 @@ namespace VAL.Host.Abyss
             SendEnvelope(WebMessageTypes.Command, WebCommandNames.ContinuumInjectText, new { chatId = chatId, text = text }, chatId);
         }
 
-        private static string BuildInjectPayload(AbyssSearchResult result, string query)
+        private string BuildInjectPayload(AbyssSearchResult result, string query)
         {
             var snippet = BuildSnippet(result.Exchange);
-            var (startLine, endLine) = AbyssSearch.GetLineRange(result.Exchange);
+            var (startLine, endLine) = _abyssSearch.GetLineRange(result.Exchange);
             var rangeLabel = FormatLineRangeLabel(startLine, endLine);
 
             var sb = new StringBuilder();
@@ -340,8 +347,8 @@ namespace VAL.Host.Abyss
             {
                 var result = snapshot[i];
                 var exchange = result.Exchange;
-                var (startLine, endLine) = AbyssSearch.GetLineRange(exchange);
-                var fingerprint = AbyssSearch.BuildFingerprint(exchange);
+                var (startLine, endLine) = _abyssSearch.GetLineRange(exchange);
+                var fingerprint = _abyssSearch.BuildFingerprint(exchange);
                 var snippet = BuildSnippet(exchange);
                 var preview = BuildPreview(snippet);
                 var title = BuildTitle(exchange);

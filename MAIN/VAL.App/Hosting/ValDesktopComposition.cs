@@ -54,6 +54,7 @@ namespace VAL.Hosting
             builder.Services.AddSingleton<ToolsCommandHandlers>();
             builder.Services.AddSingleton<NavigationCommandHandlers>();
             builder.Services.AddSingleton<DockCommandHandlers>();
+            builder.Services.AddSingleton<AbyssSearchService>();
             builder.Services.AddSingleton<AbyssRuntime>();
             builder.Services.AddSingleton<AbyssCommandHandlers>();
             builder.Services.AddSingleton<CommandRegistryComposer>();
