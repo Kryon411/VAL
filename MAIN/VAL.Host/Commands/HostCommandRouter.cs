@@ -31,14 +31,14 @@ namespace VAL.Host.Commands
 
         public HostCommandRouter(
             CommandRegistry commandRegistry,
+            ILog log,
             ICommandDiagnosticsReporter? diagnosticsReporter = null,
-            ISessionContext? sessionContext = null,
-            ILog? log = null)
+            ISessionContext? sessionContext = null)
         {
             _commandRegistry = commandRegistry ?? throw new ArgumentNullException(nameof(commandRegistry));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
             _diagnosticsReporter = diagnosticsReporter;
             _sessionContext = sessionContext ?? new SessionContext();
-            _log = log ?? ValLog.Instance;
         }
 
         public HostCommandExecutionResult HandleWebMessage(WebMessageEnvelope webMessage)

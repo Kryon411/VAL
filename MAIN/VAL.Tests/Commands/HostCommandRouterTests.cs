@@ -120,7 +120,7 @@ namespace VAL.Tests.Commands
         {
             var registry = new CommandRegistry();
             register(registry);
-            return new HostCommandRouter(registry, log: new FakeLog());
+            return new HostCommandRouter(registry, new FakeLog());
         }
 
         private sealed class FakeLog : ILog

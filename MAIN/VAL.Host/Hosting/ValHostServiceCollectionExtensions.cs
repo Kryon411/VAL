@@ -80,9 +80,9 @@ namespace VAL.Host.Hosting
             services.AddSingleton(sp =>
                 new HostCommandRouter(
                     sp.GetRequiredService<CommandRegistry>(),
+                    sp.GetRequiredService<ILog>(),
                     sp.GetService<ICommandDiagnosticsReporter>(),
-                    sp.GetRequiredService<ISessionContext>(),
-                    sp.GetRequiredService<ILog>()));
+                    sp.GetRequiredService<ISessionContext>()));
 
             services.AddSingleton<IWebViewSessionNonce, WebViewSessionNonce>();
             services.AddSingleton<IWebMessageSender, WebMessageSender>();
