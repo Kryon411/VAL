@@ -1,4 +1,5 @@
 using System;
+
 using Microsoft.Extensions.DependencyInjection;
 
 namespace VAL.Host.Services
@@ -16,6 +17,22 @@ namespace VAL.Host.Services
         public TWindow Create()
         {
             return _serviceProvider.GetRequiredService<TWindow>();
+        }
+    }
+
+    public sealed class ServiceProviderWindowFactory<TWindow, TArgument> : IWindowFactory<TWindow, TArgument>
+        where TWindow : class
+    {
+        private readonly IServiceProvider _serviceProvider;
+
+        public ServiceProviderWindowFactory(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        }
+
+        public TWindow Create(TArgument argument)
+        {
+            return ActivatorUtilities.CreateInstance<TWindow>(_serviceProvider, argument!);
         }
     }
 }

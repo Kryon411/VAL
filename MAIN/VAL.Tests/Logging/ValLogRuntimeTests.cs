@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+
 using VAL.Host.Logging;
+
 using Xunit;
 
 namespace VAL.Tests.Logging

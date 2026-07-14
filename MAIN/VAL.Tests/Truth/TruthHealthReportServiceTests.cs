@@ -1,11 +1,15 @@
 using System;
 using System.Globalization;
 using System.IO;
+
 using Microsoft.Extensions.Options;
+
+using VAL.App.Host.Services;
 using VAL.Continuum.Pipeline.Truth;
 using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
+
 using Xunit;
 
 namespace VAL.Tests.Truth

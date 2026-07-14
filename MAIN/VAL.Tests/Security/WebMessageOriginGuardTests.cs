@@ -1,5 +1,7 @@
 using System;
+
 using VAL.Host.Security;
+
 using Xunit;
 
 namespace VAL.Tests.Security

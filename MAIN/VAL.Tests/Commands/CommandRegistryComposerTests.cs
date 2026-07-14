@@ -2,15 +2,21 @@ using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using VAL.Contracts;
+
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
+
+using VAL.App.Host.Commands;
+using VAL.App.Host.Services;
+using VAL.App.State;
 using VAL.Continuum;
+using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Abyss;
 using VAL.Host.Commands;
 using VAL.Host.Services;
 using VAL.Host.WebMessaging;
-using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
+
 using Xunit;
 
 namespace VAL.Tests.Commands
@@ -70,7 +76,7 @@ namespace VAL.Tests.Commands
                     new FakeCommandDiagnosticsReporter(),
                     new FakeLog()),
                 new NavigationCommandHandlers(webViewRuntime ?? new FakeWebViewRuntime(), new FakeToastHub()),
-                new DockCommandHandlers(new FakeDockModelService(), new FakeDockUiStateStore(), new FakeWebMessageSender(), new FakeLog()),
+                new DockCommandHandlers(new FakeDockModelService(), new FakeControlCentreUiStateStore(), new FakeWebMessageSender(), new FakeLog()),
                 new AbyssCommandHandlers(CreateUninitialized<AbyssRuntime>(), new FakeLog()),
             };
 
@@ -240,6 +246,7 @@ namespace VAL.Tests.Commands
         private sealed class FakeWebViewRuntime : IWebViewRuntime
         {
             public string? LastNavigatedUrl { get; private set; }
+            public bool IsReady => false;
             public CoreWebView2? Core => null;
             public Uri? LastChatUri => null;
             public event Action<WebMessageEnvelope>? WebMessageJsonReceived { add { } remove { } }
@@ -258,10 +265,10 @@ namespace VAL.Tests.Commands
             public void UpdatePortalState(bool enabled, bool privacyAllowed, int count) { }
         }
 
-        private sealed class FakeDockUiStateStore : IDockUiStateStore
+        private sealed class FakeControlCentreUiStateStore : IControlCentreUiStateStore
         {
-            public DockUiState Load() => DockUiState.Default;
-            public void Save(DockUiState state) { }
+            public ControlCentreUiState Load() => ControlCentreUiState.Default;
+            public void Save(ControlCentreUiState state) { }
         }
 
         private sealed class FakeDisposable : IDisposable

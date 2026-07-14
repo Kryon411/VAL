@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+using VAL.Host.Options;
+
 namespace VAL.Host.Logging
 {
     internal sealed class ValLogRuntime
@@ -139,8 +141,7 @@ namespace VAL.Host.Logging
 
         private static string ResolveLogPath()
         {
-            var root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            return Path.Combine(root, "VAL", "Logs", "VAL.log");
+            return Path.Combine(ValOptions.DefaultDataRoot, ValOptions.DefaultLogsPath, "VAL.log");
         }
 
         private void EnsurePrimarySink()

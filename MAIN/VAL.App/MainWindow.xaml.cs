@@ -1,98 +1,62 @@
 using System;
 using System.ComponentModel;
-using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Windows;
-using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
-using Microsoft.Extensions.Options;
+
 using VAL.Host;
-using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Startup;
 using VAL.Host.WebMessaging;
-using VAL.ViewModels;
 
-namespace VAL
+namespace VAL.App
 {
     public partial class MainWindow : Window
     {
         private readonly ILog _log;
+        private readonly IDesktopDialogService _dialogService;
         private readonly IToastService _toastService;
         private readonly IWebViewRuntime _webViewRuntime;
         private readonly MainWindowViewModel _viewModel;
-        private readonly WebViewOptions _webViewOptions;
-        private readonly StartupOptions _startupOptions;
-        private readonly IStartupCrashGuard _startupCrashGuard;
-        private readonly IControlCentreUiStateStore _uiStateStore;
-        private readonly DispatcherTimer _persistTimer;
-        private readonly DispatcherTimer _dockInitStateTimer;
-
-        private ControlCentreOverlay? _ccOverlay;
-        private bool _ccLoggedNotReady;
-        private bool _isDockOpen;
-        private bool _layoutMode;
-        private DateTime _lastLauncherClickUtc = DateTime.MinValue;
-        private bool _hotKeyRegistered;
-        private HwndSource? _hwndSource;
-        private ControlCentreUiState _uiState = ControlCentreUiState.Default;
-
-        private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-        private const int HotKeyIdLayoutToggle = 0x4256;
-        private const uint ModAlt = 0x0001;
-        private const uint ModControl = 0x0002;
-        private const uint ModShift = 0x0004;
-        private const int VKeyL = 0x4C;
-        private const int WmHotKey = 0x0312;
-
-        private const string DockOpenMessage = "{\"type\":\"dock.open\",\"source\":\"host\"}";
-        private const string DockCloseMessage = "{\"type\":\"dock.close\",\"source\":\"host\"}";
-        private const string DockLayoutEnableMessage = "{\"type\":\"dock.layout.enable\",\"source\":\"host\"}";
-        private const string DockLayoutDisableMessage = "{\"type\":\"dock.layout.disable\",\"source\":\"host\"}";
-        private const string DockUiStateSetType = "dock.ui_state.set";
-        private const string DockStateType = "dock.state";
-
-        [DllImport("dwmapi.dll")]
-        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+        private readonly MainWindowStartupCoordinator _startupCoordinator;
+        private readonly MainWindowShellStateController _shellStateController;
+        private readonly MainWindowShellBridgeController _shellBridgeController;
+        private readonly MainWindowShellTimingController _shellTimingController;
+        private readonly MainWindowOverlayController _overlayController;
+        private readonly MainWindowNativeChromeController _nativeChromeController;
+        private readonly IControlCentreOverlayHost _overlayHost;
 
         public MainWindow(
             ILog log,
+            IDesktopDialogService dialogService,
             IToastService toastService,
             IWebViewRuntime webViewRuntime,
             MainWindowViewModel viewModel,
-            IOptions<WebViewOptions> webViewOptions,
             StartupOptions startupOptions,
-            IStartupCrashGuard startupCrashGuard,
-            IControlCentreUiStateStore uiStateStore)
+            MainWindowStartupCoordinator startupCoordinator,
+            MainWindowShellStateController shellStateController,
+            MainWindowShellBridgeController shellBridgeController,
+            MainWindowShellTimingController shellTimingController,
+            MainWindowOverlayController overlayController,
+            MainWindowNativeChromeController nativeChromeController,
+            IControlCentreOverlayHost overlayHost)
         {
+            ArgumentNullException.ThrowIfNull(startupOptions);
+
             _log = log ?? throw new ArgumentNullException(nameof(log));
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
             _toastService = toastService;
             _webViewRuntime = webViewRuntime;
             _viewModel = viewModel;
-            _webViewOptions = webViewOptions.Value;
-            _startupOptions = startupOptions;
-            _startupCrashGuard = startupCrashGuard;
-            _uiStateStore = uiStateStore;
-
-            _persistTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
-            _persistTimer.Tick += PersistTimer_Tick;
-
-            _dockInitStateTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
-            _dockInitStateTimer.Tick += (_, _) =>
-            {
-                _dockInitStateTimer.Stop();
-                SendDockUiStateData();
-            };
+            _startupCoordinator = startupCoordinator ?? throw new ArgumentNullException(nameof(startupCoordinator));
+            _shellStateController = shellStateController ?? throw new ArgumentNullException(nameof(shellStateController));
+            _shellBridgeController = shellBridgeController ?? throw new ArgumentNullException(nameof(shellBridgeController));
+            _shellTimingController = shellTimingController ?? throw new ArgumentNullException(nameof(shellTimingController));
+            _overlayController = overlayController ?? throw new ArgumentNullException(nameof(overlayController));
+            _nativeChromeController = nativeChromeController ?? throw new ArgumentNullException(nameof(nativeChromeController));
+            _overlayHost = overlayHost ?? throw new ArgumentNullException(nameof(overlayHost));
 
             InitializeComponent();
-            Title = _startupOptions.SafeMode ? "VAL (SAFE MODE)" : "VAL";
+            Title = startupOptions.SafeMode ? "VAL (SAFE MODE)" : "VAL";
             DataContext = _viewModel;
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
@@ -104,6 +68,10 @@ namespace VAL
             LocationChanged += MainWindow_LocationChanged;
             SizeChanged += MainWindow_SizeChanged;
 
+            _nativeChromeController.LayoutToggleRequested += NativeChromeController_LayoutToggleRequested;
+            _overlayHost.Clicked += ControlCentreOverlay_Clicked;
+            _overlayHost.GeometryChanged += ControlCentreOverlay_GeometryChanged;
+            _overlayHost.LayoutToggleRequested += ControlCentreOverlay_LayoutToggleRequested;
             _webViewRuntime.WebMessageJsonReceived += _viewModel.HandleWebMessageJson;
             _webViewRuntime.WebMessageJsonReceived += HandleWebMessageForDockState;
             _webViewRuntime.NavigationCompleted += WebViewRuntime_NavigationCompleted;
@@ -114,12 +82,9 @@ namespace VAL
             try
             {
                 if (_viewModel.ShouldCancelClose(() =>
-                    MessageBox.Show(
+                    _dialogService.ConfirmWarning(
                         "An operation is still running. Exiting may interrupt it.",
-                        "VAL",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Warning
-                    ) == MessageBoxResult.Yes))
+                        "VAL")))
                 {
                     e.Cancel = true;
                 }
@@ -134,13 +99,9 @@ namespace VAL
         {
             try
             {
-                var hwnd = new WindowInteropHelper(this).Handle;
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
                 _viewModel.AttachPortalWindow(hwnd);
-                if (hwnd != IntPtr.Zero)
-                {
-                    _hwndSource = HwndSource.FromHwnd(hwnd);
-                    _hwndSource?.AddHook(WndProc);
-                }
+                _nativeChromeController.Attach(hwnd);
             }
             catch
             {
@@ -150,344 +111,83 @@ namespace VAL
 
         private void MainWindow_Closed(object? sender, EventArgs e)
         {
+            _nativeChromeController.LayoutToggleRequested -= NativeChromeController_LayoutToggleRequested;
+            _overlayHost.Clicked -= ControlCentreOverlay_Clicked;
+            _overlayHost.GeometryChanged -= ControlCentreOverlay_GeometryChanged;
+            _overlayHost.LayoutToggleRequested -= ControlCentreOverlay_LayoutToggleRequested;
             _webViewRuntime.WebMessageJsonReceived -= _viewModel.HandleWebMessageJson;
             _webViewRuntime.WebMessageJsonReceived -= HandleWebMessageForDockState;
             _webViewRuntime.NavigationCompleted -= WebViewRuntime_NavigationCompleted;
+            _shellTimingController.FlushAndStop();
 
-            UnregisterLayoutHotKey();
-
-            if (_hwndSource != null)
-            {
-                _hwndSource.RemoveHook(WndProc);
-                _hwndSource = null;
-            }
-
-            try
-            {
-                if (_ccOverlay != null)
-                {
-                    _ccOverlay.Clicked -= ControlCentreOverlay_Clicked;
-                    _ccOverlay.GeometryChanged -= ControlCentreOverlay_GeometryChanged;
-                    _ccOverlay.LayoutToggleRequested -= ControlCentreOverlay_LayoutToggleRequested;
-                    _ccOverlay.Close();
-                    _ccOverlay = null;
-                }
-            }
-            catch
-            {
-                _log.Warn("MainWindow", "Failed to close Control Centre overlay window.");
-            }
+            _nativeChromeController.Detach();
+            _overlayController.Close();
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             WindowState = WindowState.Maximized;
             _toastService.Initialize(this);
-            LoadUiState();
-            _isDockOpen = _uiState.Dock.IsOpen;
-            _layoutMode = _uiState.LayoutMode;
+            _shellTimingController.LoadState();
+            _nativeChromeController.ApplyImmersiveDarkMode();
 
-            var hwnd = new WindowInteropHelper(this).Handle;
-            if (hwnd != IntPtr.Zero)
-            {
-                int dark = 1;
-                var hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
-                if (hr != 0)
-                {
-                    _log.Warn("MainWindow", $"Failed to set dark mode attribute (HRESULT=0x{hr:X8}).");
-                }
-            }
+            var webViewHost = new MainWindowWebViewHost(WebView, _webViewRuntime);
+            await _startupCoordinator.InitializeAsync(
+                webViewHost,
+                () => _viewModel.OnLoadedAsync(webViewHost.Focus));
 
-            var webViewInitialized = false;
-            try
-            {
-                await _webViewRuntime.InitializeAsync(WebView);
-                webViewInitialized = true;
-            }
-            catch (Exception ex)
-            {
-                _log.Warn("MainWindow", $"WebView2 initialization failed: {ex}");
-                MessageBox.Show(
-                    "VAL could not initialize the embedded browser. Please restart the app.",
-                    "VAL",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-
-            if (webViewInitialized)
-            {
-                WebView.DefaultBackgroundColor = System.Drawing.Color.FromArgb(11, 12, 16);
-            }
-
-            try
-            {
-                await _viewModel.OnLoadedAsync(() => WebView.Focus());
-            }
-            catch
-            {
-                _log.Warn("MainWindow", "View model initialization failed.");
-            }
-
-            if (!Uri.TryCreate(_webViewOptions.StartUrl, UriKind.Absolute, out var startUri))
-            {
-                _log.Warn("MainWindow", "Invalid StartUrl configured. Falling back to default.");
-                startUri = new Uri(WebViewOptions.DefaultStartUrl);
-            }
-
-            if (webViewInitialized)
-            {
-                WebView.Source = startUri;
-            }
-
-            EnsureControlCentreOverlay();
-            ApplyOverlayGeometry();
-            ShowControlCentreOverlayIfNeeded();
+            _overlayController.Attach(this);
+            _overlayController.InitializeGeometry(BuildDefaultOverlayGeometry);
+            _overlayController.HandleOwnerStateChanged(WindowState);
             ApplyLayoutMode();
 
-            _dockInitStateTimer.Start();
-            _startupCrashGuard.MarkSuccess();
-        }
-
-        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-        {
-            if (msg == WmHotKey && wParam.ToInt32() == HotKeyIdLayoutToggle)
-            {
-                ToggleLayoutMode();
-                handled = true;
-            }
-
-            return IntPtr.Zero;
+            _shellTimingController.RequestDockStateSync();
         }
 
         private void ControlCentreOverlay_Clicked(object? sender, EventArgs e)
         {
-            if ((DateTime.UtcNow - _lastLauncherClickUtc).TotalMilliseconds < 250)
+            if (!_shellBridgeController.TryHandleLauncherClick(DateTime.UtcNow, out var requiresDockStateSync))
             {
                 return;
             }
 
-            _lastLauncherClickUtc = DateTime.UtcNow;
-
-            if (_isDockOpen)
+            if (requiresDockStateSync)
             {
-                _isDockOpen = false;
-                _uiState.Dock.IsOpen = false;
-                PostDockMessage(DockCloseMessage);
-            }
-            else
-            {
-                _isDockOpen = true;
-                _uiState.Dock.IsOpen = true;
-                PostDockMessage(DockOpenMessage);
-                _dockInitStateTimer.Start();
+                _shellTimingController.RequestDockStateSync();
             }
 
-            ScheduleStatePersist();
+            _shellTimingController.ScheduleStatePersist();
         }
 
         private void ControlCentreOverlay_GeometryChanged(object? sender, EventArgs e)
         {
-            if (_ccOverlay == null)
-            {
-                return;
-            }
-
-            ClampOverlayToVirtualScreen();
-            ScheduleStatePersist();
-        }
-
-        private void PostDockMessage(string payload)
-        {
-            try
-            {
-                if (WebView.CoreWebView2 == null)
-                {
-                    if (_ccLoggedNotReady)
-                    {
-                        return;
-                    }
-
-                    _ccLoggedNotReady = true;
-                    _log.Info("MainWindow", "Control Centre click ignored because WebView2 is not ready.");
-                    return;
-                }
-
-                WebView.CoreWebView2.PostWebMessageAsString(payload);
-            }
-            catch (Exception ex)
-            {
-                _log.Warn("MainWindow", $"Failed to post Control Centre message: {ex.Message}");
-            }
+            _overlayController.HandleGeometryChanged();
+            _shellTimingController.ScheduleStatePersist();
         }
 
         private void HandleWebMessageForDockState(WebMessageEnvelope envelope)
         {
-            try
+            if (_shellBridgeController.TryHandleDockMessage(envelope, GetVirtualScreenBounds()))
             {
-                if (!envelope.TryGetParsedEnvelope(out var parsedEnvelope))
-                {
-                    return;
-                }
-
-                var type = parsedEnvelope.Name?.Trim();
-                if (string.IsNullOrWhiteSpace(type))
-                {
-                    return;
-                }
-
-                if (string.Equals(type, DockStateType, StringComparison.Ordinal) && TryReadIsOpen(parsedEnvelope, out var dockIsOpen))
-                {
-                    _isDockOpen = dockIsOpen;
-                    _uiState.Dock.IsOpen = dockIsOpen;
-                    ScheduleStatePersist();
-                    return;
-                }
-
-                if (!string.Equals(type, DockUiStateSetType, StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                if (TryReadIsOpen(parsedEnvelope, out var isOpen))
-                {
-                    _isDockOpen = isOpen;
-                    _uiState.Dock.IsOpen = isOpen;
-                }
-
-                UpdateDockGeometryFromMessage(parsedEnvelope);
-                ScheduleStatePersist();
+                _shellTimingController.ScheduleStatePersist();
             }
-            catch
-            {
-                // Ignore malformed messages from web modules.
-            }
-        }
-
-        private static bool TryReadIsOpen(MessageEnvelope envelope, out bool isOpen)
-        {
-            isOpen = false;
-
-            if (!TryGetPayloadRoot(envelope, out var root))
-            {
-                return false;
-            }
-
-            if (root.TryGetProperty("isOpen", out var direct) && TryReadBoolean(direct, out isOpen))
-            {
-                return true;
-            }
-
-            if (!root.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            return payload.TryGetProperty("isOpen", out var payloadIsOpen) && TryReadBoolean(payloadIsOpen, out isOpen);
-        }
-
-        private static bool TryReadBoolean(JsonElement value, out bool result)
-        {
-            result = false;
-
-            if (value.ValueKind == JsonValueKind.True)
-            {
-                result = true;
-                return true;
-            }
-
-            if (value.ValueKind == JsonValueKind.False)
-            {
-                result = false;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static double? TryReadDoubleProperty(JsonElement root, string name)
-        {
-            if (root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number))
-            {
-                return number;
-            }
-
-            if (root.TryGetProperty("payload", out var payload) && payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty(name, out var payloadValue) && payloadValue.ValueKind == JsonValueKind.Number && payloadValue.TryGetDouble(out var payloadNumber))
-            {
-                return payloadNumber;
-            }
-
-            return null;
-        }
-
-        private void UpdateDockGeometryFromMessage(MessageEnvelope envelope)
-        {
-            if (!TryGetPayloadRoot(envelope, out var root))
-            {
-                return;
-            }
-
-            var x = TryReadDoubleProperty(root, "x");
-            var y = TryReadDoubleProperty(root, "y");
-            var w = TryReadDoubleProperty(root, "w");
-            var h = TryReadDoubleProperty(root, "h");
-
-            if (x.HasValue) _uiState.Dock.X = x.Value;
-            if (y.HasValue) _uiState.Dock.Y = y.Value;
-            if (w.HasValue) _uiState.Dock.W = w.Value;
-            if (h.HasValue) _uiState.Dock.H = h.Value;
-
-            ClampDockGeometry();
-        }
-
-        private static bool TryGetPayloadRoot(MessageEnvelope envelope, out JsonElement root)
-        {
-            root = default;
-
-            if (!envelope.Payload.HasValue || envelope.Payload.Value.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            root = envelope.Payload.Value;
-            return true;
         }
 
         private void MainWindow_Activated(object? sender, EventArgs e)
         {
-            RegisterLayoutHotKey();
-
-            if (_ccOverlay == null)
-            {
-                return;
-            }
-
-            _ccOverlay.Topmost = true;
-            _ccOverlay.Topmost = false;
+            _nativeChromeController.RegisterLayoutHotKey();
+            _overlayController.HandleActivated();
         }
 
         private void MainWindow_Deactivated(object? sender, EventArgs e)
         {
-            UnregisterLayoutHotKey();
-
-            if (_ccOverlay != null)
-            {
-                _ccOverlay.Topmost = false;
-            }
+            _nativeChromeController.UnregisterLayoutHotKey();
+            _overlayController.HandleDeactivated();
         }
 
         private void MainWindow_StateChanged(object? sender, EventArgs e)
         {
-            if (WindowState == WindowState.Minimized)
-            {
-                _ccOverlay?.Hide();
-                return;
-            }
-
-            ShowControlCentreOverlayIfNeeded();
-            if (!_layoutMode)
-            {
-                ClampOverlayToVirtualScreen();
-            }
+            _overlayController.HandleOwnerStateChanged(WindowState);
         }
 
         private void WebViewRuntime_NavigationCompleted()
@@ -496,21 +196,10 @@ namespace VAL
             {
                 try
                 {
-                    if (WindowState == WindowState.Minimized)
+                    if (_overlayController.HandleNavigationCompleted(WindowState, IsActive))
                     {
-                        return;
+                        _shellTimingController.RequestDockStateSync();
                     }
-
-                    ShowControlCentreOverlayIfNeeded();
-
-                    if (_ccOverlay != null && IsActive)
-                    {
-                        _ccOverlay.Topmost = true;
-                        _ccOverlay.Topmost = false;
-                    }
-
-                    _dockInitStateTimer.Stop();
-                    _dockInitStateTimer.Start();
                 }
                 catch
                 {
@@ -521,89 +210,30 @@ namespace VAL
 
         private void MainWindow_LocationChanged(object? sender, EventArgs e)
         {
-            if (!_layoutMode)
-            {
-                ClampOverlayToVirtualScreen();
-            }
+            _overlayController.HandleOwnerBoundsChanged();
         }
 
         private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (!_layoutMode)
-            {
-                ClampOverlayToVirtualScreen();
-            }
-        }
-
-        private void EnsureControlCentreOverlay()
-        {
-            if (_ccOverlay != null)
-            {
-                return;
-            }
-
-            _ccOverlay = new ControlCentreOverlay(_log);
-            _ccOverlay.Owner = this;
-            _ccOverlay.Clicked += ControlCentreOverlay_Clicked;
-            _ccOverlay.GeometryChanged += ControlCentreOverlay_GeometryChanged;
-            _ccOverlay.LayoutToggleRequested += ControlCentreOverlay_LayoutToggleRequested;
-        }
-
-        private void ShowControlCentreOverlayIfNeeded()
-        {
-            if (_ccOverlay == null || WindowState == WindowState.Minimized)
-            {
-                return;
-            }
-
-            if (_ccOverlay.IsVisible)
-            {
-                return;
-            }
-
-            _ccOverlay.Show();
-        }
-
-        private void ApplyOverlayGeometry()
-        {
-            if (_ccOverlay == null)
-            {
-                return;
-            }
-
-            var geometry = _uiState.ControlCentre;
-            if (!geometry.HasPosition)
-            {
-                geometry = BuildDefaultOverlayGeometry();
-                _uiState.ControlCentre = geometry;
-            }
-
-            _ccOverlay.Width = geometry.W;
-            _ccOverlay.Height = geometry.H;
-            _ccOverlay.Left = geometry.X;
-            _ccOverlay.Top = geometry.Y;
-
-            ClampOverlayToVirtualScreen();
+            _overlayController.HandleOwnerBoundsChanged();
         }
 
         private GeometryState BuildDefaultOverlayGeometry()
         {
             var dpi = VisualTreeHelper.GetDpi(this);
             var webViewOriginPx = WebView.PointToScreen(new Point(0, 0));
-            var webViewOriginDip = new Point(webViewOriginPx.X / dpi.DpiScaleX, webViewOriginPx.Y / dpi.DpiScaleY);
-            var w = 40d;
-            var h = 40d;
-            var x = webViewOriginDip.X + Math.Max(0, WebView.ActualWidth - w - 16);
-            var y = webViewOriginDip.Y + 12;
-            return new GeometryState(x, y, w, h);
+            return ControlCentreOverlayPlacement.CreateDefault(
+                webViewOriginPx,
+                WebView.ActualWidth,
+                dpi.DpiScaleX,
+                dpi.DpiScaleY);
         }
 
         private void ToggleLayoutMode()
         {
-            _layoutMode = !_layoutMode;
-            _uiState.LayoutMode = _layoutMode;
+            _ = _shellStateController.ToggleLayoutMode();
             ApplyLayoutMode();
-            ScheduleStatePersist();
+            _shellTimingController.ScheduleStatePersist();
         }
 
         private void ControlCentreOverlay_LayoutToggleRequested(object? sender, EventArgs e)
@@ -611,142 +241,25 @@ namespace VAL
             ToggleLayoutMode();
         }
 
+        private void NativeChromeController_LayoutToggleRequested(object? sender, EventArgs e)
+        {
+            ToggleLayoutMode();
+        }
+
         private void ApplyLayoutMode()
         {
-            if (_ccOverlay != null)
-            {
-                _ccOverlay.LayoutModeEnabled = _layoutMode;
-            }
-
-            PostDockMessage(_layoutMode ? DockLayoutEnableMessage : DockLayoutDisableMessage);
-            SendDockUiStateData();
+            _overlayController.ApplyLayoutMode();
+            _shellBridgeController.PublishLayoutMode();
         }
 
-        private void RegisterLayoutHotKey()
+        private static Rect GetVirtualScreenBounds()
         {
-            if (_hotKeyRegistered)
-            {
-                return;
-            }
-
-            var hwnd = new WindowInteropHelper(this).Handle;
-            if (hwnd == IntPtr.Zero)
-            {
-                return;
-            }
-
-            var registered = RegisterHotKey(hwnd, HotKeyIdLayoutToggle, ModControl | ModAlt | ModShift, VKeyL);
-            if (!registered)
-            {
-                _log.Warn("MainWindow", "Failed to register layout hotkey Ctrl+Alt+Shift+L.");
-                return;
-            }
-
-            _hotKeyRegistered = true;
+            return new Rect(
+                SystemParameters.VirtualScreenLeft,
+                SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenWidth,
+                SystemParameters.VirtualScreenHeight);
         }
 
-        private void UnregisterLayoutHotKey()
-        {
-            if (!_hotKeyRegistered)
-            {
-                return;
-            }
-
-            var hwnd = new WindowInteropHelper(this).Handle;
-            if (hwnd != IntPtr.Zero)
-            {
-                var unregistered = UnregisterHotKey(hwnd, HotKeyIdLayoutToggle);
-                if (!unregistered)
-                {
-                    _log.Warn("MainWindow", "Failed to unregister layout hotkey Ctrl+Alt+Shift+L.");
-                }
-            }
-
-            _hotKeyRegistered = false;
-        }
-
-        private void SendDockUiStateData()
-        {
-            var dock = _uiState.Dock;
-            dock.IsOpen = _isDockOpen;
-            var payload = JsonSerializer.Serialize(new
-            {
-                type = "dock.ui_state.data",
-                source = "host",
-                x = dock.X,
-                y = dock.Y,
-                w = dock.W,
-                h = dock.H,
-                isOpen = dock.IsOpen
-            });
-
-            PostDockMessage(payload);
-        }
-
-        private void ClampOverlayToVirtualScreen()
-        {
-            if (_ccOverlay == null)
-            {
-                return;
-            }
-
-            var geometry = new GeometryState(_ccOverlay.Left, _ccOverlay.Top, _ccOverlay.Width, _ccOverlay.Height);
-            ClampWindowGeometry(_ccOverlay, ref geometry);
-            _uiState.ControlCentre = geometry;
-        }
-
-        private void ClampDockGeometry()
-        {
-            var dock = _uiState.Dock;
-            var virtualLeft = SystemParameters.VirtualScreenLeft;
-            var virtualTop = SystemParameters.VirtualScreenTop;
-            var virtualRight = virtualLeft + SystemParameters.VirtualScreenWidth;
-            var virtualBottom = virtualTop + SystemParameters.VirtualScreenHeight;
-
-            dock.W = Math.Clamp(dock.W, 360, Math.Max(360, SystemParameters.VirtualScreenWidth));
-            dock.H = Math.Clamp(dock.H, 180, Math.Max(180, SystemParameters.VirtualScreenHeight));
-            dock.X = Math.Clamp(dock.X, virtualLeft, virtualRight - dock.W);
-            dock.Y = Math.Clamp(dock.Y, virtualTop, virtualBottom - dock.H);
-        }
-
-        private static void ClampWindowGeometry(Window window, ref GeometryState state)
-        {
-            var left = SystemParameters.VirtualScreenLeft;
-            var top = SystemParameters.VirtualScreenTop;
-            var right = left + SystemParameters.VirtualScreenWidth;
-            var bottom = top + SystemParameters.VirtualScreenHeight;
-
-            state.W = Math.Clamp(state.W, window.MinWidth, window.MaxWidth > 0 ? window.MaxWidth : state.W);
-            state.H = Math.Clamp(state.H, window.MinHeight, window.MaxHeight > 0 ? window.MaxHeight : state.H);
-            state.X = Math.Clamp(state.X, left, right - state.W);
-            state.Y = Math.Clamp(state.Y, top, bottom - state.H);
-
-            window.Width = state.W;
-            window.Height = state.H;
-            window.Left = state.X;
-            window.Top = state.Y;
-        }
-
-        private void ScheduleStatePersist()
-        {
-            _persistTimer.Stop();
-            _persistTimer.Start();
-        }
-
-        private void PersistTimer_Tick(object? sender, EventArgs e)
-        {
-            _persistTimer.Stop();
-            SaveUiState();
-        }
-
-        private void LoadUiState()
-        {
-            _uiState = _uiStateStore.Load();
-        }
-
-        private void SaveUiState()
-        {
-            _uiStateStore.Save(_uiState);
-        }
     }
 }

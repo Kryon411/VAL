@@ -1,10 +1,11 @@
 using System;
 using System.IO;
-using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+
 using VAL.Host.Services;
 
-namespace VAL
+namespace VAL.App.State
 {
     public interface IControlCentreUiStateStore
     {
@@ -15,6 +16,8 @@ namespace VAL
     public sealed class ControlCentreUiStateStore : IControlCentreUiStateStore
     {
         private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+        private const string CurrentStateFileName = "controlcentre.ui.json";
+        private const string LegacyDockStateFileName = "dock.ui.json";
         private readonly string _stateRoot;
 
         public ControlCentreUiStateStore(IAppPaths appPaths)
@@ -27,13 +30,12 @@ namespace VAL
         {
             try
             {
-                var path = ResolveStatePath();
-                if (!File.Exists(path))
-                    return ControlCentreUiState.Default;
+                var result = JsonStateFile.Read<ControlCentreUiState>(ResolveStatePath(), JsonOptions);
+                if (result.IsSuccess && result.Value != null)
+                    return result.Value.Normalize();
 
-                var json = File.ReadAllText(path);
-                var loaded = JsonSerializer.Deserialize<ControlCentreUiState>(json, JsonOptions);
-                return loaded?.Normalize() ?? ControlCentreUiState.Default;
+                var migrated = TryLoadLegacyDockState();
+                return migrated?.Normalize() ?? ControlCentreUiState.Default;
             }
             catch
             {
@@ -48,35 +50,8 @@ namespace VAL
             try
             {
                 var normalized = state.Normalize();
-                var path = ResolveStatePath();
-                Directory.CreateDirectory(_stateRoot);
-
-                var tempPath = path + ".tmp." + Guid.NewGuid().ToString("N");
-                var json = JsonSerializer.Serialize(normalized, JsonOptions);
-
-                try
-                {
-                    using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
-                    using (var sw = new StreamWriter(fs, new UTF8Encoding(false)))
-                    {
-                        sw.Write(json);
-                        sw.Flush();
-                        fs.Flush(flushToDisk: true);
-                    }
-
-                    if (File.Exists(path))
-                    {
-                        File.Replace(tempPath, path, destinationBackupFileName: null, ignoreMetadataErrors: true);
-                    }
-                    else
-                    {
-                        File.Move(tempPath, path);
-                    }
-                }
-                finally
-                {
-                    TryDelete(tempPath);
-                }
+                JsonStateFile.Write(ResolveStatePath(), normalized, JsonOptions);
+                TryDeleteLegacyDockState();
             }
             catch
             {
@@ -86,20 +61,73 @@ namespace VAL
 
         private string ResolveStatePath()
         {
-            return Path.Combine(_stateRoot, "controlcentre.ui.json");
+            return Path.Combine(_stateRoot, CurrentStateFileName);
         }
 
-        private static void TryDelete(string? path)
+        private string ResolveLegacyDockStatePath()
+        {
+            return Path.Combine(_stateRoot, LegacyDockStateFileName);
+        }
+
+        private ControlCentreUiState? TryLoadLegacyDockState()
+        {
+            var result = JsonStateFile.Read<LegacyDockUiState>(ResolveLegacyDockStatePath(), JsonOptions);
+            if (!result.IsSuccess || result.Value == null || result.Value.Version != 1)
+            {
+                return null;
+            }
+
+            var state = ControlCentreUiState.Default;
+            state.Dock.IsOpen = result.Value.IsOpen;
+
+            if (result.Value.X.HasValue)
+                state.Dock.X = result.Value.X.Value;
+
+            if (result.Value.Y.HasValue)
+                state.Dock.Y = result.Value.Y.Value;
+
+            if (result.Value.W.HasValue)
+                state.Dock.W = result.Value.W.Value;
+
+            if (result.Value.H.HasValue)
+                state.Dock.H = result.Value.H.Value;
+
+            return state;
+        }
+
+        private void TryDeleteLegacyDockState()
         {
             try
             {
-                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
-                    File.Delete(path);
+                var legacyPath = ResolveLegacyDockStatePath();
+                if (File.Exists(legacyPath))
+                    File.Delete(legacyPath);
             }
             catch
             {
-                // Best effort cleanup only.
+                // Best-effort cleanup only.
             }
+        }
+
+        private sealed class LegacyDockUiState
+        {
+            [JsonPropertyName("version")]
+            public int Version { get; set; }
+
+            [JsonPropertyName("isOpen")]
+            public bool IsOpen { get; set; }
+
+            [JsonPropertyName("x")]
+            public int? X { get; set; }
+
+            [JsonPropertyName("y")]
+            public int? Y { get; set; }
+
+            [JsonPropertyName("w")]
+            public int? W { get; set; }
+
+            [JsonPropertyName("h")]
+            public int? H { get; set; }
         }
     }
 }

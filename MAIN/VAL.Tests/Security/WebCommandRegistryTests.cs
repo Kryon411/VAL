@@ -1,5 +1,6 @@
 using VAL.Contracts;
 using VAL.Host.Security;
+
 using Xunit;
 
 namespace VAL.Tests.Security

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+
 using VAL.Continuum.Pipeline.Truth;
 using VAL.Host.Logging;
 
@@ -159,13 +160,16 @@ namespace VAL.Host.Abyss
             return $"{exchange.ChatId}:{startLine}-{endLine}";
         }
 
-        internal List<AbyssExchange> GetLastFromMostRecent(string memoryRoot, int count)
+        internal List<AbyssExchange> GetLastFromMostRecent(
+            string memoryRoot,
+            int count,
+            CancellationToken cancellationToken = default)
         {
             var list = new List<AbyssExchange>();
             if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
                 return list;
 
-            var latest = GetMostRecentTruthLog(memoryRoot);
+            var latest = GetMostRecentTruthLog(memoryRoot, cancellationToken);
             if (latest == null)
                 return list;
 
@@ -176,6 +180,7 @@ namespace VAL.Host.Abyss
             count = Math.Max(1, Math.Min(3, count));
             for (int i = Math.Max(0, exchanges.Count - count); i < exchanges.Count; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 list.Add(exchanges[i]);
             }
 
@@ -220,11 +225,13 @@ namespace VAL.Host.Abyss
             }
         }
 
-        private TruthLogSnapshot? GetMostRecentTruthLog(string memoryRoot)
+        private TruthLogSnapshot? GetMostRecentTruthLog(
+            string memoryRoot,
+            CancellationToken cancellationToken)
         {
             TruthLogSnapshot? latest = null;
 
-            foreach (var snapshot in GetTruthLogSnapshots(memoryRoot, CancellationToken.None))
+            foreach (var snapshot in GetTruthLogSnapshots(memoryRoot, cancellationToken))
             {
                 if (latest == null || snapshot.LastWriteUtc > latest.LastWriteUtc)
                     latest = snapshot;

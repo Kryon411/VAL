@@ -1,14 +1,27 @@
 using System;
 using System.IO;
 using System.Text.Json;
+
+using VAL.App.Host.Startup;
 using VAL.Host;
-using VAL.Host.Startup;
+
 using Xunit;
 
 namespace VAL.Tests.Startup
 {
     public sealed class StartupCrashGuardTests
     {
+        [Fact]
+        public void EvaluateWhenStateIsMissingDoesNotEnterSafeMode()
+        {
+            var productRoot = CreateTempRoot();
+            var guard = new StartupCrashGuard(new FakeLog(), productRoot);
+
+            var safeMode = guard.EvaluateAndMarkStarting();
+
+            Assert.False(safeMode);
+        }
+
         [Fact]
         public void EvaluateWhenCrashCountAtThresholdEntersSafeMode()
         {

@@ -1,8 +1,11 @@
 using System;
 using System.IO;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+
+using VAL.App.Host.Services;
 using VAL.Continuum.Pipeline.Telemetry;
 using VAL.Host;
 using VAL.Host.Logging;
@@ -10,7 +13,7 @@ using VAL.Host.Options;
 using VAL.Host.Services;
 using VAL.Host.Startup;
 
-namespace VAL.Hosting
+namespace VAL.App.Hosting
 {
     public static class ValDesktopHostRunner
     {
@@ -37,7 +40,7 @@ namespace VAL.Hosting
                     services.GetRequiredService<TelemetryThresholdMonitor>());
                 LogStartup(safeBoot, services, startupOptions);
 
-                var app = services.GetRequiredService<App>();
+                var app = services.GetRequiredService<ValApplication>();
                 var crashHandler = services.GetRequiredService<ICrashHandler>();
                 crashHandler.Register(app);
 
@@ -110,14 +113,46 @@ namespace VAL.Hosting
 
         private static void Shutdown(IHost host, TelemetryRegistration? telemetryRegistration)
         {
+            telemetryRegistration?.Dispose();
+
+            var log = host.Services.GetService<ILog>();
             try
             {
-                telemetryRegistration?.Dispose();
-                host.StopAsync().GetAwaiter().GetResult();
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                host.Services
+                    .GetService<IContinuumPump>()?
+                    .StopAsync(timeout.Token)
+                    .GetAwaiter()
+                    .GetResult();
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore shutdown errors.
+                log?.Warn(nameof(ValDesktopHostRunner),
+                    $"Continuum shutdown failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+            }
+
+            try
+            {
+                host.Services
+                    .GetService<IBackgroundTaskSupervisor>()?
+                    .StopAsync(TimeSpan.FromSeconds(5))
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (Exception ex)
+            {
+                log?.Warn(nameof(ValDesktopHostRunner),
+                    $"Background shutdown failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+            }
+
+            try
+            {
+                host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                log?.Warn(nameof(ValDesktopHostRunner),
+                    $"Host shutdown failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
             }
         }
 

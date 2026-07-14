@@ -1,4 +1,5 @@
 using VAL.Continuum;
+
 using Xunit;
 
 namespace VAL.Tests.Continuum
@@ -11,7 +12,7 @@ namespace VAL.Tests.Continuum
         [InlineData("refresh.inject.success:Signal:current_chat", "Signal", "current_chat")]
         public void TryParseRefreshInjectSuccessParsesModeAndLabel(string evt, string expectedMode, string expectedLabel)
         {
-            var ok = ContinuumHost.TryParseRefreshInjectSuccess(evt, out var mode, out var label);
+            var ok = ContinuumEventParser.TryParseRefreshInjectSuccess(evt, out var mode, out var label);
 
             Assert.True(ok);
             Assert.Equal(expectedMode, mode);
@@ -24,7 +25,7 @@ namespace VAL.Tests.Continuum
         [InlineData("refresh.inject.success:Pulse")]
         public void TryParseRefreshInjectSuccessRejectsIncompleteEvents(string evt)
         {
-            var ok = ContinuumHost.TryParseRefreshInjectSuccess(evt, out _, out _);
+            var ok = ContinuumEventParser.TryParseRefreshInjectSuccess(evt, out _, out _);
 
             Assert.False(ok);
         }
@@ -37,7 +38,7 @@ namespace VAL.Tests.Continuum
         [InlineData("", false)]
         public void IsPulseCompletionTargetAllowsOnlyNewChatTargets(string label, bool expected)
         {
-            var actual = ContinuumHost.IsPulseCompletionTarget(label);
+            var actual = ContinuumEventParser.IsPulseCompletionTarget(label);
 
             Assert.Equal(expected, actual);
         }
@@ -47,7 +48,7 @@ namespace VAL.Tests.Continuum
         [InlineData("signal.reply.settled:abc123", "abc123")]
         public void TryParseSignalReplySettledParsesAssistantTurnId(string evt, string expectedAssistantTurnId)
         {
-            var ok = ContinuumHost.TryParseSignalReplySettled(evt, out var assistantTurnId);
+            var ok = ContinuumEventParser.TryParseSignalReplySettled(evt, out var assistantTurnId);
 
             Assert.True(ok);
             Assert.Equal(expectedAssistantTurnId, assistantTurnId);
@@ -59,7 +60,7 @@ namespace VAL.Tests.Continuum
         [InlineData("")]
         public void TryParseSignalReplySettledRejectsInvalidEvents(string evt)
         {
-            var ok = ContinuumHost.TryParseSignalReplySettled(evt, out _);
+            var ok = ContinuumEventParser.TryParseSignalReplySettled(evt, out _);
 
             Assert.False(ok);
         }

@@ -1,4 +1,5 @@
 using VAL.Host.Startup;
+
 using Xunit;
 
 namespace VAL.Tests.Startup

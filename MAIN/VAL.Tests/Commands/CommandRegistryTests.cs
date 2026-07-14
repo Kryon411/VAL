@@ -1,7 +1,9 @@
 using System;
 using System.Reflection;
 using System.Text.Json;
+
 using VAL.Host.Commands;
+
 using Xunit;
 
 namespace VAL.Tests.Commands

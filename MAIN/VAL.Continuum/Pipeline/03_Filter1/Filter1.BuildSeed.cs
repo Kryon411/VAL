@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+
 using VAL.Continuum.Pipeline.Truth;
 
 namespace VAL.Continuum.Pipeline.Filter1
@@ -89,7 +90,7 @@ namespace VAL.Continuum.Pipeline.Filter1
             return sb.ToString().Trim();
         }
 
-        
+
         private static List<SeedExchange> PairIntoExchanges(IReadOnlyList<TruthMessage> messages)
         {
             var exchanges = new List<SeedExchange>();

@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+
 using VAL.Continuum.Pipeline;
 
 namespace VAL.Continuum.Pipeline.Truth

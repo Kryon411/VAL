@@ -1,19 +1,17 @@
 using System;
-using System.Diagnostics;
-using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+
+using VAL.Continuum.Pipeline;
+using VAL.Continuum.Pipeline.Inject;
+using VAL.Continuum.Pipeline.QuickRefresh;
+using VAL.Continuum.Pipeline.Truth;
 using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Commands;
 using VAL.Host.Services;
 using VAL.Host.WebMessaging;
-using VAL.Continuum.Pipeline.QuickRefresh;
-using VAL.Continuum.Pipeline.Signal;
-using VAL.Continuum.Pipeline.Truth;
-using VAL.Continuum.Pipeline.Inject;
-using VAL.Continuum.Pipeline;
 
 namespace VAL.Continuum
 {
@@ -22,11 +20,12 @@ namespace VAL.Continuum
         private readonly IWebMessageSender _messageSender;
         private readonly IToastHub _toastHub;
         private readonly ITruthStore _writer;
-        private readonly IQuickRefreshService _quickRefreshService;
-        private readonly IContinuumInjectInbox _injectQueue;
         private readonly ISessionContext _sessionContext;
-        private readonly OperationCoordinator _operationCoordinator;
-        private readonly IToastLedger _toastLedger;
+        private readonly IBackgroundTaskSupervisor _backgroundTasks;
+        private readonly IProcessLauncher _processLauncher;
+        private readonly ContinuumArchiveService _archives;
+        private readonly ContinuumChronicleWorkflow _chronicle;
+        private readonly ContinuumPulseWorkflow _pulse;
 
         // Best-effort UI context captured from the WebMessageReceived thread (usually UI/Dispatcher).
         private SynchronizationContext? _uiCtx;
@@ -39,16 +38,43 @@ namespace VAL.Continuum
             IContinuumInjectInbox injectQueue,
             ISessionContext sessionContext,
             OperationCoordinator operationCoordinator,
-            IToastLedger toastLedger)
+            IToastLedger toastLedger,
+            IBackgroundTaskSupervisor backgroundTasks,
+            IProcessLauncher processLauncher,
+            ContinuumArchiveService archives)
         {
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
             _writer = writer ?? throw new ArgumentNullException(nameof(writer));
-            _quickRefreshService = quickRefreshService ?? throw new ArgumentNullException(nameof(quickRefreshService));
-            _injectQueue = injectQueue ?? throw new ArgumentNullException(nameof(injectQueue));
+            ArgumentNullException.ThrowIfNull(quickRefreshService);
+            ArgumentNullException.ThrowIfNull(injectQueue);
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
-            _operationCoordinator = operationCoordinator ?? throw new ArgumentNullException(nameof(operationCoordinator));
-            _toastLedger = toastLedger ?? throw new ArgumentNullException(nameof(toastLedger));
+            ArgumentNullException.ThrowIfNull(operationCoordinator);
+            _backgroundTasks = backgroundTasks ?? throw new ArgumentNullException(nameof(backgroundTasks));
+            _processLauncher = processLauncher ?? throw new ArgumentNullException(nameof(processLauncher));
+            _archives = archives ?? throw new ArgumentNullException(nameof(archives));
+            _chronicle = new ContinuumChronicleWorkflow(
+                _messageSender,
+                _toastHub,
+                _writer,
+                _sessionContext,
+                operationCoordinator,
+                toastLedger ?? throw new ArgumentNullException(nameof(toastLedger)),
+                _archives,
+                IsRefreshInFlight,
+                MarkChronicleAttemptFinished,
+                MarkChronicleCompleted);
+            _pulse = new ContinuumPulseWorkflow(
+                _messageSender,
+                _toastHub,
+                quickRefreshService,
+                injectQueue,
+                _sessionContext,
+                operationCoordinator,
+                _backgroundTasks,
+                _archives,
+                () => _chronicle.IsInFlight,
+                PostToUi);
         }
 
         public bool IsMessageSenderWired => _messageSender != null;
@@ -56,134 +82,9 @@ namespace VAL.Continuum
         private Action<MessageEnvelope> PostToWebMessage => _messageSender.Send;
         private IToastHub Toasts => _toastHub;
         private ITruthStore Writer => _writer;
-        private IQuickRefreshService QuickRefresh => _quickRefreshService;
-        private IContinuumInjectInbox InjectQueue => _injectQueue;
         private ISessionContext SessionContext => _sessionContext;
-        private OperationCoordinator OperationCoordinator => _operationCoordinator;
-        private IToastLedger ToastLedger => _toastLedger;
-
-        // -------------------------
-        // Toast Catalog v1 (final)
-        // -------------------------
-        private const string Toast_ContinuumArchivingPaused =
-            "Continuum has been paused and archiving has stopped.";
-
-        private const string Toast_PulseInitiated =
-            "A Pulse jump has been initiated. Please stand by.";
-
-        private const string Toast_PulseReady =
-            "Your Pulse jump is ready. Please hit Send to finalize and continue.";
-
-        private const string Toast_ChronicleStarted =
-            "Chronicle has started. VAL is rebuilding an archive for this chat — please do not send messages until Chronicle is complete.";
-
-        private const string Toast_ChronicleCompleted =
-            "Chronicle is complete. This chat is now archived and ready for Pulse jumps.";
-
-        // Chronicle prompt (existing chat without a completed Chronicle archive): timed action toast.
-        private const string Toast_ChroniclePromptTitle =
-            "Create an archive for future Pulse jumps?";
-
-        private const string Toast_ChroniclePromptSubtitle =
-            "Chronicle can create a local archive so future Pulse jumps have the right context.";
-
-
-
-        private const string Toast_NoTruthLogFound =
-            "There’s no archive for this chat yet. Running Chronicle will create one so Pulse jumps can work properly.";
-
-        private const string Toast_ChronicleSuggested =
-            "VAL has detected you’re continuing in a chat without an archive. Chronicle can rebuild one to help maintain context for Pulse jumps. Please select Chronicle in the Control Centre.";
-
-        private const string Toast_PulseAlreadyRunning =
-            "A Pulse jump is already in progress. Please wait a moment for it to finish.";
-
-        private const string Toast_PulseUnavailable =
-            "Pulse can’t be used in this chat yet. Preparing the chat with Chronicle will make Pulse jumps available.";
-
-        private const string Toast_ChronicleUnavailable =
-            "Chronicle can only be used in an existing chat. Please open the conversation you want to archive and try again.";
-
-        private const string Toast_ActionUnavailable =
-            "That action isn’t available right now. Please try again in a moment.";
-
-        private const string Toast_OperationInProgress =
-            "An operation is already in progress.";
-
-        private const string Toast_OperationCancelled =
-            "Operation cancelled.";
-
-        // Toast groups (used for deterministic replacement/dismiss)
-        private const string ToastGroup_Chronicle = "chronicle";
-
-        // Pulse flush handshake (prevents missing tail turns).
-        private string? _pendingPulseChatId;
-        private string? _pendingFlushRequestId;
-        private DateTime _pendingFlushRequestedUtc = DateTime.MinValue;
-
-        private const int FlushAckTimeoutMs = 900;
-        private const int SignalResponseTimeoutMs = 45000;
-
-        private sealed class PendingSignalPulse
-        {
-            public long OperationId { get; init; }
-            public string ChatId { get; init; } = string.Empty;
-            public string SignalRequestId { get; init; } = string.Empty;
-            public PulseSnapshot Snapshot { get; init; } = new();
-            public DeterministicPulseSections DeterministicSections { get; init; } = new();
-            public string DeterministicFallbackPacket { get; init; } = string.Empty;
-            public EssenceInjectController.InjectSeed DeterministicFallbackSeed { get; init; } = new();
-        }
-
-        private sealed class Msg
-        {
-            public string? type { get; set; }
-            public string? chatId { get; set; }
-
-            public string? requestId { get; set; }
-            public string? role { get; set; }
-            public string? text { get; set; }
-
-            public string? line { get; set; }
-
-            public string? evt { get; set; }
-
-            // UI signals (best-effort)
-            public string? href { get; set; }
-            public string? reason { get; set; }
-
-            public string? phase { get; set; }
-            public int? percent { get; set; }
-            public int? capturedTurns { get; set; }
-            public long? ms { get; set; }
-
-            // Chronicle client may send an error string on completion.
-            public string? error { get; set; }
-
-            public bool? enabled { get; set; }
-        }
 
         private readonly object Sync = new object();
-        private bool _refreshInFlight;
-        private DateTime _lastRefreshCompletedUtc = DateTime.MinValue;
-        private PendingSignalPulse? _pendingSignalPulse;
-
-        // Chronicle (Truth backfill/rebuild) state
-        private bool _chronicleInFlight;
-        private string? _chronicleRequestId;
-        private DateTime _chronicleStartedUtc = DateTime.MinValue;
-        private ToastReason _chronicleCancelReason = ToastReason.Background;
-
-
-        // Chronicle running flag (toast suppression + sequencing only).
-        private bool _chronicleRunning;
-
-        // When Pulse opens a new chat automatically, suppress follow-on guidance nudges briefly.
-        private DateTime _suppressGuidanceUntilUtc = DateTime.MinValue;
-        private static readonly TimeSpan GuidanceSuppressWindow = TimeSpan.FromSeconds(25);
-
-        private static readonly TimeSpan RefreshCooldown = TimeSpan.FromSeconds(10);
-
         private bool _loggingEnabled = true;
 
         // Toast intent gating:
@@ -191,7 +92,6 @@ namespace VAL.Continuum
         //   (prevents spam when bouncing between chats) *and* then interacts with the composer.
         private int _toastAttachToken;
         private string _toastAttachChatId = string.Empty;
-        private DateTime _toastAttachUtc = DateTime.MinValue;
 
         // Chronicle prompt gating should be per chat (not global), otherwise baseline math can bleed across chat switches.
         // Baseline is captured on the first composer interaction after attach for a given chatId.
@@ -215,7 +115,7 @@ namespace VAL.Continuum
         private DateTime _lastSessionAttachHandledUtc = DateTime.MinValue;
         private static readonly TimeSpan AttachDedupeWindow = TimeSpan.FromSeconds(3);
 
-        
+
 
         public void HandleCommand(HostCommand cmd)
         {
@@ -224,23 +124,10 @@ namespace VAL.Continuum
 
             var type = cmd.Type.Trim();
 
-            Msg? msg = null;
-            if (cmd.Root.ValueKind == JsonValueKind.Object)
-            {
-                try { msg = cmd.Root.Deserialize<Msg>(); } catch { msg = null; }
-            }
-
-            if (msg == null)
-                msg = new Msg();
-
-            if (string.IsNullOrWhiteSpace(msg.type))
-                msg.type = type;
-
-            if (string.IsNullOrWhiteSpace(msg.chatId) && !string.IsNullOrWhiteSpace(cmd.ChatId))
-                msg.chatId = cmd.ChatId;
+            var msg = ContinuumCommandMessage.From(cmd);
 
             // Authoritative session context update.
-            SessionContext.Observe(type, msg.chatId);
+            SessionContext.Observe(type, msg.ChatId);
 
             // Best-effort capture of UI context from the WebMessageReceived thread.
             _uiCtx ??= SynchronizationContext.Current;
@@ -248,28 +135,28 @@ namespace VAL.Continuum
             // Capture flush acknowledgements (Pulse preflight)
             if (type.Equals(WebCommandNames.ContinuumCaptureFlushAck, StringComparison.OrdinalIgnoreCase))
             {
-                HandleCaptureFlushAck(msg);
+                _pulse.HandleCaptureFlushAck(msg);
                 return;
             }
 
             if (type.Equals(WebCommandNames.ContinuumSessionAttached, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumSessionAttach, StringComparison.OrdinalIgnoreCase))
             {
-                HandleSessionAttach(msg.chatId);
+                HandleSessionAttach(msg.ChatId);
                 return;
             }
 
             if (type.Equals(WebCommandNames.ContinuumCommandToggleLogging, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
-                HandleToggleLogging(msg.enabled ?? true, reason);
+                var reason = ToastReasonParser.Parse(msg.Reason, ToastReason.DockClick);
+                HandleToggleLogging(msg.Enabled ?? true, reason);
                 return;
             }
 
             if (type.Equals(WebCommandNames.ContinuumUiComposerInteraction, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
-                HandleChronicleComposerInteraction(msg.chatId, msg.capturedTurns ?? 0, reason);
+                var reason = ToastReasonParser.Parse(msg.Reason, ToastReason.DockClick);
+                HandleChronicleComposerInteraction(msg.ChatId, msg.CapturedTurns ?? 0, reason);
                 return;
             }
 
@@ -278,23 +165,20 @@ namespace VAL.Continuum
             {
                 bool enabled;
                 bool chronicle;
-                lock (Sync) { enabled = _loggingEnabled; chronicle = _chronicleInFlight; }
+                lock (Sync) { enabled = _loggingEnabled; chronicle = _chronicle.IsInFlight; }
                 if (!enabled && !chronicle) return;
 
-                var cid = SessionContext.ResolveChatId(msg.chatId);
+                var cid = SessionContext.ResolveChatId(msg.ChatId);
                 if (string.IsNullOrWhiteSpace(cid)) return;
 
-                var txt = msg.text ?? string.Empty;
+                var txt = msg.Text ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(txt)) return;
 
-                char role = 'U';
-                var r = (msg.role ?? string.Empty).Trim().ToLowerInvariant();
-                if (r == "a" || r == "assistant") role = 'A';
-                if (r == "u" || r == "user") role = 'U';
+                var role = ContinuumTruthCaptureParser.ParseRole(msg.Role);
 
                 // Detect Continuum/Pulse-seeded chats from the injected CONTINUUM CONTEXT payload.
                 // (This is what makes Chronicle prompts semantically suppressible in Pulse-created chats.)
-                if (role == 'U' && LooksLikeContinuumSeedText(txt))
+                if (role == 'U' && ContinuumSeedClassifier.IsContinuumSeed(txt))
                     SessionContext.MarkContinuumSeeded(cid);
 
                 Writer.AppendTruthLine(cid, role, txt);
@@ -305,48 +189,17 @@ namespace VAL.Continuum
             {
                 bool enabled;
                 bool chronicle;
-                lock (Sync) { enabled = _loggingEnabled; chronicle = _chronicleInFlight; }
+                lock (Sync) { enabled = _loggingEnabled; chronicle = _chronicle.IsInFlight; }
                 if (!enabled && !chronicle) return;
 
-                var cid = SessionContext.ResolveChatId(msg.chatId);
+                var cid = SessionContext.ResolveChatId(msg.ChatId);
                 if (string.IsNullOrWhiteSpace(cid)) return;
 
-                var ln = msg.line ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(ln)) return;
-
-                char role = 'U';
-                try
-                {
-                    var parts = ln.Split(']');
-                    if (parts.Length >= 3)
-                    {
-                        var tag = parts[1].Replace("[", "").Trim();
-                        if (tag.Equals("A", StringComparison.OrdinalIgnoreCase)) role = 'A';
-                        if (tag.Equals("U", StringComparison.OrdinalIgnoreCase)) role = 'U';
-                    }
-                }
-                catch { }
-
-                string text = ln;
-                try
-                {
-                    var last = ln.LastIndexOf("] ", StringComparison.Ordinal);
-                    if (last >= 0 && last + 2 < ln.Length)
-                        text = ln.Substring(last + 2);
-                    else
-                    {
-                        var third = nthIndexOf(ln, ']', 3);
-                        if (third >= 0 && third + 1 < ln.Length)
-                            text = ln.Substring(third + 1).TrimStart();
-                    }
-                }
-                catch { }
-
-                if (!string.IsNullOrWhiteSpace(text))
+                if (ContinuumTruthCaptureParser.TryParseLegacyLine(msg.Line, out var role, out var text))
                 {
                     // Detect Continuum/Pulse-seeded chats from the injected CONTINUUM CONTEXT payload.
                     // NOTE: client escapes newlines as "\\n", but the marker strings remain intact.
-                    if (role == 'U' && LooksLikeContinuumSeedText(text))
+                    if (role == 'U' && ContinuumSeedClassifier.IsContinuumSeed(text))
                         SessionContext.MarkContinuumSeeded(cid);
 
                     Writer.AppendTruthLine(cid, role, text);
@@ -358,30 +211,30 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.ContinuumCommandPulse, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandRefreshQuick, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
-                HandlePulse(msg.chatId, reason);
+                var reason = ToastReasonParser.Parse(msg.Reason, ToastReason.DockClick);
+                _pulse.Start(msg.ChatId, reason);
                 return;
             }
 
             if (type.Equals(WebCommandNames.ContinuumCommandOpenSessionFolder, StringComparison.OrdinalIgnoreCase))
             {
-                HandleOpenSessionFolder(msg.chatId);
+                HandleOpenSessionFolder(msg.ChatId);
                 return;
             }
 
             if (type.Equals(WebCommandNames.ContinuumCommandChronicleCancel, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandCancelChronicle, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
-                HandleChronicleCancel(msg.chatId, reason);
+                var reason = ToastReasonParser.Parse(msg.Reason, ToastReason.DockClick);
+                _chronicle.Cancel(msg.ChatId, reason);
                 return;
             }
 
             if (type.Equals(WebCommandNames.ContinuumCommandChronicleRebuildTruth, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals(WebCommandNames.ContinuumCommandChronicle, StringComparison.OrdinalIgnoreCase))
             {
-                var reason = ToastReasonParser.Parse(msg.reason, ToastReason.DockClick);
-                HandleChronicleRebuild(msg.chatId, reason);
+                var reason = ToastReasonParser.Parse(msg.Reason, ToastReason.DockClick);
+                _chronicle.Start(msg.ChatId, reason);
                 return;
             }
 
@@ -393,20 +246,20 @@ namespace VAL.Continuum
 
             if (type.Equals(WebCommandNames.ContinuumChronicleDone, StringComparison.OrdinalIgnoreCase))
             {
-                HandleChronicleDone(msg);
+                _chronicle.Complete(msg);
                 return;
             }
 
             if (type.Equals(WebCommandNames.ContinuumEvent, StringComparison.OrdinalIgnoreCase))
             {
-                HandleContinuumEvent(msg);
+                _pulse.HandleEvent(msg);
                 return;
             }
 
             if (type.Equals(WebCommandNames.InjectSuccess, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals("refresh.inject.success", StringComparison.OrdinalIgnoreCase))
             {
-                EndRefresh(SessionContext.ResolveChatId(msg.chatId));
+                _pulse.CompleteInjection(msg.ChatId);
                 return;
             }
         }
@@ -425,7 +278,7 @@ namespace VAL.Continuum
 
             bool attachMissingTruthLog = false;
             if (isValidChat)
-                attachMissingTruthLog = !HasTruthLog(cid);
+                attachMissingTruthLog = !_archives.HasTruthLog(cid);
 
             bool chronicleRunning;
             bool isDuplicateAttach = false;
@@ -434,7 +287,7 @@ namespace VAL.Continuum
 
             lock (Sync)
             {
-                chronicleRunning = _chronicleRunning;
+                chronicleRunning = _chronicle.IsInFlight;
 
                 // Dedupe: the client may ping session.attach repeatedly during a short watchdog window.
                 if (!string.IsNullOrWhiteSpace(cid) &&
@@ -452,7 +305,6 @@ namespace VAL.Continuum
                     // Reset toast intent gates for this attach.
                     _toastAttachToken++;
                     _toastAttachChatId = cid;
-                    _toastAttachUtc = nowUtc;
                     _toastAttachDwellMet = false;
                     _toastAttachChronicleShown = false;
                     _toastAttachLastCapturedTurns = 0;
@@ -505,7 +357,7 @@ namespace VAL.Continuum
             {
                 Toasts.DismissGroup("continuum_guidance");
                 Toasts.DismissGroup("continuum.lifecycle");
-                Toasts.DismissGroup(ToastGroup_Chronicle);
+                Toasts.DismissGroup("chronicle");
             }
             catch { }
 
@@ -514,22 +366,18 @@ namespace VAL.Continuum
             string gateCid;
             lock (Sync) { token = _toastAttachToken; gateCid = _toastAttachChatId; }
 
-            _ = Task.Run(async () =>
+            _backgroundTasks.Run("Continuum attach dwell", async cancellationToken =>
             {
-                try
+                await Task.Delay(ToastAttachDwellWindow, cancellationToken).ConfigureAwait(false);
+                lock (Sync)
                 {
-                    await Task.Delay(ToastAttachDwellWindow).ConfigureAwait(false);
-                    lock (Sync)
+                    if (_toastAttachToken == token &&
+                        !string.IsNullOrWhiteSpace(_toastAttachChatId) &&
+                        _toastAttachChatId.Equals(gateCid, StringComparison.OrdinalIgnoreCase))
                     {
-                        if (_toastAttachToken == token &&
-                            !string.IsNullOrWhiteSpace(_toastAttachChatId) &&
-                            _toastAttachChatId.Equals(gateCid, StringComparison.OrdinalIgnoreCase))
-                        {
-                            _toastAttachDwellMet = true;
-                        }
+                        _toastAttachDwellMet = true;
                     }
                 }
-                catch { }
             });
         }
 
@@ -580,752 +428,6 @@ namespace VAL.Continuum
         // -------------------------
         // Pulse
         // -------------------------
-        private void ToastPulseActionUnavailable(string? chatId, ToastReason reason)
-        {
-            // ActionUnavailable is shared across the app; for Pulse we keep it in the "pulse" group.
-            Toasts.TryShow(
-                ToastKey.ActionUnavailable,
-                chatId: chatId,
-                bypassLaunchQuiet: true,
-                groupKeyOverride: "pulse",
-                replaceGroupOverride: true,
-                origin: ToastOrigin.Continuum,
-                reason: reason);
-        }
-
-        private void ToastOperationInProgress(ToastReason reason)
-        {
-            Toasts.TryShow(
-                ToastKey.OperationInProgress,
-                bypassLaunchQuiet: true,
-                origin: ToastOrigin.Continuum,
-                reason: reason);
-        }
-
-        private void ToastOperationCancelled(string groupKey, ToastReason reason)
-        {
-            Toasts.TryShowOperationCancelled(groupKey, ToastOrigin.Continuum, reason);
-        }
-
-        private bool HasTruthLog(string chatId)
-        {
-            try
-            {
-                var truthPath = Writer.GetTruthPath(chatId);
-                return File.Exists(truthPath) && new FileInfo(truthPath).Length > 4;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private bool HasNonTrivialTruthLog(string chatId)
-        {
-            try
-            {
-                var truthPath = Writer.GetTruthPath(chatId);
-                return File.Exists(truthPath) && new FileInfo(truthPath).Length >= 2048;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private bool HasChronicleMarker(string chatId)
-        {
-            try
-            {
-                var dir = Writer.EnsureChatDir(chatId);
-                var marker = Path.Combine(dir, "Chronicle.complete.flag");
-                return File.Exists(marker);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void WriteChronicleMarker(string chatId)
-        {
-            try
-            {
-                var dir = Writer.EnsureChatDir(chatId);
-                var marker = Path.Combine(dir, "Chronicle.complete.flag");
-                if (!File.Exists(marker))
-                    File.WriteAllText(marker, DateTime.UtcNow.ToString("O"));
-            }
-            catch { }
-        }
-
-        private bool IsMeaningfulChatForChronicle(string chatId, int capturedTurns)
-        {
-            // Primary signal (preferred): the client reports how many turns are rendered.
-            // This is the correct way to distinguish an older chat with history from a fresh shell.
-            if (capturedTurns > 0)
-                return capturedTurns >= 4;
-
-            // Fallback (weak): truth.log size. Only used if the client didn't provide a turn count.
-            try
-            {
-                var truthPath = Writer.GetTruthPath(chatId);
-                if (!File.Exists(truthPath)) return false;
-                return new FileInfo(truthPath).Length >= 2048;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static bool LooksLikeContinuumSeedText(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return false;
-
-            // Keep this intentionally simple and robust.
-            // We only want to classify chats that clearly contain the ESSENCE-M handoff payload.
-            bool hasContext =
-                text.Contains("CONTEXT BLOCK — READ ONLY", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("WHERE WE LEFT OFF -- LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("CONTEXT FILLER (REFERENCE ONLY -- DO NOT ADVANCE FROM HERE)", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("CONTEXT FILLER (REFERENCE ONLY — DO NOT ADVANCE FROM HERE)", StringComparison.OrdinalIgnoreCase);
-
-            bool hasAuthoritativeSeed =
-                text.Contains("ESSENCE-M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("ESSENCE\u2011M SNAPSHOT (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("WHERE WE LEFT OFF -- LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)", StringComparison.OrdinalIgnoreCase);
-
-            return hasAuthoritativeSeed || hasContext;
-        }
-
-
-        private void HandlePulse(string? chatId, ToastReason reason)
-        {
-            var cid = SessionContext.ResolveChatId(chatId);
-
-            // Brand-new chat / invalid context: Pulse unavailable.
-            if (string.IsNullOrWhiteSpace(cid) || cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase))
-            {
-                Toasts.TryShow(
-                    ToastKey.PulseUnavailable,
-                    chatId: cid,
-                    bypassLaunchQuiet: true,
-                    origin: ToastOrigin.Continuum,
-                    reason: reason);
-                return;
-            }
-
-            // Single-flight guard: only one long-running operation at a time.
-            if (OperationCoordinator.IsBusy)
-            {
-                ToastOperationInProgress(reason);
-                return;
-            }
-
-            // Missing archive: reactive guidance (once per chat).
-            if (!HasTruthLog(cid))
-            {
-                bool chronicleRunning;
-                lock (Sync) { chronicleRunning = _chronicleRunning; }
-
-                // AUTHORITATIVE POLICY: while Chronicle is running, suppress missing-archive guidance.
-                if (!chronicleRunning)
-                {
-                    // ToastHub applies the once-per-chat ledger gate for this nudge.
-                    Toasts.TryShow(
-                        ToastKey.PulseNoTruthLogFound,
-                        chatId: cid,
-                        bypassLaunchQuiet: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: reason);
-                }
-
-                return;
-            }
-
-            if (!OperationCoordinator.TryBegin(GuardedOperationKind.Pulse, out _))
-            {
-                ToastOperationInProgress(reason);
-                return;
-            }
-
-            if (!TryBeginRefresh(cid, reason))
-            {
-                OperationCoordinator.End(GuardedOperationKind.Pulse);
-                return;
-            }
-
-            Toasts.TryShow(
-                ToastKey.PulseInitiated,
-                chatId: cid,
-                bypassLaunchQuiet: true,
-                origin: ToastOrigin.Continuum,
-                reason: reason);
-
-            // Preflight: ask the client to flush any pending captures before we read Truth.log.
-            // This prevents the common "last assistant message missing" tail failure.
-            if (!RequestCaptureFlushAndArmPulse(cid))
-            {
-                // No bridge / cannot flush; proceed immediately as best-effort.
-                RunPulseNow(cid, "no-flush");
-            }
-        }
-
-        private bool TryBeginRefresh(string chatId, ToastReason reason)
-        {
-            lock (Sync)
-            {
-                if (!SessionContext.IsSessionAttached)
-                {
-                    ToastPulseActionUnavailable(chatId, reason);
-                    return false;
-                }
-
-                if (_refreshInFlight)
-                {
-                    Toasts.TryShow(
-                        ToastKey.PulseAlreadyRunning,
-                        chatId: chatId,
-                        bypassLaunchQuiet: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: reason);
-                    return false;
-                }
-
-                if (_lastRefreshCompletedUtc != DateTime.MinValue)
-                {
-                    var delta = DateTime.UtcNow - _lastRefreshCompletedUtc;
-                    if (delta < RefreshCooldown)
-                    {
-                        ToastPulseActionUnavailable(chatId, reason);
-                        return false;
-                    }
-                }
-
-                _refreshInFlight = true;
-
-                // Suppress guidance nudges during this refresh while Pulse navigates into a new chat.
-                _suppressGuidanceUntilUtc = DateTime.UtcNow + GuidanceSuppressWindow;
-                return true;
-            }
-        }
-
-        private void FinishRefresh(string chatId, bool showReadyToast)
-        {
-            bool endedRefresh = false;
-
-            lock (Sync)
-            {
-                if (_refreshInFlight)
-                {
-                    _refreshInFlight = false;
-                    _lastRefreshCompletedUtc = DateTime.UtcNow;
-                    _pendingSignalPulse = null;
-                    endedRefresh = true;
-                }
-            }
-
-            if (endedRefresh)
-            {
-                OperationCoordinator.End(GuardedOperationKind.Pulse);
-            }
-
-            if (endedRefresh && showReadyToast && !string.IsNullOrWhiteSpace(chatId))
-            {
-                Toasts.TryShow(
-                    ToastKey.PulseReady,
-                    chatId: chatId,
-                    bypassLaunchQuiet: true,
-                    origin: ToastOrigin.Continuum,
-                    reason: ToastReason.Background);
-            }
-        }
-
-        private void EndRefresh(string chatId)
-        {
-            // JS emits "inject.success" for injections generally.
-            // Only show Pulse completion if a refresh was actually in-flight.
-            FinishRefresh(chatId, showReadyToast: true);
-        }
-
-        private void HandleContinuumEvent(Msg msg)
-        {
-            var evt = (msg.evt ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(evt))
-                return;
-
-            if (TryParseSignalReplySettled(evt, out _))
-            {
-                HandleSignalReplySettled(msg);
-                return;
-            }
-
-            if (evt.StartsWith("signal.send.failed:", StringComparison.OrdinalIgnoreCase))
-            {
-                HandleSignalFailure(msg.chatId, msg.requestId);
-                return;
-            }
-
-            if (evt.StartsWith("refresh.inject.success", StringComparison.OrdinalIgnoreCase))
-            {
-                HandleInjectSuccessEvent(msg.chatId, evt);
-            }
-        }
-
-        private void HandleInjectSuccessEvent(string? chatId, string evt)
-        {
-            var cid = SessionContext.ResolveChatId(chatId);
-            if (string.IsNullOrWhiteSpace(cid))
-                return;
-
-            if (TryParseRefreshInjectSuccess(evt, out var mode, out var label))
-            {
-                if (mode.Equals("Signal", StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                if (mode.Equals("Pulse", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (IsPulseCompletionTarget(label))
-                        EndRefresh(cid);
-                    return;
-                }
-            }
-
-            if (HasPendingSignalPulse(cid))
-                return;
-
-            EndRefresh(cid);
-        }
-
-        internal static bool TryParseRefreshInjectSuccess(string evt, out string mode, out string label)
-        {
-            mode = string.Empty;
-            label = string.Empty;
-
-            if (string.IsNullOrWhiteSpace(evt))
-                return false;
-
-            var parts = evt.Split(':');
-            if (parts.Length < 3)
-                return false;
-
-            mode = (parts[1] ?? string.Empty).Trim();
-            label = (parts[2] ?? string.Empty).Trim();
-            return !string.IsNullOrWhiteSpace(mode);
-        }
-
-        internal static bool IsPulseCompletionTarget(string label)
-        {
-            return label.Equals("new_chat", StringComparison.OrdinalIgnoreCase) ||
-                   label.Equals("new_chat_root", StringComparison.OrdinalIgnoreCase);
-        }
-
-        internal static bool TryParseSignalReplySettled(string evt, out string assistantTurnId)
-        {
-            assistantTurnId = string.Empty;
-
-            if (string.IsNullOrWhiteSpace(evt))
-                return false;
-
-            const string prefix = "signal.reply.settled:";
-            if (!evt.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            assistantTurnId = (evt.Substring(prefix.Length) ?? string.Empty).Trim();
-            return !string.IsNullOrWhiteSpace(assistantTurnId);
-        }
-
-        private void HandleSignalReplySettled(Msg msg)
-        {
-            var cid = SessionContext.ResolveChatId(msg.chatId);
-            if (string.IsNullOrWhiteSpace(cid))
-                return;
-
-            var requestId = (msg.requestId ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(requestId))
-                return;
-
-            if (!TryGetPendingSignalPulse(cid, out var pending))
-                return;
-
-            if (OperationCoordinator.CurrentOperationId != pending.OperationId)
-                return;
-
-            if (!requestId.Equals(pending.SignalRequestId, StringComparison.OrdinalIgnoreCase))
-                return;
-
-            var signalReply = msg.text ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(signalReply))
-            {
-                HandleSignalFailure(cid, requestId);
-                return;
-            }
-
-            if (!SignalPacket.TryParse(signalReply, out var signalSummary))
-            {
-                HandleSignalFailure(cid, requestId);
-                return;
-            }
-
-            var renderedPulsePacket = PulsePacketComposer.Compose(pending.Snapshot, pending.DeterministicSections, signalSummary);
-            if (string.IsNullOrWhiteSpace(renderedPulsePacket))
-            {
-                HandleSignalFailure(cid, requestId);
-                return;
-            }
-
-            if (!TryTakePendingSignalPulse(cid, pending.OperationId, requestId, out pending))
-                return;
-
-            try
-            {
-                var token = OperationCoordinator.GetTokenIfRunning(GuardedOperationKind.Pulse);
-                var seed = QuickRefresh.CreatePulseSeed(cid, renderedPulsePacket, "PulsePacketComposer", token);
-                InjectQueue.Enqueue(seed);
-            }
-            catch (OperationCanceledException)
-            {
-                FinishRefresh(cid, showReadyToast: false);
-                ToastOperationCancelled("pulse", ToastReason.Background);
-            }
-            catch
-            {
-                InjectQueue.Enqueue(pending.DeterministicFallbackSeed);
-            }
-        }
-
-        private void HandleSignalFailure(string? chatId, string? requestId)
-        {
-            var cid = SessionContext.ResolveChatId(chatId);
-            if (string.IsNullOrWhiteSpace(cid))
-                return;
-
-            if (!TryTakePendingSignalPulseForCurrentOperation(cid, requestId, out var pending))
-                return;
-
-            InjectQueue.Enqueue(pending.DeterministicFallbackSeed);
-        }
-
-        private bool HasPendingSignalPulse(string chatId)
-        {
-            lock (Sync)
-            {
-                return _pendingSignalPulse != null &&
-                    _pendingSignalPulse.ChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase);
-            }
-        }
-
-        private bool TryGetPendingSignalPulse(string chatId, out PendingSignalPulse pending)
-        {
-            lock (Sync)
-            {
-                if (_pendingSignalPulse == null ||
-                    !_pendingSignalPulse.ChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase))
-                {
-                    pending = null!;
-                    return false;
-                }
-
-                pending = _pendingSignalPulse;
-                return true;
-            }
-        }
-
-        private bool TryTakePendingSignalPulseForCurrentOperation(string chatId, string? requestId, out PendingSignalPulse pending)
-        {
-            pending = null!;
-
-            if (!OperationCoordinator.IsRunning(GuardedOperationKind.Pulse))
-                return false;
-
-            var operationId = OperationCoordinator.CurrentOperationId;
-            if (operationId <= 0)
-                return false;
-
-            return TryTakePendingSignalPulse(chatId, operationId, requestId, out pending);
-        }
-
-        private bool TryTakePendingSignalPulse(string chatId, long operationId, string? requestId, out PendingSignalPulse pending)
-        {
-            lock (Sync)
-            {
-                if (_pendingSignalPulse == null ||
-                    _pendingSignalPulse.OperationId != operationId ||
-                    !_pendingSignalPulse.ChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase))
-                {
-                    pending = null!;
-                    return false;
-                }
-
-                var expectedRequestId = _pendingSignalPulse.SignalRequestId;
-                if (!string.IsNullOrWhiteSpace(requestId) &&
-                    !string.IsNullOrWhiteSpace(expectedRequestId) &&
-                    !requestId.Equals(expectedRequestId, StringComparison.OrdinalIgnoreCase))
-                {
-                    pending = null!;
-                    return false;
-                }
-
-                pending = _pendingSignalPulse;
-                _pendingSignalPulse = null;
-                return true;
-            }
-        }
-
-        private void StartSignalTimeout(PendingSignalPulse pending)
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(SignalResponseTimeoutMs).ConfigureAwait(false);
-
-                    PostToUi(() =>
-                    {
-                        if (!OperationCoordinator.IsRunning(GuardedOperationKind.Pulse))
-                            return;
-
-                        if (OperationCoordinator.CurrentOperationId != pending.OperationId)
-                            return;
-
-                        if (TryTakePendingSignalPulse(pending.ChatId, pending.OperationId, pending.SignalRequestId, out var timedOutPending))
-                            InjectQueue.Enqueue(timedOutPending.DeterministicFallbackSeed);
-                    });
-                }
-                catch { }
-            });
-        }
-
-        // -------------------------
-        // Pulse preflight: capture flush handshake
-        // -------------------------
-        private bool RequestCaptureFlushAndArmPulse(string chatId)
-        {
-            try
-            {
-                var post = PostToWebMessage;
-                if (post == null) return false;
-
-                var reqId = Guid.NewGuid().ToString("N");
-
-                lock (Sync)
-                {
-                    _pendingPulseChatId = chatId;
-                    _pendingFlushRequestId = reqId;
-                    _pendingFlushRequestedUtc = DateTime.UtcNow;
-                }
-
-                post(new MessageEnvelope
-                {
-                    Type = WebMessageTypes.Command,
-                    Name = WebCommandNames.ContinuumCaptureFlush,
-                    ChatId = chatId,
-                    Payload = JsonSerializer.SerializeToElement(new
-                    {
-                        chatId = chatId,
-                        requestId = reqId,
-                        reason = "pulse"
-                    })
-                });
-
-                // Fallback: if the client never ACKs, proceed after a short timeout.
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(FlushAckTimeoutMs).ConfigureAwait(false);
-
-                        string? cid;
-                        string? rid;
-                        lock (Sync)
-                        {
-                            cid = _pendingPulseChatId;
-                            rid = _pendingFlushRequestId;
-                        }
-
-                        if (cid == chatId && rid == reqId)
-                        {
-                            // Still pending -> timed out. Clear pending and proceed.
-                            lock (Sync)
-                            {
-                                if (_pendingPulseChatId == chatId && _pendingFlushRequestId == reqId)
-                                {
-                                    _pendingPulseChatId = null;
-                                    _pendingFlushRequestId = null;
-                                }
-                            }
-
-                            PostToUi(() =>
-                            {
-                                if (!OperationCoordinator.IsRunning(GuardedOperationKind.Pulse))
-                                    return;
-
-                                if (OperationCoordinator.IsCancellationRequested(GuardedOperationKind.Pulse))
-                                {
-                                    FinishRefresh(chatId, showReadyToast: false);
-                                    ToastOperationCancelled("pulse", ToastReason.Background);
-                                    return;
-                                }
-
-                                RunPulseNow(chatId, "flush-timeout");
-                            });
-                        }
-                    }
-                    catch { }
-                });
-
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void HandleCaptureFlushAck(Msg msg)
-        {
-            try
-            {
-                var rid = (msg.requestId ?? string.Empty).Trim();
-                if (string.IsNullOrWhiteSpace(rid)) return;
-
-                string? cid;
-                string? pendingRid;
-
-                lock (Sync)
-                {
-                    cid = SessionContext.ResolveChatId(msg.chatId);
-                    pendingRid = _pendingFlushRequestId;
-                }
-
-                if (string.IsNullOrWhiteSpace(cid)) return;
-
-                // Only honor ACK for the currently armed pulse.
-                if (!rid.Equals(pendingRid, StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                lock (Sync)
-                {
-                    _pendingPulseChatId = null;
-                    _pendingFlushRequestId = null;
-                }
-
-                if (!OperationCoordinator.IsRunning(GuardedOperationKind.Pulse))
-                    return;
-
-                if (OperationCoordinator.IsCancellationRequested(GuardedOperationKind.Pulse))
-                {
-                    FinishRefresh(cid, showReadyToast: false);
-                    ToastOperationCancelled("pulse", ToastReason.Background);
-                    return;
-                }
-
-                RunPulseNow(cid, "flush-ack");
-            }
-            catch { }
-        }
-
-        private void RunPulseNow(string chatId, string reasonTag)
-        {
-            try
-            {
-                if (OperationCoordinator.IsCancellationRequested(GuardedOperationKind.Pulse))
-                {
-                    FinishRefresh(chatId, showReadyToast: false);
-                    ToastOperationCancelled("pulse", ToastReason.Background);
-                    return;
-                }
-
-                var token = OperationCoordinator.GetTokenIfRunning(GuardedOperationKind.Pulse);
-                RunPulseWithSignalFallback(chatId, token);
-            }
-            catch (OperationCanceledException)
-            {
-                FinishRefresh(chatId, showReadyToast: false);
-                ToastOperationCancelled("pulse", ToastReason.Background);
-            }
-            catch
-            {
-                // Catalog v1: no detailed exception toasts.
-                ToastPulseActionUnavailable(chatId, ToastReason.Background);
-
-                // Clear refresh state (no "ready" toast on failure).
-                FinishRefresh(chatId, showReadyToast: false);
-            }
-        }
-
-        private void RunPulseWithSignalFallback(string chatId, CancellationToken token)
-        {
-            var snapshot = QuickRefresh.BuildPulseSnapshot(chatId, token);
-            token.ThrowIfCancellationRequested();
-
-            var deterministicSections = QuickRefresh.BuildDeterministicPulseSections(chatId, snapshot, token);
-            token.ThrowIfCancellationRequested();
-
-            var deterministicFallbackPacket = QuickRefresh.BuildDeterministicPulsePacket(snapshot, deterministicSections, token);
-            var deterministicFallbackSeed = QuickRefresh.CreatePulseSeed(chatId, deterministicFallbackPacket, "PulsePacketComposer", token);
-
-            token.ThrowIfCancellationRequested();
-
-            var signalPrompt = (ContinuumAssetLoader.LoadSignalPrompt(chatId) ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(signalPrompt))
-            {
-                InjectQueue.Enqueue(deterministicFallbackSeed);
-                return;
-            }
-
-            var signalInput = SignalInputBuilder.Build(signalPrompt);
-            if (string.IsNullOrWhiteSpace(signalInput))
-            {
-                InjectQueue.Enqueue(deterministicFallbackSeed);
-                return;
-            }
-
-            var operationId = OperationCoordinator.CurrentOperationId;
-            if (operationId <= 0)
-            {
-                InjectQueue.Enqueue(deterministicFallbackSeed);
-                return;
-            }
-
-            var signalRequestId = Guid.NewGuid().ToString("N");
-            var pending = new PendingSignalPulse
-            {
-                OperationId = operationId,
-                ChatId = chatId,
-                SignalRequestId = signalRequestId,
-                Snapshot = snapshot,
-                DeterministicSections = deterministicSections,
-                DeterministicFallbackPacket = deterministicFallbackPacket,
-                DeterministicFallbackSeed = deterministicFallbackSeed
-            };
-
-            lock (Sync)
-            {
-                _pendingSignalPulse = pending;
-            }
-
-            InjectQueue.Enqueue(new EssenceInjectController.InjectSeed
-            {
-                ChatId = chatId,
-                Mode = "Signal",
-                EssenceText = signalInput,
-                OpenNewChat = false,
-                AutoSend = true,
-                RequestId = signalRequestId,
-                SourceFileName = "SignalInputBuilder",
-                EssenceFileName = "Signal.Prompt.v1.txt"
-            });
-
-            StartSignalTimeout(pending);
-        }
-
         private void PostToUi(Action act)
         {
             try
@@ -1345,7 +447,7 @@ namespace VAL.Continuum
         // -------------------------
         // Chronicle: rebuild Truth.log from the UI (user-invoked recovery tool)
         // -------------------------
-                
+
         private void HandleChronicleComposerInteraction(string? chatId, int capturedTurns, ToastReason reason)
         {
             try
@@ -1356,19 +458,16 @@ namespace VAL.Continuum
 
                 // Suppress while Chronicle is running.
                 bool chronicleRunning;
-                bool refreshInFlight;
-                DateTime suppressGuidanceUntil;
                 bool attachMatch;
                 bool attachDwellMet;
                 bool chronicleAlreadyShown;
 
                 var nowUtc = DateTime.UtcNow;
+                var pulseGuidanceSuppressed = _pulse.IsGuidanceSuppressed(nowUtc);
 
                 lock (Sync)
                 {
-                    chronicleRunning = _chronicleRunning;
-                    refreshInFlight = _refreshInFlight;
-                    suppressGuidanceUntil = _suppressGuidanceUntilUtc;
+                    chronicleRunning = _chronicle.IsInFlight;
 
                     attachMatch = !string.IsNullOrWhiteSpace(_toastAttachChatId) &&
                                   _toastAttachChatId.Equals(cid, StringComparison.OrdinalIgnoreCase);
@@ -1411,15 +510,14 @@ namespace VAL.Continuum
                 if (!attachDwellMet) return;
 
                 // Suppress Chronicle nudges during Pulse/refresh and the post-Pulse suppression window.
-                if (refreshInFlight) return;
-                if (suppressGuidanceUntil != DateTime.MinValue && nowUtc < suppressGuidanceUntil) return;
+                if (pulseGuidanceSuppressed) return;
                 if (chronicleAlreadyShown) return;
 
                 // AUTHORITATIVE POLICY: suppress Chronicle prompts in Pulse/Continuum-seeded chats.
-                if (IsContinuumSeededChat(cid)) return;
+                if (_archives.IsContinuumSeededChat(cid)) return;
 
                 // Only if Chronicle has not completed for this chat yet.
-                if (HasChronicleMarker(cid)) return;
+                if (_archives.HasChronicleMarker(cid)) return;
 
                 // Only prompt on meaningful chats with real history (avoid tiny shells).
                 // capturedTurns is the primary signal; we also keep the last value seen this attach as a fallback.
@@ -1428,13 +526,13 @@ namespace VAL.Continuum
                 {
                     lock (Sync) { turns = Math.Max(turns, _toastAttachLastCapturedTurns); }
                 }
-                if (!IsMeaningfulChatForChronicle(cid, turns)) return;
+                if (!_archives.IsMeaningfulChat(cid, turns)) return;
 
                 bool loggingEnabled;
                 lock (Sync) { loggingEnabled = _loggingEnabled; }
 
-                bool hasTruthLog = HasTruthLog(cid);
-                bool hasNonTrivialTruthLog = HasNonTrivialTruthLog(cid);
+                bool hasTruthLog = _archives.HasTruthLog(cid);
+                bool hasNonTrivialTruthLog = _archives.HasNonTrivialTruthLog(cid);
 
                 int turnsForCompleteness = turns;
                 if (turnsForCompleteness <= 0)
@@ -1462,7 +560,7 @@ namespace VAL.Continuum
                     {
                         ("Chronicle", () =>
                         {
-                            try { HandleChronicleRebuild(cid, ToastReason.DockClick); } catch { }
+                            try { _chronicle.Start(cid, ToastReason.DockClick); } catch { }
                         }),
                         ("Not now", () => { })
                     },
@@ -1490,43 +588,26 @@ namespace VAL.Continuum
             catch { }
         }
 
-        private bool IsContinuumSeededChat(string chatId)
+        private bool IsRefreshInFlight()
         {
-            try
+            return _pulse.IsInFlight;
+        }
+
+        private void MarkChronicleAttemptFinished(string chatId)
+        {
+            lock (Sync)
             {
-                if (SessionContext.GetOrigin(chatId) == ChatOrigin.ContinuumSeeded)
-                    return true;
+                if (_toastAttachChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase))
+                    _toastAttachChronicleShown = true;
             }
-            catch { }
+        }
 
-            // Fallback: scan the current Truth.log head for the Continuum injection markers.
-            // This protects against any rare cases where the seed classification wasn't recorded
-            // (e.g., if the host missed the append event in an edge case).
-            try
+        private void MarkChronicleCompleted(string chatId)
+        {
+            lock (Sync)
             {
-                var truthPath = Writer.GetTruthPath(chatId);
-                if (!File.Exists(truthPath)) return false;
-
-                var sb = new System.Text.StringBuilder();
-                foreach (var entry in TruthReader.Read(truthPath, repairTailFirst: true))
-                {
-                    if (sb.Length >= 32768)
-                        break;
-
-                    sb.Append(entry.Role);
-                    sb.Append('|');
-                    sb.Append(entry.Payload);
-                    sb.Append('\n');
-                }
-
-                if (sb.Length == 0)
-                    return false;
-
-                return LooksLikeContinuumSeedText(sb.ToString());
-            }
-            catch
-            {
-                return false;
+                _chronicleBaselineTurnsByChat.Remove(chatId);
+                _chroniclePromptLastShownUtcByChat.Remove(chatId);
             }
         }
 
@@ -1536,410 +617,21 @@ namespace VAL.Continuum
             if (chatId.StartsWith("session-", StringComparison.OrdinalIgnoreCase)) return;
 
             bool chronicleRunning;
-            lock (Sync) { chronicleRunning = _chronicleRunning; }
+            lock (Sync) { chronicleRunning = _chronicle.IsInFlight; }
 
             // AUTHORITATIVE POLICY: suppress missing-archive guidance while Chronicle is running.
             if (chronicleRunning) return;
 
-            try
-            {
-                var truthPath = Writer.GetTruthPath(chatId);
-                if (!File.Exists(truthPath) || new FileInfo(truthPath).Length <= 4)
-                {
-                    Toasts.TryShow(
-                        ToastKey.ChronicleSuggested,
-                        chatId: chatId,
-                        origin: ToastOrigin.Continuum,
-                        reason: ToastReason.Attach);
-                }
-            }
-            catch
-            {
-                // ignore
-            }
-        }
-
-
-        private void HandleChronicleCancel(string? chatId, ToastReason reason)
-        {
-            try
-            {
-                if (!OperationCoordinator.IsRunning(GuardedOperationKind.Chronicle))
-                    return;
-
-                _chronicleCancelReason = reason;
-                OperationCoordinator.RequestCancel();
-
-                // Ask the client to stop its scroll+scan loop.
-                var post = PostToWebMessage;
-                if (post == null) return;
-
-                var cid = SessionContext.ResolveChatId(chatId);
-                if (string.IsNullOrWhiteSpace(cid)) return;
-
-                string rid;
-                lock (Sync) { rid = _chronicleRequestId ?? string.Empty; }
-
-                post(new MessageEnvelope
-                {
-                    Type = WebMessageTypes.Command,
-                    Name = WebCommandNames.ContinuumChronicleCancel,
-                    ChatId = cid,
-                    Payload = JsonSerializer.SerializeToElement(new
-                    {
-                        chatId = cid,
-                        requestId = rid
-                    })
-                });
-            }
-            catch { }
-        }
-
-
-        private void HandleChronicleRebuild(string? chatId, ToastReason reason)
-        {
-            var cid = SessionContext.ResolveChatId(chatId);
-            if (string.IsNullOrWhiteSpace(cid) || cid.StartsWith("session-", StringComparison.OrdinalIgnoreCase))
+            if (!_archives.HasTruthLog(chatId))
             {
                 Toasts.TryShow(
-                    ToastKey.ChronicleUnavailable,
-                    chatId: cid,
-                    bypassLaunchQuiet: true,
+                    ToastKey.ChronicleSuggested,
+                    chatId: chatId,
                     origin: ToastOrigin.Continuum,
-                    reason: reason);
-                return;
-            }
-
-            _chronicleCancelReason = ToastReason.Background;
-
-            // Single-flight guard: only one long-running operation at a time.
-            if (OperationCoordinator.IsBusy)
-            {
-                ToastOperationInProgress(reason);
-                return;
-            }
-
-            if (!OperationCoordinator.TryBegin(GuardedOperationKind.Chronicle, out var chronicleToken))
-            {
-                ToastOperationInProgress(reason);
-                return;
-            }
-
-            lock (Sync)
-            {
-                if (!SessionContext.IsSessionAttached)
-                {
-                    Toasts.TryShow(
-                        ToastKey.ActionUnavailable,
-                        bypassLaunchQuiet: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: reason);
-                    OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    return;
-                }
-                if (_refreshInFlight)
-                {
-                    Toasts.TryShow(
-                        ToastKey.ActionUnavailable,
-                        bypassLaunchQuiet: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: reason);
-                    OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    return;
-                }
-                if (_chronicleInFlight)
-                {
-                    Toasts.TryShow(
-                        ToastKey.ActionUnavailable,
-                        bypassLaunchQuiet: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: reason);
-                    OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    return;
-                }
-
-                _chronicleInFlight = true;
-                _chronicleRunning = true;
-                _chronicleRequestId = Guid.NewGuid().ToString("N");
-                _chronicleStartedUtc = DateTime.UtcNow;
-            }
-
-            // Prepare an atomic Truth.log rebuild. Existing Truth.log remains unchanged until commit.
-            string backupPath = string.Empty;
-            try
-            {
-                if (!Writer.TryBeginTruthRebuild(cid, backupExisting: true, out backupPath, out _, chronicleToken))
-                {
-                    lock (Sync)
-                    {
-                        _chronicleInFlight = false;
-                        _chronicleRunning = false;
-                        _chronicleRequestId = null;
-                    }
-
-                    OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    Toasts.TryShow(
-                        ToastKey.ActionUnavailable,
-                        bypassLaunchQuiet: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: reason);
-                    return;
-                }
-
-                // Best-effort cleanup of derived artifacts (so the session folder reflects the new rebuild)
-                TryDeleteDerivedArtifacts(cid);
-                TryAppendChronicleAudit(cid, $"Chronicle STARTED  | Utc={DateTime.UtcNow:o} | Backup={backupPath}");
-            }
-            catch
-            {
-                Writer.AbortTruthRebuild(cid);
-                lock (Sync)
-                {
-                    _chronicleInFlight = false;
-                    _chronicleRunning = false;
-                    _chronicleRequestId = null;
-                }
-
-                OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                Toasts.TryShow(
-                    ToastKey.ActionUnavailable,
-                    bypassLaunchQuiet: true,
-                    origin: ToastOrigin.Continuum,
-                    reason: reason);
-                return;
-            }
-
-            // Ask the client to run a deterministic scroll+scan capture from top->bottom.
-            try
-            {
-                var post = PostToWebMessage;
-                if (post == null)
-                {
-                    // Ensure any sticky Chronicle toast is dismissed on failure.
-                    Toasts.TryShow(
-                        ToastKey.ActionUnavailable,
-                        bypassLaunchQuiet: true,
-                        groupKeyOverride: ToastGroup_Chronicle,
-                        replaceGroupOverride: true,
-                        bypassBurstDedupeOverride: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: reason);
-                    lock (Sync) { _chronicleInFlight = false; _chronicleRunning = false; _chronicleRequestId = null; }
-                    try { Writer.AbortTruthRebuild(cid); } catch { }
-                    OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    return;
-                }
-
-                string rid;
-                lock (Sync) { rid = _chronicleRequestId ?? Guid.NewGuid().ToString("N"); }
-
-                post(new MessageEnvelope
-                {
-                    Type = WebMessageTypes.Command,
-                    Name = WebCommandNames.ContinuumChronicleStart,
-                    ChatId = cid,
-                    Payload = JsonSerializer.SerializeToElement(new
-                    {
-                        chatId = cid,
-                        requestId = rid,
-                        mode = "full"
-                    })
-                });
-                // Sticky instruction toast: remains visible until Chronicle completes (then replaced).
-                Toasts.TryShow(
-                    ToastKey.ChronicleStarted,
-                    chatId: cid,
-                    bypassLaunchQuiet: true,
-                    origin: ToastOrigin.Continuum,
-                    reason: reason);
-            }
-            catch
-            {
-                lock (Sync) { _chronicleInFlight = false; _chronicleRunning = false; _chronicleRequestId = null; }
-                try { Writer.AbortTruthRebuild(cid); } catch { }
-                OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                // Ensure any sticky Chronicle toast is dismissed on failure.
-                Toasts.TryShow(
-                    ToastKey.ActionUnavailable,
-                    bypassLaunchQuiet: true,
-                    groupKeyOverride: ToastGroup_Chronicle,
-                    replaceGroupOverride: true,
-                    bypassBurstDedupeOverride: true,
-                    origin: ToastOrigin.Continuum,
-                    reason: reason);
+                    reason: ToastReason.Attach);
             }
         }
 
-        private void HandleChronicleDone(Msg msg)
-        {
-            try
-            {
-                var cid = SessionContext.ResolveChatId(msg.chatId);
-                if (string.IsNullOrWhiteSpace(cid)) return;
-
-                string? rid;
-                bool active;
-                DateTime startedUtc;
-
-                lock (Sync)
-                {
-                    rid = _chronicleRequestId;
-                    active = _chronicleInFlight;
-                    startedUtc = _chronicleStartedUtc;
-                }
-
-                if (!active) return;
-
-                if (!string.IsNullOrWhiteSpace(msg.requestId) && !string.IsNullOrWhiteSpace(rid) &&
-                    !msg.requestId.Equals(rid, StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                lock (Sync)
-                {
-                    _chronicleInFlight = false;
-                    _chronicleRunning = false;
-                    _chronicleRequestId = null;
-
-                    // Chronicle rebuild produces a provenance-complete archive for this chat.
-                    // Treat the attach-level toasts as satisfied if this is the currently viewed chat.
-                    if (!string.IsNullOrWhiteSpace(_toastAttachChatId) &&
-                        _toastAttachChatId.Equals(cid, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _toastAttachChronicleShown = true;
-                    }
-                }
-
-                // Ensure the "Chronicle suggested" guidance doesn't appear again for this chat.
-                try { ToastLedger.TryMarkShown(cid, "guidance.chronicle_suggested"); } catch { }
-
-                var captured = msg.capturedTurns ?? 0;
-                var ms = msg.ms ?? (long)Math.Max(0, (DateTime.UtcNow - startedUtc).TotalMilliseconds);
-
-                // If the client reported an error/abort, dismiss the sticky warning toast and surface a
-                // catalog-approved fallback (no new wording).
-                if (OperationCoordinator.IsCancellationRequested(GuardedOperationKind.Chronicle))
-                {
-                    try { Writer.AbortTruthRebuild(cid); } catch { }
-
-                    ToastOperationCancelled(ToastGroup_Chronicle, _chronicleCancelReason);
-                    _chronicleCancelReason = ToastReason.Background;
-                    TryAppendChronicleAudit(cid, $"Chronicle CANCELLED | Utc={DateTime.UtcNow:o} | Captured={captured} | Ms={ms}");
-                    OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    return;
-                }
-
-                if (!string.IsNullOrWhiteSpace(msg.error))
-                {
-                    try { Writer.AbortTruthRebuild(cid); } catch { }
-
-                    Toasts.TryShow(
-                        ToastKey.ActionUnavailable,
-                        bypassLaunchQuiet: true,
-                        groupKeyOverride: ToastGroup_Chronicle,
-                        replaceGroupOverride: true,
-                        bypassBurstDedupeOverride: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: ToastReason.Background);
-
-                    TryAppendChronicleAudit(cid, $"Chronicle FAILED    | Utc={DateTime.UtcNow:o} | Error={msg.error} | Captured={captured} | Ms={ms}");
-                    OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    return;
-                }
-
-                if (!Writer.TryCommitTruthRebuild(cid))
-                {
-                    Toasts.TryShow(
-                        ToastKey.ActionUnavailable,
-                        bypassLaunchQuiet: true,
-                        groupKeyOverride: ToastGroup_Chronicle,
-                        replaceGroupOverride: true,
-                        bypassBurstDedupeOverride: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: ToastReason.Background);
-
-                    TryAppendChronicleAudit(cid, $"Chronicle FAILED    | Utc={DateTime.UtcNow:o} | Error=commit_failed | Captured={captured} | Ms={ms}");
-                    OperationCoordinator.End(GuardedOperationKind.Chronicle);
-                    return;
-                }
-
-                // Chronicle completed successfully: mark this chat as chronicle-archived.
-                WriteChronicleMarker(cid);
-                try { SessionContext.MarkChronicleRebuilt(cid); } catch { }
-
-                // This chat no longer needs Chronicle prompting/baseline tracking.
-                lock (Sync)
-                {
-                    _chronicleBaselineTurnsByChat.Remove(cid);
-                    _chroniclePromptLastShownUtcByChat.Remove(cid);
-                }
-                // Replace the sticky "do not send" toast with the completion toast.
-                Toasts.TryShow(
-                    ToastKey.ChronicleCompleted,
-                    chatId: cid,
-                    bypassLaunchQuiet: true,
-                    origin: ToastOrigin.Continuum,
-                    reason: ToastReason.Background);
-
-                TryAppendChronicleAudit(cid, $"Chronicle COMPLETED | Utc={DateTime.UtcNow:o} | Captured={captured} | Ms={ms}");
-                OperationCoordinator.End(GuardedOperationKind.Chronicle);
-            }
-            catch
-            {
-                lock (Sync) { _chronicleInFlight = false; _chronicleRunning = false; _chronicleRequestId = null; }
-
-                // If the completion handler failed unexpectedly, do not leave the sticky "do not send" toast up.
-                try
-                {
-                    Toasts.TryShow(
-                        ToastKey.ActionUnavailable,
-                        bypassLaunchQuiet: true,
-                        groupKeyOverride: ToastGroup_Chronicle,
-                        replaceGroupOverride: true,
-                        bypassBurstDedupeOverride: true,
-                        origin: ToastOrigin.Continuum,
-                        reason: ToastReason.Background);
-                }
-                catch { }
-            }
-        }
-
-
-        private void TryDeleteDerivedArtifacts(string chatId)
-        {
-            try
-            {
-                var dir = Writer.EnsureChatDir(chatId);
-                string[] files =
-                {
-                    "Truth.view",
-                    "Seed.log",
-                    "RestructuredSeed.log",
-                    "Essence-M.Pulse.txt"
-                };
-
-                foreach (var f in files)
-                {
-                    try
-                    {
-                        var p = Path.Combine(dir, f);
-                        if (File.Exists(p)) File.Delete(p);
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-        }
-
-        private void TryAppendChronicleAudit(string chatId, string line)
-        {
-            try
-            {
-                var dir = Writer.EnsureChatDir(chatId);
-                var path = Path.Combine(dir, "Chronicle.audit.txt");
-                AtomicFile.TryAppendAllText(path, (line ?? string.Empty).Trim() + Environment.NewLine, durable: false);
-            }
-            catch { }
-        }
 
         private void HandleOpenSessionFolder(string? chatId)
         {
@@ -1950,7 +642,7 @@ namespace VAL.Continuum
             try
             {
                 var dir = Writer.EnsureChatDir(cid);
-                Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true });
+                _processLauncher.OpenFolder(dir);
             }
             catch
             {
@@ -1962,18 +654,5 @@ namespace VAL.Continuum
             }
         }
 
-        private static int nthIndexOf(string s, char c, int n)
-        {
-            int count = 0;
-            for (int i = 0; i < s.Length; i++)
-            {
-                if (s[i] == c)
-                {
-                    count++;
-                    if (count == n) return i;
-                }
-            }
-            return -1;
-        }
     }
 }

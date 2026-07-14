@@ -1,6 +1,8 @@
 using System;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
 using VAL.Host.Commands;
 using VAL.Host.Logging;
 using VAL.Host.Options;
@@ -91,6 +93,7 @@ namespace VAL.Host.Hosting
             services.AddSingleton<ILog>(sp => sp.GetRequiredService<ILogBootstrapper>());
             services.AddSingleton<IAppPaths, AppPaths>();
             services.AddSingleton<IProcessLauncher, ProcessLauncher>();
+            services.AddSingleton<IBackgroundTaskSupervisor, BackgroundTaskSupervisor>();
             services.AddSingleton<IUiThread, UiThread>();
             services.AddSingleton<IBuildInfo, BuildInfo>();
             services.AddSingleton<IWebViewRuntime, WebViewRuntime>();

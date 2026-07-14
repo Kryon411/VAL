@@ -1,4 +1,5 @@
 using VAL.Continuum.Pipeline.Inject;
+
 using Xunit;
 
 namespace VAL.Tests.Continuum

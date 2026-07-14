@@ -1,5 +1,5 @@
-using System.Threading.Channels;
 using System.Threading;
+using System.Threading.Channels;
 
 namespace VAL.Continuum.Pipeline.Inject
 {

@@ -14,9 +14,7 @@ REM ============================================================
 
 for %%I in ("%~dp0.") do set "ROOT=%%~fI"
 set "CONFIG=Release"
-set "PRODUCT_DIR=%ROOT%\PRODUCT"
 set "TEST_PROJ=%ROOT%\MAIN\VAL.Tests\VAL.Tests.csproj"
-set "MAIN_DIR=%ROOT%\MAIN"
 
 if /I "%~1"=="--test"        goto :test
 if /I "%~1"=="--manifest"    goto :manifest
@@ -65,39 +63,25 @@ echo Manifest updated.
 exit /b 0
 
 :publish_fdd
-echo Publishing PRODUCT (%CONFIG%) - framework-dependent (no single-file compression)...
-
-pushd "%MAIN_DIR%" >nul
-dotnet publish -c %CONFIG% -o "%PRODUCT_DIR%" --self-contained false ^
-  /p:PublishSingleFile=false ^
-  /p:EnableCompressionInSingleFile=false ^
-  /p:IncludeAllContentForSelfExtract=false ^
-  /p:IncludeNativeLibrariesForSelfExtract=false
+set "PS_EXE=pwsh"
+where /q pwsh || set "PS_EXE=powershell"
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\Build\Publish_Release.ps1" -FrameworkDependent
 if errorlevel 1 (
-  popd >nul
   echo.
   echo ERROR: Publish failed.
   exit /b 1
 )
-popd >nul
-
-echo Publish complete: %PRODUCT_DIR%
 exit /b 0
 
 :publish_sc
-echo Publishing PRODUCT (%CONFIG%) - self-contained win-x64...
-
-pushd "%MAIN_DIR%" >nul
-dotnet publish -c %CONFIG% -r win-x64 -o "%PRODUCT_DIR%" --self-contained true
+set "PS_EXE=pwsh"
+where /q pwsh || set "PS_EXE=powershell"
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\Build\Publish_Release.ps1"
 if errorlevel 1 (
-  popd >nul
   echo.
   echo ERROR: Publish failed.
   exit /b 1
 )
-popd >nul
-
-echo Publish complete: %PRODUCT_DIR%
 exit /b 0
 
 :release

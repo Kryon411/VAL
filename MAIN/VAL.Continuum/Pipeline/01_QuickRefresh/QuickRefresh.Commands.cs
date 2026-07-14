@@ -1,4 +1,5 @@
 using System;
+
 using VAL.Contracts;
 
 namespace VAL.Continuum.Pipeline.QuickRefresh

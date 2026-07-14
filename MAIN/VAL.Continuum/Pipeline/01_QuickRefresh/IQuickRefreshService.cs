@@ -1,4 +1,5 @@
 using System.Threading;
+
 using VAL.Continuum.Pipeline.Inject;
 
 namespace VAL.Continuum.Pipeline.QuickRefresh

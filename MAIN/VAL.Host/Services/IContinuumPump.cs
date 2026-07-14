@@ -3,6 +3,6 @@ namespace VAL.Host.Services
     public interface IContinuumPump
     {
         void Start();
-        void StopPump();
+        Task StopAsync(CancellationToken cancellationToken = default);
     }
 }

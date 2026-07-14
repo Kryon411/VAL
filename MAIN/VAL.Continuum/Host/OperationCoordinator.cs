@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+
 using VAL.Host.Services;
 
 namespace VAL.Host
@@ -91,6 +92,7 @@ namespace VAL.Host
                 if (_currentKind != kind)
                     return;
 
+                try { _cts.Cancel(); } catch { }
                 try { _cts.Dispose(); } catch { }
                 _cts = null;
                 _currentKind = null;
@@ -129,6 +131,7 @@ namespace VAL.Host
         {
             lock (_gate)
             {
+                try { _cts?.Cancel(); } catch { }
                 try { _cts?.Dispose(); } catch { }
                 _cts = null;
                 _currentKind = null;

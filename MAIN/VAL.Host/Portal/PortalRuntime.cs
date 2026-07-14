@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
+
 using VAL.Contracts;
 using VAL.Host.Services;
 using VAL.Host.WebMessaging;
@@ -36,7 +37,7 @@ namespace VAL.Host.Portal
         private string _lastSig = "";
 
 
-// Stronger de-dupe across clipboard churn (Snipping Tool can update clipboard twice for the same pixels).
+        // Stronger de-dupe across clipboard churn (Snipping Tool can update clipboard twice for the same pixels).
         private readonly HashSet<string> _recentSigSet = new();
         private readonly Queue<string> _recentSigQueue = new();
         private const int RECENT_SIG_MAX = 24;
@@ -258,7 +259,7 @@ namespace VAL.Host.Portal
                         SendCtrlV();
 
                         // Let the web app ingest the image.
-                        await Task.Delay(450);                        await Task.Delay(260);
+                        await Task.Delay(450); await Task.Delay(260);
                     }
 
                     // After sending, clear + reset counters.

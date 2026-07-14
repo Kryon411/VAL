@@ -1,4 +1,5 @@
 using VAL.Host;
+
 using Xunit;
 
 namespace VAL.Tests.Modules

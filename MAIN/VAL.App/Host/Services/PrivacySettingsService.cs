@@ -1,0 +1,211 @@
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+using VAL.Continuum;
+
+namespace VAL.App.Host.Services
+{
+    internal sealed class PrivacySettingsService : IPrivacySettingsService
+    {
+        private const int CurrentVersion = 1;
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        private readonly ContinuumHost _continuumHost;
+        private readonly ILog _log;
+        private readonly object _gate = new();
+        private readonly string _settingsPath;
+        private PrivacySettingsState _settings;
+
+        public PrivacySettingsService(IAppPaths appPaths, ContinuumHost continuumHost, ILog log)
+        {
+            ArgumentNullException.ThrowIfNull(appPaths);
+            ArgumentNullException.ThrowIfNull(continuumHost);
+
+            _continuumHost = continuumHost;
+            _log = log ?? throw new ArgumentNullException(nameof(log));
+            _settingsPath = Path.Combine(appPaths.DataRoot, "settings.json");
+            _settings = LoadSettings();
+
+            ApplyContinuumLogging(_settings.ContinuumLoggingEnabled);
+        }
+
+        public event Action<PrivacySettingsSnapshot>? SettingsChanged;
+
+        public PrivacySettingsSnapshot GetSnapshot()
+        {
+            lock (_gate)
+            {
+                return _settings.ToSnapshot();
+            }
+        }
+
+        public bool UpdateContinuumLogging(bool enabled)
+        {
+            var updated = Update(settings => settings.ContinuumLoggingEnabled = enabled);
+            if (updated)
+                ApplyContinuumLogging(enabled);
+            return updated;
+        }
+
+        public bool UpdatePortalCapture(bool enabled)
+        {
+            return Update(settings => settings.PortalCaptureEnabled = enabled);
+        }
+
+        private PrivacySettingsState LoadSettings()
+        {
+            try
+            {
+                var result = JsonStateFile.Read<PrivacySettingsState>(_settingsPath, JsonOptions);
+                if (result.Status == JsonStateFileReadStatus.Missing || result.Status == JsonStateFileReadStatus.Empty)
+                    return PrivacySettingsState.CreateDefault();
+
+                if (!result.IsSuccess)
+                {
+                    var errorType = result.Error?.GetType().Name ?? "InvalidData";
+                    var errorMessage = result.Error?.Message;
+                    var suffix = string.IsNullOrWhiteSpace(errorMessage)
+                        ? errorType
+                        : $"{errorType}: {errorMessage}";
+                    _log.Warn(nameof(PrivacySettingsService), $"Failed to load settings.json. {suffix}");
+                    return PrivacySettingsState.CreateDefault();
+                }
+
+                var settings = result.Value!;
+                if (settings.Version <= 0)
+                    settings.Version = CurrentVersion;
+
+                return settings.WithDefaults();
+            }
+            catch (Exception ex)
+            {
+                _log.Warn(nameof(PrivacySettingsService), $"Failed to load settings.json. {ex.GetType().Name}: {ex.Message}");
+                return PrivacySettingsState.CreateDefault();
+            }
+        }
+
+        private bool Update(Action<PrivacySettingsState> update)
+        {
+            PrivacySettingsSnapshot snapshot;
+            bool changed;
+
+            lock (_gate)
+            {
+                var next = _settings.Clone();
+                update(next);
+                next.Version = CurrentVersion;
+                next = next.WithDefaults();
+
+                changed = !next.Equals(_settings);
+                if (changed)
+                {
+                    _settings = next;
+                    PersistSettings(next);
+                }
+
+                snapshot = _settings.ToSnapshot();
+            }
+
+            if (changed)
+            {
+                SettingsChanged?.Invoke(snapshot);
+            }
+
+            return changed;
+        }
+
+        private void PersistSettings(PrivacySettingsState settings)
+        {
+            try
+            {
+                JsonStateFile.Write(_settingsPath, settings, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                _log.Warn(nameof(PrivacySettingsService), $"Failed to persist settings.json. {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private void ApplyContinuumLogging(bool enabled)
+        {
+            try
+            {
+                _continuumHost.ApplyLoggingSetting(enabled, showToast: false);
+            }
+            catch
+            {
+                _log.Warn(nameof(PrivacySettingsService), "Failed to apply Continuum logging setting.");
+            }
+        }
+
+        private sealed class PrivacySettingsState : IEquatable<PrivacySettingsState>
+        {
+            [JsonPropertyName("version")]
+            public int Version { get; set; } = CurrentVersion;
+
+            [JsonPropertyName("continuumLoggingEnabled")]
+            public bool ContinuumLoggingEnabled { get; set; } = true;
+
+            [JsonPropertyName("portalCaptureEnabled")]
+            public bool PortalCaptureEnabled { get; set; } = true;
+
+            public static PrivacySettingsState CreateDefault()
+            {
+                return new PrivacySettingsState
+                {
+                    Version = CurrentVersion,
+                    ContinuumLoggingEnabled = true,
+                    PortalCaptureEnabled = true
+                };
+            }
+
+            public PrivacySettingsState WithDefaults()
+            {
+                if (Version <= 0)
+                    Version = CurrentVersion;
+
+                return this;
+            }
+
+            public PrivacySettingsState Clone()
+            {
+                return new PrivacySettingsState
+                {
+                    Version = Version,
+                    ContinuumLoggingEnabled = ContinuumLoggingEnabled,
+                    PortalCaptureEnabled = PortalCaptureEnabled
+                };
+            }
+
+            public PrivacySettingsSnapshot ToSnapshot()
+            {
+                return new PrivacySettingsSnapshot(Version, ContinuumLoggingEnabled, PortalCaptureEnabled);
+            }
+
+            public bool Equals(PrivacySettingsState? other)
+            {
+                if (other is null) return false;
+                if (ReferenceEquals(this, other)) return true;
+                return Version == other.Version
+                    && ContinuumLoggingEnabled == other.ContinuumLoggingEnabled
+                    && PortalCaptureEnabled == other.PortalCaptureEnabled;
+            }
+
+            public override bool Equals(object? obj)
+            {
+                return obj is PrivacySettingsState other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(Version, ContinuumLoggingEnabled, PortalCaptureEnabled);
+            }
+        }
+    }
+}

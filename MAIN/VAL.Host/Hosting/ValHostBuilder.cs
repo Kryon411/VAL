@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
 using VAL.Host.Commands;
 
 namespace VAL.Host.Hosting

@@ -10,6 +10,9 @@ namespace VAL.Host.Options
         public static string DefaultDataRoot =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VAL");
 
+        public static string DefaultLocalConfigPath =>
+            Path.Combine(DefaultDataRoot, "config.json");
+
         public const string DefaultLogsPath = "Logs";
         public const string DefaultProfilePath = "Profile";
 

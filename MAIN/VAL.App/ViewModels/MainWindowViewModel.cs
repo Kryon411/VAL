@@ -1,35 +1,28 @@
 using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows.Input;
+
 using VAL.Host;
-using VAL.Host.Services;
 using VAL.Host.Commands;
 using VAL.Host.Logging;
+using VAL.Host.Services;
 using VAL.Host.Startup;
 
-namespace VAL.ViewModels
+namespace VAL.App.ViewModels
 {
-    public sealed class MainWindowViewModel : INotifyPropertyChanged
+    public sealed class MainWindowViewModel
     {
         private readonly IOperationCoordinator _operationCoordinator;
         private readonly HostCommandRouter _commandRouter;
         private readonly IPortalRuntimeService _portalRuntimeService;
         private readonly IModuleRuntimeService _moduleRuntimeService;
         private readonly IContinuumPump _continuumPump;
-        private readonly IProcessLauncher _processLauncher;
-        private readonly IAppPaths _appPaths;
         private readonly IDiagnosticsWindowService _diagnosticsWindowService;
-        private readonly ITruthHealthWindowService _truthHealthWindowService;
         private readonly IToastService _toastService;
         private readonly StartupOptions _startupOptions;
         private readonly ILog _log;
 
         private long _lastExitWarnedOperationId;
-        private bool _isDockOpen;
-        private string _statusText = string.Empty;
-        private bool _isDebugEnabled;
 
         public MainWindowViewModel(
             IOperationCoordinator operationCoordinator,
@@ -37,10 +30,7 @@ namespace VAL.ViewModels
             IPortalRuntimeService portalRuntimeService,
             IModuleRuntimeService moduleRuntimeService,
             IContinuumPump continuumPump,
-            IProcessLauncher processLauncher,
-            IAppPaths appPaths,
             IDiagnosticsWindowService diagnosticsWindowService,
-            ITruthHealthWindowService truthHealthWindowService,
             IToastService toastService,
             StartupOptions startupOptions,
             ILog log)
@@ -50,50 +40,15 @@ namespace VAL.ViewModels
             _portalRuntimeService = portalRuntimeService;
             _moduleRuntimeService = moduleRuntimeService;
             _continuumPump = continuumPump;
-            _processLauncher = processLauncher;
-            _appPaths = appPaths;
             _diagnosticsWindowService = diagnosticsWindowService;
-            _truthHealthWindowService = truthHealthWindowService;
             _toastService = toastService;
             _startupOptions = startupOptions;
             _log = log ?? throw new ArgumentNullException(nameof(log));
 
-            ToggleDockCommand = new RelayCommand(() => IsDockOpen = !IsDockOpen);
-            OpenLogsFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.LogsRoot));
-            OpenDataFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.DataRoot));
-            OpenModulesFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.ModulesRoot));
-            OpenProfileFolderCommand = new RelayCommand(() => _processLauncher.OpenFolder(_appPaths.ProfileRoot));
             OpenDiagnosticsCommand = new RelayCommand(() => _diagnosticsWindowService.ShowDiagnostics());
-            OpenTruthHealthCommand = new RelayCommand(() => _truthHealthWindowService.ShowTruthHealth());
         }
 
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        public ICommand ToggleDockCommand { get; }
-        public ICommand OpenLogsFolderCommand { get; }
-        public ICommand OpenDataFolderCommand { get; }
-        public ICommand OpenModulesFolderCommand { get; }
-        public ICommand OpenProfileFolderCommand { get; }
         public ICommand OpenDiagnosticsCommand { get; }
-        public ICommand OpenTruthHealthCommand { get; }
-
-        public bool IsDockOpen
-        {
-            get => _isDockOpen;
-            set => SetProperty(ref _isDockOpen, value);
-        }
-
-        public string StatusText
-        {
-            get => _statusText;
-            set => SetProperty(ref _statusText, value);
-        }
-
-        public bool IsDebugEnabled
-        {
-            get => _isDebugEnabled;
-            set => SetProperty(ref _isDebugEnabled, value);
-        }
 
         public async Task OnLoadedAsync(Action focusControl)
         {
@@ -213,15 +168,6 @@ namespace VAL.ViewModels
                 _log.Warn(nameof(MainWindowViewModel), "Close guard failed.");
                 return false;
             }
-        }
-
-        private void SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
-        {
-            if (Equals(storage, value))
-                return;
-
-            storage = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

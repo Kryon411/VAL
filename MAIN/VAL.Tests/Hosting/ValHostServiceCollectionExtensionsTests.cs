@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.Json;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
 using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Commands;
@@ -11,6 +13,7 @@ using VAL.Host.Hosting;
 using VAL.Host.Logging;
 using VAL.Host.Services;
 using VAL.Host.Startup;
+
 using Xunit;
 
 namespace VAL.Tests.Hosting

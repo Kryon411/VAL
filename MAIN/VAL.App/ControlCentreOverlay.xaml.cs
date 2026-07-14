@@ -6,9 +6,10 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+
 using VAL.Host;
 
-namespace VAL
+namespace VAL.App
 {
     public partial class ControlCentreOverlay : Window
     {

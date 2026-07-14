@@ -4,10 +4,12 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+
+using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
+
 using VAL.Host;
-using Microsoft.Extensions.Options;
 using VAL.Host.Options;
 using VAL.Host.Security;
 using VAL.Host.WebMessaging;
@@ -33,6 +35,7 @@ namespace VAL.Host.Services
         private EventHandler<CoreWebView2NewWindowRequestedEventArgs>? _newWindowRequestedHandler;
         private Uri? _lastChatUri;
 
+        public bool IsReady => Core != null;
         public CoreWebView2? Core { get; private set; }
         public Uri? LastChatUri => _lastChatUri;
 

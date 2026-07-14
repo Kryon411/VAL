@@ -1,13 +1,15 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Buffers;
 using System.Text.Json;
 using System.Threading.Tasks;
+
 using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
+
 using VAL.Host.Json;
 using VAL.Host.Logging;
 using VAL.Host.Options;
@@ -313,7 +315,7 @@ namespace VAL.Host.Services
                     if (string.IsNullOrWhiteSpace(script))
                     {
                         var reason = "Invalid manifest: entryScripts contains an empty path.";
-                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                        _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                         RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                         return;
                     }
@@ -326,7 +328,7 @@ namespace VAL.Host.Services
                     if (!File.Exists(scriptPath))
                     {
                         var reason = $"Invalid manifest: missing entry script '{trimmed}'.";
-                    _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
+                        _log.Warn("ModuleLoader", $"Skipping module in '{moduleDir}': {reason}");
                         RecordModuleStatus(configPath, moduleName, $"Skipped ({reason})");
                         return;
                     }
@@ -447,11 +449,11 @@ namespace VAL.Host.Services
                 }
                 catch (Exception ex)
                 {
-                        if (_rateLimiter.Allow("module.discovery.console_log", LogInterval))
-                        {
-                            _log.Warn(nameof(ModuleLoaderService),
-                                $"Module discovery devtools log failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
-                        }
+                    if (_rateLimiter.Allow("module.discovery.console_log", LogInterval))
+                    {
+                        _log.Warn(nameof(ModuleLoaderService),
+                            $"Module discovery devtools log failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
+                    }
                 }
 
                 foreach (var configPath in configs)

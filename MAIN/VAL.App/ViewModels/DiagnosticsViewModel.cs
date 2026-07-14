@@ -3,13 +3,15 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
+
 using VAL.Host.Options;
 using VAL.Host.Services;
 
-namespace VAL.ViewModels
+namespace VAL.App.ViewModels
 {
     public sealed class DiagnosticsViewModel
     {
@@ -165,10 +167,7 @@ namespace VAL.ViewModels
 
         private static string ResolveLocalConfigPath()
         {
-            return System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "VAL",
-                "config.json");
+            return ValOptions.DefaultLocalConfigPath;
         }
     }
 }

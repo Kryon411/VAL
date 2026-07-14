@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -8,8 +7,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using VAL.Contracts;
+
 using VAL.Continuum.Pipeline.Truth;
+using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Security;
 using VAL.Host.Services;
@@ -41,6 +41,9 @@ namespace VAL.Host.Abyss
         private readonly ISessionContext _sessionContext;
         private readonly IAppPaths _appPaths;
         private readonly ITruthStore _truthStore;
+        private readonly IProcessLauncher _processLauncher;
+        private readonly IBackgroundTaskSupervisor _backgroundTasks;
+        private readonly ILog _log;
         private List<AbyssSearchResult> _lastResults = new();
         private string? _lastQuery;
         private string? _lastQueryOriginal;
@@ -53,7 +56,10 @@ namespace VAL.Host.Abyss
             IToastHub toastHub,
             ISessionContext sessionContext,
             IAppPaths appPaths,
-            ITruthStore truthStore)
+            ITruthStore truthStore,
+            IProcessLauncher processLauncher,
+            IBackgroundTaskSupervisor backgroundTasks,
+            ILog log)
         {
             _abyssSearch = abyssSearch ?? throw new ArgumentNullException(nameof(abyssSearch));
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
@@ -61,6 +67,9 @@ namespace VAL.Host.Abyss
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
+            _processLauncher = processLauncher ?? throw new ArgumentNullException(nameof(processLauncher));
+            _backgroundTasks = backgroundTasks ?? throw new ArgumentNullException(nameof(backgroundTasks));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
         public void InjectPrompt(string? chatId)
@@ -82,50 +91,60 @@ namespace VAL.Host.Abyss
 
             var token = BeginSearchCancellation();
 
-            Task.Run(() =>
+            _backgroundTasks.Run(
+                "Abyss search",
+                cancellationToken =>
+                {
+                    ExecuteSearch(chatId, query, maxResults, queryOriginal, excludeFingerprints, cancellationToken);
+                    return Task.CompletedTask;
+                },
+                _ => HandleBackgroundFailure(chatId),
+                token);
+        }
+
+        private void ExecuteSearch(
+            string? chatId,
+            string query,
+            int maxResults,
+            string? queryOriginal,
+            IReadOnlyCollection<string>? excludeFingerprints,
+            CancellationToken cancellationToken)
+        {
+            var memoryRoot = _appPaths.MemoryChatsRoot;
+            TrackQuery(query, queryOriginal);
+            if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
             {
-                try
-                {
-                    var memoryRoot = _appPaths.MemoryChatsRoot;
-                    TrackQuery(query, queryOriginal);
-                    if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
-                    {
-                        ClearLastResults();
-                        ShowToast(AbyssToastKind.NoTruthLogs, chatId);
-                        EmitResults(chatId);
-                        return;
-                    }
+                ClearLastResults();
+                ShowToast(AbyssToastKind.NoTruthLogs, chatId);
+                EmitResults(chatId);
+                return;
+            }
 
-                    token.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
 
-                    var results = _abyssSearch.Search(memoryRoot, query, maxResults, excludeFingerprints, token);
-                    token.ThrowIfCancellationRequested();
+            var results = _abyssSearch.Search(
+                memoryRoot,
+                query,
+                maxResults,
+                excludeFingerprints,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
 
-                    lock (_gate)
-                    {
-                        _lastResults = results;
-                    }
+            lock (_gate)
+            {
+                _lastResults = results;
+            }
 
-                    if (results.Count == 0)
-                    {
-                        ShowToast(AbyssToastKind.NoMatches, chatId);
-                    }
-                    else
-                    {
-                        ShowToast(AbyssToastKind.Matches, chatId, $"Abyss: {results.Count} matches");
-                    }
+            ShowToast(
+                results.Count == 0 ? AbyssToastKind.NoMatches : AbyssToastKind.Matches,
+                chatId,
+                results.Count == 0 ? null : $"Abyss: {results.Count} matches");
 
-                    var resultsPath = WriteResultsFile(chatId, query, results);
-                    if (!string.IsNullOrWhiteSpace(resultsPath))
-                        ShowToast(AbyssToastKind.ResultsWritten, chatId);
+            var resultsPath = WriteResultsFile(chatId, query, results);
+            if (!string.IsNullOrWhiteSpace(resultsPath))
+                ShowToast(AbyssToastKind.ResultsWritten, chatId);
 
-                    EmitResults(chatId);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Swallow cancellation to avoid stale updates.
-                }
-            }, token);
+            EmitResults(chatId);
         }
 
         public void RetryLast(string? chatId, IReadOnlyCollection<string>? excludeFingerprints, int maxResults)
@@ -151,48 +170,65 @@ namespace VAL.Host.Abyss
         public void FetchLast(string? chatId, int count, bool inject)
         {
             ShowToast(AbyssToastKind.Searching, chatId);
+            var token = BeginSearchCancellation();
 
-            Task.Run(() =>
+            _backgroundTasks.Run(
+                "Abyss recent recall",
+                cancellationToken =>
+                {
+                    ExecuteFetchLast(chatId, count, inject, cancellationToken);
+                    return Task.CompletedTask;
+                },
+                _ => HandleBackgroundFailure(chatId),
+                token);
+        }
+
+        private void ExecuteFetchLast(
+            string? chatId,
+            int count,
+            bool inject,
+            CancellationToken cancellationToken)
+        {
+            var memoryRoot = _appPaths.MemoryChatsRoot;
+            TrackQuery("(Last)", null);
+            if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
             {
-                var memoryRoot = _appPaths.MemoryChatsRoot;
-                TrackQuery("(Last)", null);
-                if (string.IsNullOrWhiteSpace(memoryRoot) || !Directory.Exists(memoryRoot))
-                {
-                    ClearLastResults();
-                    ShowToast(AbyssToastKind.NoTruthLogs, chatId);
-                    EmitResults(chatId);
-                    return;
-                }
-
-                var exchanges = _abyssSearch.GetLastFromMostRecent(memoryRoot, count);
-                var results = exchanges.Select(ex => new AbyssSearchResult { Exchange = ex, Score = 0 }).ToList();
-
-                lock (_gate)
-                {
-                    _lastResults = results;
-                }
-
-                if (results.Count == 0)
-                {
-                    ClearLastResults();
-                    ShowToast(AbyssToastKind.NoMatches, chatId);
-                    EmitResults(chatId);
-                    return;
-                }
-
-                ShowToast(AbyssToastKind.Matches, chatId, $"Abyss: {results.Count} matches");
-
-                var resultsPath = WriteResultsFile(chatId, "(Last)", results);
-                if (!string.IsNullOrWhiteSpace(resultsPath))
-                    ShowToast(AbyssToastKind.ResultsWritten, chatId);
-
+                ClearLastResults();
+                ShowToast(AbyssToastKind.NoTruthLogs, chatId);
                 EmitResults(chatId);
+                return;
+            }
 
-                if (inject)
-                {
-                    InjectResults(DefaultInjectIndices, chatId);
-                }
-            });
+            cancellationToken.ThrowIfCancellationRequested();
+            var exchanges = _abyssSearch.GetLastFromMostRecent(memoryRoot, count, cancellationToken);
+            var results = exchanges
+                .Select(exchange => new AbyssSearchResult { Exchange = exchange, Score = 0 })
+                .ToList();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            lock (_gate)
+            {
+                _lastResults = results;
+            }
+
+            if (results.Count == 0)
+            {
+                ClearLastResults();
+                ShowToast(AbyssToastKind.NoMatches, chatId);
+                EmitResults(chatId);
+                return;
+            }
+
+            ShowToast(AbyssToastKind.Matches, chatId, $"Abyss: {results.Count} matches");
+
+            var resultsPath = WriteResultsFile(chatId, "(Last)", results);
+            if (!string.IsNullOrWhiteSpace(resultsPath))
+                ShowToast(AbyssToastKind.ResultsWritten, chatId);
+
+            EmitResults(chatId);
+
+            if (inject)
+                InjectResults(DefaultInjectIndices, chatId);
         }
 
         public void InjectResults(IReadOnlyList<int> indices, string? chatId = null)
@@ -216,9 +252,11 @@ namespace VAL.Host.Abyss
         public void InjectResult(string? id, int? index, string? chatId = null)
         {
             List<AbyssSearchResult> snapshot;
+            string query;
             lock (_gate)
             {
                 snapshot = _lastResults.ToList();
+                query = _lastQueryOriginal ?? _lastQuery ?? string.Empty;
             }
 
             if (snapshot.Count == 0)
@@ -255,7 +293,7 @@ namespace VAL.Host.Abyss
                 return;
             }
 
-            var payload = BuildInjectPayload(selected, _lastQueryOriginal ?? _lastQuery ?? string.Empty);
+            var payload = BuildInjectPayload(selected, query);
             SendInjectText(payload, chatId);
 
             ShowToast(AbyssToastKind.Injected, chatId, "Abyss: injected result");
@@ -287,13 +325,13 @@ namespace VAL.Host.Abyss
             {
                 if (File.Exists(truthPath))
                 {
-                    Process.Start(new ProcessStartInfo { FileName = truthPath, UseShellExecute = true });
+                    _processLauncher.OpenPath(truthPath);
                     return;
                 }
 
                 if (Directory.Exists(chatDir))
                 {
-                    Process.Start(new ProcessStartInfo { FileName = chatDir, UseShellExecute = true });
+                    _processLauncher.OpenFolder(chatDir);
                     return;
                 }
             }
@@ -519,6 +557,12 @@ namespace VAL.Host.Abyss
             {
                 _lastResults = new List<AbyssSearchResult>();
             }
+        }
+
+        private void HandleBackgroundFailure(string? chatId)
+        {
+            _log.Warn(nameof(AbyssRuntime), "Abyss background operation failed.");
+            ShowToast(AbyssToastKind.ActionUnavailable, chatId, bypassLaunchQuiet: true);
         }
 
         private void ShowToast(

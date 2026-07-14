@@ -1,21 +1,17 @@
-# Release publishing
+# Release Publishing
 
-From the repo root:
+From the repository root:
 
 ```powershell
-.\Build\Publish_Release.ps1
+./Build/Publish_Release.ps1
 ```
 
-The script restores and publishes `MAIN/VAL.csproj` to `PRODUCT/Publish`, verifying required runtime content (`appsettings.json`, `Modules`, `Dock`, `Icons`).
+The script publishes `MAIN/VAL.Desktop/VAL.Desktop.csproj` to `PRODUCT/Publish`, verifies required runtime content, writes `VAL.exe.sha256`, and creates `PRODUCT/VAL-win-x64.zip`.
 
-Optional:
+Use `-FrameworkDependent` only for internal diagnostics. Set `VAL_SIGNING_CERTIFICATE_PATH` and `VAL_SIGNING_CERTIFICATE_PASSWORD` to sign release candidates.
 
-```powershell
-.\Build\Publish_Release.ps1 -RuntimeIdentifier win-x64 -SelfContained
-```
-
-Smoke test example:
+Run the published smoke test with:
 
 ```powershell
-VAL.exe --smoke --smoke-timeout-ms=20000
+./PRODUCT/Publish/VAL.exe --smoke --smoke-timeout-ms=30000
 ```

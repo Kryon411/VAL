@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
+
 using VAL.Host.Logging;
+
 using Xunit;
 
 namespace VAL.Tests.Logging

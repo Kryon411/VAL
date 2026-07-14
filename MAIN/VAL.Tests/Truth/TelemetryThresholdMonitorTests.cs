@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+
 using VAL.Continuum.Pipeline.Telemetry;
+
 using Xunit;
 
 namespace VAL.Tests.Truth

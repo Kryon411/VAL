@@ -1,4 +1,5 @@
 using System;
+
 using VAL.Host.Logging;
 
 namespace VAL.Host

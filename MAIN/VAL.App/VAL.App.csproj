@@ -10,25 +10,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ApplicationDefinition Remove="App.xaml" />
-    <Page Remove="App.xaml" />
-    <None Include="App.xaml" Condition="Exists('App.xaml')" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3595.46" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Web.WebView2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\VAL.Host\VAL.Host.csproj" />
     <ProjectReference Include="..\VAL.Abyss\VAL.Abyss.csproj" />
     <ProjectReference Include="..\VAL.Continuum\VAL.Continuum.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\Host\**\*.cs" Link="Host\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

@@ -1,8 +1,10 @@
 using System;
+
 using VAL.Continuum.Pipeline;
 using VAL.Continuum.Pipeline.Filter2;
 using VAL.Continuum.Pipeline.Signal;
 using VAL.Continuum.Pipeline.Truth;
+
 using Xunit;
 
 namespace VAL.Tests.Continuum

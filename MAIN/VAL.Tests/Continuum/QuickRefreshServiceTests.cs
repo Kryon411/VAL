@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Threading;
+
 using VAL.Continuum.Pipeline;
 using VAL.Continuum.Pipeline.QuickRefresh;
 using VAL.Continuum.Pipeline.Truth;
+
 using Xunit;
 
 namespace VAL.Tests.Continuum

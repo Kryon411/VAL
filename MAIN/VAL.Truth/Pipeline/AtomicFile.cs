@@ -99,7 +99,8 @@ namespace VAL.Continuum.Pipeline
                     Directory.CreateDirectory(dir);
 
                 var options = durable ? FileOptions.WriteThrough : FileOptions.None;
-                using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, options))
+                // Truth repair/readers may need concurrent read-write access while an append is in flight.
+                using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, options))
                 using (var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
                 {
                     sw.Write(text ?? string.Empty);

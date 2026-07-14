@@ -5,8 +5,10 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+
 using VAL.Continuum.Pipeline;
 using VAL.Continuum.Pipeline.Truth;
+
 using Xunit;
 
 namespace VAL.Tests.Truth
@@ -124,7 +126,8 @@ namespace VAL.Tests.Truth
                 {
                     // best-effort cleanup
                 }
-            });
+            }
+            );
         }
     }
 }

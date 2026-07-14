@@ -1,4 +1,5 @@
 using VAL.Continuum.Pipeline.Signal;
+
 using Xunit;
 
 namespace VAL.Tests.Continuum

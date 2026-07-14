@@ -1,128 +1,65 @@
 # VAL (Virtual Assistant Layer)
 
-## 🚀 Download
+VAL is a Windows desktop shell for ChatGPT with explicit, local, user-invoked tools for continuity, recall, capture, and interface control.
 
-➡️ **[Download VAL (Latest Release)](https://github.com/Kryon411/VAL/releases/latest)**
+## Principles
 
-VAL is a lightweight Windows desktop shell for running ChatGPT in a clean, controlled UI with **user-invoked, deterministic tools** layered on top.
+- **Explicit:** features run in response to user actions.
+- **Deterministic:** important outputs are file-backed and traceable.
+- **Local-first:** archives, diagnostics, and preferences remain on the device.
+- **Modular:** desktop, host, storage, and feature concerns have enforced project boundaries.
 
-VAL is designed around a simple philosophy:
+## Requirements
 
-- **Explicit**: features are activated by you (no background automation)
-- **Deterministic**: outputs are reproducible and traceable
-- **Transparent**: actions are visible, inspectable, and file-backed
-- **Modular**: each module is self-contained and can evolve independently
+- Windows 10 or Windows 11
+- .NET 8 SDK for development (see `global.json`)
+- Microsoft Edge WebView2 Evergreen Runtime
 
----
+## Build And Test
 
-## Download / Install
+```powershell
+dotnet restore VAL.sln --locked-mode
+dotnet build VAL.sln -c Release --no-restore
+dotnet test MAIN/VAL.Tests/VAL.Tests.csproj -c Release --no-build --no-restore
+```
 
-✅ Download the latest installer from the **Releases** page and run:
+Run the development build:
 
-- `VAL_Setup.exe`
+```powershell
+dotnet run --project MAIN/VAL.Desktop/VAL.Desktop.csproj
+```
 
-> Windows may warn that this is an unsigned installer (“Unknown publisher”). This is expected.
+The executable is written under `MAIN/VAL.Desktop/bin/<Configuration>/net8.0-windows/win-x64/`.
 
----
+## Publish
 
-## Build & Run (Developer)
+```powershell
+./Build/Publish_Release.ps1
+```
 
-**Prerequisites**
-- Windows 10/11
-- .NET SDK 8.x (see `global.json`)
-- Microsoft Edge WebView2 Runtime (Evergreen)
+The release script performs a locked restore, creates a clean self-contained publish, optionally signs `VAL.exe`, writes a SHA-256 checksum, and creates `PRODUCT/VAL-win-x64.zip`.
 
-**Build**
-- `dotnet build MAIN/VAL.csproj`
-- or `Build.cmd --publish` (creates `PRODUCT/`)
+For signed releases, set `VAL_SIGNING_CERTIFICATE_PATH` and `VAL_SIGNING_CERTIFICATE_PASSWORD` before publishing.
 
-**Run**
-- `dotnet run --project MAIN/VAL.csproj`
-- or launch `MAIN/bin/Debug/net8.0-windows/VAL.exe` after build
+## Modules
 
-**Troubleshooting**
-- Default data root: `%LOCALAPPDATA%\VAL` (see `MAIN/appsettings.json`)
-- Logs: `%LOCALAPPDATA%\VAL\Logs\VAL.log`
+- **Continuum:** maintains local conversation archives and creates Pulse handoffs.
+- **Abyss:** searches archived sessions and returns results with source provenance.
+- **Portal:** stages user-requested captures for sending.
+- **Void:** reduces expensive or distracting page content.
+- **VALTheme:** applies VAL's desktop visual treatment.
 
----
-
-## Quick Start
-
-1) Launch **VAL**
-2) Open the **Control Centre** (the dock/pill UI)
-3) Use modules as needed (each module is manual + user-invoked)
-
-If something doesn’t look right after an update:
-- Restart VAL
-- Run the module action again
-- Check the module’s output files (most modules write artifacts beside session data)
-
----
-
-## Modules (Overview)
-
-### Continuum (Continuity / Refresh)
-Continuum is the continuity layer that helps you resume work cleanly across long sessions.
-
-Typical actions:
-- **Quick Refresh**: builds a compact “wake-up state” (Essence-M) from the most relevant recent Truth.log context
-- **Deep Refresh**: uses a larger context window for tougher jumps
-
-Outputs (per session):
-- `Truth.log`
-- `Seed.log`
-- `RestructuredSeed.log`
-- `Essence-M.Pulse.txt`
-
----
-
-### Abyss (Recall / Search)
-Abyss is VAL’s local recall and search module.
-
-It searches across your archived session logs and returns **ranked results** with **provenance**, so you can rehydrate context without manually digging through folders.
-
-Typical actions:
-- **Search**: enter a recall question and retrieve ranked results
-- **Inject**: inject a selected snippet into the composer
-- **Open Source**: open the source session folder / log
-- **Disregard**: dismiss a specific snippet result and try again
-
----
-
-### Portal (Capture / Stage)
-Portal is the capture workflow module (built to reduce friction when collecting screenshots or supporting material during a working session).
-
-Typical actions:
-- Capture → stage → send when ready
-
----
-
-### Void (Clean View)
-Void helps keep the UI fast and readable by suppressing high-cost content.
-
-Typical actions:
-- Hide or reduce heavy blocks (e.g. large pasted code or screenshots)
-
----
+Application data and logs default to `%LOCALAPPDATA%\VAL`. See `MAIN/appsettings.json` for configuration.
 
 ## Documentation
 
-For “how-to” steps and module-specific guides, see:
+- [Architecture](Docs/Architecture.md)
+- [Release readiness](Docs/ReleaseReadiness.md)
+- [Threat model](Docs/ThreatModel.md)
+- [Privacy and local data](Docs/Privacy.md)
+- [Modules](Docs/Modules.md)
+- [Build smoke checklist](Docs/BuildSmokeChecklist.md)
 
-- **Docs/Modules.md**
-- **Docs/BuildSmokeChecklist.md**
+## Project Status
 
----
-
-## Project Goals
-
-VAL aims to be:
-- A clean work environment for long AI-assisted sessions
-- A modular foundation you can extend safely over time
-- A tool that improves continuity without inventing “magic memory”
-
----
-
-## License / Notes
-
-This project is evolving quickly. Expect small behavioral changes between versions as modules are refined.
+VAL is in pre-release hardening. Architecture and automated quality gates are in place, but a public commercial release still requires signed distribution, an installer/update channel, legal and privacy review, and a supported-machine test matrix.

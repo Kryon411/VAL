@@ -1,5 +1,7 @@
 using System;
+
 using VAL.Continuum.Pipeline.Truth;
+
 using Xunit;
 
 namespace VAL.Tests.Truth

@@ -1,8 +1,10 @@
 using System;
+
 using VAL.Contracts;
 using VAL.Host;
 using VAL.Host.Commands;
 using VAL.Host.WebMessaging;
+
 using Xunit;
 
 namespace VAL.Tests.Commands

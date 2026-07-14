@@ -1,7 +1,6 @@
 using System.Windows;
-using VAL.ViewModels;
 
-namespace VAL
+namespace VAL.App
 {
     public partial class DiagnosticsWindow : Window
     {

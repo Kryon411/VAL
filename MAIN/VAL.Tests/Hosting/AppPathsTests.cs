@@ -1,9 +1,12 @@
 using System;
 using System.IO;
+
 using Microsoft.Extensions.Options;
+
 using VAL.Host;
 using VAL.Host.Options;
 using VAL.Host.Services;
+
 using Xunit;
 
 namespace VAL.Tests.Hosting

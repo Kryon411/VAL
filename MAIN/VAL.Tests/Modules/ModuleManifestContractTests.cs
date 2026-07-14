@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+
 using Xunit;
 
 namespace VAL.Tests.Modules
@@ -13,16 +15,23 @@ namespace VAL.Tests.Modules
         {
             var repoRoot = ResolveRepositoryRoot();
             var manifests = Directory.EnumerateFiles(Path.Combine(repoRoot, "MAIN"), "*.module.json", SearchOption.AllDirectories)
+                .Where(path => !ContainsBuildOutputSegment(path))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
             Assert.NotEmpty(manifests);
+            var moduleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var manifestPath in manifests)
             {
                 using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
                 var error = ValidateManifest(document.RootElement);
                 Assert.True(string.IsNullOrEmpty(error), $"{Path.GetRelativePath(repoRoot, manifestPath)} validation failed: {error}");
+
+                var moduleName = document.RootElement.GetProperty("name").GetString();
+                Assert.True(moduleNames.Add(moduleName!), $"Duplicate module name: {moduleName}");
+                AssertReferencedAssetsExist(document.RootElement, manifestPath, "entryScripts");
+                AssertReferencedAssetsExist(document.RootElement, manifestPath, "styles");
             }
         }
 
@@ -70,8 +79,11 @@ namespace VAL.Tests.Modules
             if (!TryReadNonEmptyString(root, "name", out _))
                 return "name is required.";
 
-            if (!TryReadNonEmptyString(root, "version", out _))
+            if (!TryReadNonEmptyString(root, "version", out var version))
                 return "version is required.";
+
+            if (!Version.TryParse(version, out _))
+                return "version must be a valid semantic version.";
 
             if (!TryReadNonEmptyString(root, "apiVersion", out var apiVersion))
                 return "apiVersion is required.";
@@ -113,6 +125,24 @@ namespace VAL.Tests.Modules
             return null;
         }
 
+        private static void AssertReferencedAssetsExist(JsonElement root, string manifestPath, string propertyName)
+        {
+            if (!root.TryGetProperty(propertyName, out var assets) || assets.ValueKind != JsonValueKind.Array)
+                return;
+
+            var moduleDirectory = Path.GetDirectoryName(manifestPath)!;
+            var expectedPrefix = Path.GetFullPath(moduleDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            foreach (var asset in assets.EnumerateArray())
+            {
+                var relativePath = asset.GetString();
+                Assert.False(Path.IsPathRooted(relativePath), $"{propertyName} must use relative paths: {relativePath}");
+
+                var assetPath = Path.GetFullPath(Path.Combine(moduleDirectory, relativePath!));
+                Assert.StartsWith(expectedPrefix, assetPath, StringComparison.OrdinalIgnoreCase);
+                Assert.True(File.Exists(assetPath), $"Referenced module asset does not exist: {assetPath}");
+            }
+        }
+
         private static bool TryReadNonEmptyString(JsonElement root, string propertyName, out string? value)
         {
             value = null;
@@ -121,6 +151,14 @@ namespace VAL.Tests.Modules
 
             value = property.GetString();
             return !string.IsNullOrWhiteSpace(value);
+        }
+
+        private static bool ContainsBuildOutputSegment(string path)
+        {
+            var segments = Path.GetRelativePath(ResolveRepositoryRoot(), path)
+                .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return segments.Contains("bin", StringComparer.OrdinalIgnoreCase) ||
+                   segments.Contains("obj", StringComparer.OrdinalIgnoreCase);
         }
 
         private static string ResolveRepositoryRoot()

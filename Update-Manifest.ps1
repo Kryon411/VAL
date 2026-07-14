@@ -157,23 +157,41 @@ try {
   }
 
   # Collect file list (repo-root relative). Keep predictable ordering.
+  $excludedDirectories = @(
+    ".git",
+    ".vs",
+    "bin",
+    "obj",
+    "PRODUCT",
+    "InstallerOutput",
+    "TestResults",
+    "node_modules"
+  )
+
   $files =
     Get-ChildItem -LiteralPath $rootFull -Recurse -File -Force |
     Where-Object {
       $p = $_.FullName
 
-      # Exclude common noise
-      if ($p -match '\\\.git\\') { return $false }
-      if ($p -match '\\bin\\') { return $false }
-      if ($p -match '\\obj\\') { return $false }
+      if ([string]::Equals($p, $outFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+      }
+
+      $relativePath = To-RelSlashPath $p $rootFull
+      $segments = $relativePath -split '[\\/]'
+      foreach ($segment in $segments) {
+        if ($excludedDirectories -contains $segment) { return $false }
+      }
 
       return $true
     } |
     ForEach-Object { To-RelSlashPath $_.FullName $rootFull } |
     Sort-Object
 
-  # Write manifest
-  Set-Content -LiteralPath $outFull -Value $files -Encoding UTF8
+  # Write deterministic UTF-8 without BOM and with LF line endings on every PowerShell version.
+  $manifestText = ($files -join "`n") + "`n"
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($outFull, $manifestText, $utf8NoBom)
   Write-Host "Manifest written: $outFull"
   exit 0
 }

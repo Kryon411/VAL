@@ -1,4 +1,4 @@
-<Window x:Class="VAL.UI.Truth.TruthHealthWindow"
+<Window x:Class="VAL.App.UI.Truth.TruthHealthWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Truth Health"

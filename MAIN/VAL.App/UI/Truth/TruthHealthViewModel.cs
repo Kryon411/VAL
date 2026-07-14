@@ -2,12 +2,13 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using VAL.Host.Services;
-using VAL.ViewModels;
 
-namespace VAL.UI.Truth
+using VAL.App.ViewModels;
+using VAL.Host.Services;
+
+namespace VAL.App.UI.Truth
 {
-    internal sealed class TruthHealthViewModel : INotifyPropertyChanged
+    public sealed class TruthHealthViewModel : INotifyPropertyChanged
     {
         private readonly ITruthHealthReportService _reportService;
 

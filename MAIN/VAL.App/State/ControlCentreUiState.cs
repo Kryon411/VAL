@@ -1,4 +1,4 @@
-namespace VAL
+namespace VAL.App.State
 {
     public sealed class ControlCentreUiState
     {
@@ -14,7 +14,7 @@ namespace VAL
             Version = 1;
             if (ControlCentre.W <= 0 || ControlCentre.H <= 0)
             {
-                ControlCentre = new GeometryState(ControlCentre.X, ControlCentre.Y, 36, 36);
+                ControlCentre = new GeometryState(0, 0, 0, 0);
             }
 
             Dock.W = Dock.W <= 0 ? 560 : Dock.W;
