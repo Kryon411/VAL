@@ -3,6 +3,8 @@
 **/.vs/
 PRODUCT/
 InstallerOutput/
+artifacts/
+_ToolsOut/
 *.exe
 *.zip
 *.log

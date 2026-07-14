@@ -165,10 +165,12 @@ try {
     "PRODUCT",
     "InstallerOutput",
     "TestResults",
-    "node_modules"
+    "node_modules",
+    "artifacts",
+    "_ToolsOut"
   )
 
-  $files =
+  [string[]] $files = @(
     Get-ChildItem -LiteralPath $rootFull -Recurse -File -Force |
     Where-Object {
       $p = $_.FullName
@@ -185,8 +187,11 @@ try {
 
       return $true
     } |
-    ForEach-Object { To-RelSlashPath $_.FullName $rootFull } |
-    Sort-Object
+    ForEach-Object { To-RelSlashPath $_.FullName $rootFull }
+  )
+
+  # Culture-aware sorting can order punctuation differently across CI runners.
+  [System.Array]::Sort($files, [System.StringComparer]::Ordinal)
 
   # Write deterministic UTF-8 without BOM and with LF line endings on every PowerShell version.
   $manifestText = ($files -join "`n") + "`n"
