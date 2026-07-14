@@ -38,10 +38,10 @@ namespace VAL.Host.Services
             ProductRoot = AppPathLayout.ResolveProductRoot(ContentRoot);
             var defaultDataRoot = ValOptions.DefaultDataRoot;
             var defaultModulesRoot = Path.Combine(ProductRoot, "Modules");
-            StateRoot = Path.Combine(ProductRoot, "State");
-            MemoryChatsRoot = AppPathLayout.ResolveMemoryChatsRoot(ProductRoot);
 
             DataRoot = NormalizePath(config.DataRoot, defaultDataRoot, "DataRoot", warnings, defaultDataRoot);
+            StateRoot = Path.Combine(DataRoot, "State");
+            MemoryChatsRoot = AppPathLayout.ResolveMemoryChatsRoot(DataRoot);
             LogsRoot = NormalizePath(config.LogsPath, Path.Combine(DataRoot, ValOptions.DefaultLogsPath), "LogsPath", warnings, DataRoot);
             ProfileRoot = NormalizePath(config.ProfilePath, Path.Combine(DataRoot, ValOptions.DefaultProfilePath), "ProfilePath", warnings, DataRoot);
             ModulesRoot = NormalizePath(config.ModulesPath, defaultModulesRoot, "ModulesPath", warnings, ProductRoot);

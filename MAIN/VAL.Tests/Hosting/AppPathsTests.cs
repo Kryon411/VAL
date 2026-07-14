@@ -14,7 +14,7 @@ namespace VAL.Tests.Hosting
     public sealed class AppPathsTests
     {
         [Fact]
-        public void AppPathsUsesNestedProductRootForModulesStateAndMemory()
+        public void AppPathsSeparatesProductContentFromMutableData()
         {
             var root = CreateTempRoot();
             var productRoot = Path.Combine(root, "PRODUCT");
@@ -28,8 +28,8 @@ namespace VAL.Tests.Hosting
                 Assert.Equal(Path.GetFullPath(root), paths.ContentRoot);
                 Assert.Equal(Path.GetFullPath(productRoot), paths.ProductRoot);
                 Assert.Equal(Path.Combine(productRoot, "Modules"), paths.ModulesRoot);
-                Assert.Equal(Path.Combine(productRoot, "State"), paths.StateRoot);
-                Assert.Equal(Path.Combine(productRoot, "Memory", "Chats"), paths.MemoryChatsRoot);
+                Assert.Equal(Path.Combine(root, "data", "State"), paths.StateRoot);
+                Assert.Equal(Path.Combine(root, "data", "Memory", "Chats"), paths.MemoryChatsRoot);
             }
             finally
             {
@@ -51,8 +51,8 @@ namespace VAL.Tests.Hosting
                 Assert.Equal(Path.GetFullPath(root), paths.ContentRoot);
                 Assert.Equal(Path.GetFullPath(root), paths.ProductRoot);
                 Assert.Equal(Path.Combine(root, "Modules"), paths.ModulesRoot);
-                Assert.Equal(Path.Combine(root, "State"), paths.StateRoot);
-                Assert.Equal(Path.Combine(root, "Memory", "Chats"), paths.MemoryChatsRoot);
+                Assert.Equal(Path.Combine(root, "data", "State"), paths.StateRoot);
+                Assert.Equal(Path.Combine(root, "data", "Memory", "Chats"), paths.MemoryChatsRoot);
             }
             finally
             {

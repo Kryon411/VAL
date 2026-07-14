@@ -261,7 +261,7 @@ namespace TruthDoctor
             }
 
             if (string.IsNullOrWhiteSpace(root))
-                root = ResolveProductRoot();
+                root = ResolveDataRoot();
 
             options = new Options(root, chatId, health, jsonPath, compact, compactLines, warnMb, repairTailFirst);
             return true;
@@ -276,36 +276,11 @@ namespace TruthDoctor
             return true;
         }
 
-        private static string ResolveProductRoot()
+        private static string ResolveDataRoot()
         {
-            string bundleDir;
-            try
-            {
-                var processPath = Environment.ProcessPath;
-                bundleDir = !string.IsNullOrWhiteSpace(processPath)
-                    ? (Path.GetDirectoryName(processPath) ?? AppContext.BaseDirectory)
-                    : AppContext.BaseDirectory;
-            }
-            catch
-            {
-                bundleDir = AppContext.BaseDirectory;
-            }
-
-            if (Directory.Exists(Path.Combine(bundleDir, "Modules")) || Directory.Exists(Path.Combine(bundleDir, "Dock")))
-                return bundleDir;
-
-            var productDir = Path.Combine(bundleDir, "PRODUCT");
-            if (Directory.Exists(Path.Combine(productDir, "Modules")) || Directory.Exists(Path.Combine(productDir, "Dock")))
-                return productDir;
-
-            var mainDir = Path.Combine(bundleDir, "MAIN");
-            if (Directory.Exists(Path.Combine(mainDir, "Modules")))
-            {
-                var devProduct = Path.Combine(mainDir, "PRODUCT");
-                return Directory.Exists(devProduct) ? devProduct : bundleDir;
-            }
-
-            return bundleDir;
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VAL");
         }
 
         private static void PrintUsage()

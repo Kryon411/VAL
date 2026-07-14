@@ -19,7 +19,7 @@ namespace VAL.App.Host.Services
         private readonly ISessionContext _sessionContext;
         private readonly ITruthStore _truthStore;
         private readonly ILog _log;
-        private readonly string? _productRootOverride;
+        private readonly string? _dataRootOverride;
         private readonly RateLimiter _rateLimiter = new();
 
         public TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore, ILog log)
@@ -30,13 +30,13 @@ namespace VAL.App.Host.Services
             _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
-        internal TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore, ILog log, string? productRootOverride)
+        internal TruthHealthReportService(IAppPaths appPaths, ISessionContext sessionContext, ITruthStore truthStore, ILog log, string? dataRootOverride)
         {
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _sessionContext = sessionContext ?? throw new ArgumentNullException(nameof(sessionContext));
             _truthStore = truthStore ?? throw new ArgumentNullException(nameof(truthStore));
             _log = log ?? throw new ArgumentNullException(nameof(log));
-            _productRootOverride = productRootOverride;
+            _dataRootOverride = dataRootOverride;
         }
 
         TruthHealthSnapshotResult ITruthHealthReportService.GetCurrentSnapshot()
@@ -149,8 +149,8 @@ namespace VAL.App.Host.Services
 
         private string? ResolveMemoryChatsRoot()
         {
-            if (!string.IsNullOrWhiteSpace(_productRootOverride))
-                return AppPathLayout.ResolveMemoryChatsRoot(_productRootOverride);
+            if (!string.IsNullOrWhiteSpace(_dataRootOverride))
+                return AppPathLayout.ResolveMemoryChatsRoot(_dataRootOverride);
 
             return _appPaths.MemoryChatsRoot;
         }
@@ -161,9 +161,10 @@ namespace VAL.App.Host.Services
             repairLogPath = string.Empty;
             relativePath = Path.Combine("Memory", "Chats", chatId, _truthStore.TruthFileName);
 
-            if (!string.IsNullOrWhiteSpace(_productRootOverride))
+            if (!string.IsNullOrWhiteSpace(_dataRootOverride))
             {
-                if (!SafePathResolver.TryResolveChatTruthPath(_productRootOverride, chatId, out truthPath, out var chatDir))
+                var memoryChatsRoot = AppPathLayout.ResolveMemoryChatsRoot(_dataRootOverride);
+                if (!SafePathResolver.TryResolveChatTruthPath(memoryChatsRoot, chatId, out truthPath, out var chatDir))
                     return false;
 
                 repairLogPath = Path.Combine(chatDir, "Truth.repair.log");

@@ -21,7 +21,8 @@ namespace VAL.Tests.Truth
         {
             var root = Path.Combine(Path.GetTempPath(), "val-truth-health-service", Guid.NewGuid().ToString("N"));
             var chatId = Guid.NewGuid().ToString();
-            var chatDir = Path.Combine(root, "Memory", "Chats", chatId);
+            var dataRoot = Path.Combine(root, "Data");
+            var chatDir = Path.Combine(dataRoot, "Memory", "Chats", chatId);
             Directory.CreateDirectory(chatDir);
 
             try
@@ -38,7 +39,7 @@ namespace VAL.Tests.Truth
                 sessionContext.SetActiveChatId(chatId);
                 var truthStore = new TruthStore(NullTruthTelemetryPublisher.Instance);
 
-                var service = new TruthHealthReportService(appPaths, sessionContext, truthStore, new FakeLog(), root);
+                var service = new TruthHealthReportService(appPaths, sessionContext, truthStore, new FakeLog(), dataRoot);
                 var result = service.GetCurrentSnapshot();
 
                 Assert.True(result.HasActiveChat);
@@ -62,7 +63,8 @@ namespace VAL.Tests.Truth
         {
             var root = Path.Combine(Path.GetTempPath(), "val-truth-health-service", Guid.NewGuid().ToString("N"));
             var chatId = Guid.NewGuid().ToString();
-            var chatDir = Path.Combine(root, "Memory", "Chats", chatId);
+            var dataRoot = Path.Combine(root, "Data");
+            var chatDir = Path.Combine(dataRoot, "Memory", "Chats", chatId);
             Directory.CreateDirectory(chatDir);
 
             try

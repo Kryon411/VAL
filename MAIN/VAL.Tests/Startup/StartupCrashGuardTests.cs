@@ -14,8 +14,8 @@ namespace VAL.Tests.Startup
         [Fact]
         public void EvaluateWhenStateIsMissingDoesNotEnterSafeMode()
         {
-            var productRoot = CreateTempRoot();
-            var guard = new StartupCrashGuard(new FakeLog(), productRoot);
+            var dataRoot = CreateTempRoot();
+            var guard = new StartupCrashGuard(new FakeLog(), dataRoot);
 
             var safeMode = guard.EvaluateAndMarkStarting();
 
@@ -25,9 +25,9 @@ namespace VAL.Tests.Startup
         [Fact]
         public void EvaluateWhenCrashCountAtThresholdEntersSafeMode()
         {
-            var productRoot = CreateTempRoot();
-            WriteState(productRoot, 2);
-            var guard = new StartupCrashGuard(new FakeLog(), productRoot);
+            var dataRoot = CreateTempRoot();
+            WriteState(dataRoot, 2);
+            var guard = new StartupCrashGuard(new FakeLog(), dataRoot);
 
             var safeMode = guard.EvaluateAndMarkStarting();
 
@@ -37,13 +37,13 @@ namespace VAL.Tests.Startup
         [Fact]
         public void MarkSuccessResetsCrashCount()
         {
-            var productRoot = CreateTempRoot();
-            WriteState(productRoot, 3);
-            var guard = new StartupCrashGuard(new FakeLog(), productRoot);
+            var dataRoot = CreateTempRoot();
+            WriteState(dataRoot, 3);
+            var guard = new StartupCrashGuard(new FakeLog(), dataRoot);
 
             guard.MarkSuccess();
 
-            var statePath = Path.Combine(productRoot, "State", "startup.json");
+            var statePath = Path.Combine(dataRoot, "State", "startup.json");
             using var stream = File.OpenRead(statePath);
             using var doc = JsonDocument.Parse(stream);
             var crashes = doc.RootElement.GetProperty("consecutiveStartupCrashes").GetInt32();
@@ -54,11 +54,11 @@ namespace VAL.Tests.Startup
         [Fact]
         public void EvaluateWhenStateCorruptEntersSafeMode()
         {
-            var productRoot = CreateTempRoot();
-            var statePath = Path.Combine(productRoot, "State", "startup.json");
+            var dataRoot = CreateTempRoot();
+            var statePath = Path.Combine(dataRoot, "State", "startup.json");
             Directory.CreateDirectory(Path.GetDirectoryName(statePath)!);
             File.WriteAllText(statePath, "not-json");
-            var guard = new StartupCrashGuard(new FakeLog(), productRoot);
+            var guard = new StartupCrashGuard(new FakeLog(), dataRoot);
 
             var safeMode = guard.EvaluateAndMarkStarting();
 
@@ -72,9 +72,9 @@ namespace VAL.Tests.Startup
             return path;
         }
 
-        private static void WriteState(string productRoot, int crashCount)
+        private static void WriteState(string dataRoot, int crashCount)
         {
-            var statePath = Path.Combine(productRoot, "State", "startup.json");
+            var statePath = Path.Combine(dataRoot, "State", "startup.json");
             Directory.CreateDirectory(Path.GetDirectoryName(statePath)!);
             var json = JsonSerializer.Serialize(new
             {

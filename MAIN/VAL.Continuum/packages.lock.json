@@ -31,8 +31,8 @@
           "Microsoft.Extensions.Options": "[8.0.2, )",
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[8.0.0, )",
           "Microsoft.Web.WebView2": "[1.0.4078.44, )",
-          "VAL.Contracts": "[0.1.0, )",
-          "VAL.Truth": "[0.1.0, )"
+          "VAL.Contracts": "[5.0.0, )",
+          "VAL.Truth": "[5.0.0, )"
         }
       },
       "val.truth": {

@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 
 using VAL.Host.Json;
 using VAL.Host.Logging;
+using VAL.Host.Options;
 using VAL.Host.Services;
 
 namespace VAL.App.Host.Startup
@@ -15,20 +16,20 @@ namespace VAL.App.Host.Startup
         private const string Category = "StartupCrashGuard";
         private const int CrashThreshold = 2;
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(30);
-        private readonly string _productRoot;
+        private readonly string _dataRoot;
         private readonly ILog _log;
         private readonly RateLimiter _rateLimiter = new();
 
-        public StartupCrashGuard(ILog log, string? productRoot = null)
+        public StartupCrashGuard(ILog log, string? dataRoot = null)
         {
             _log = log ?? throw new ArgumentNullException(nameof(log));
-            _productRoot = string.IsNullOrWhiteSpace(productRoot)
-                ? ProductRootResolver.ResolveProductRoot()
-                : productRoot;
+            _dataRoot = string.IsNullOrWhiteSpace(dataRoot)
+                ? ValOptions.DefaultDataRoot
+                : dataRoot;
 
-            if (string.IsNullOrWhiteSpace(_productRoot))
+            if (string.IsNullOrWhiteSpace(_dataRoot))
             {
-                _productRoot = AppContext.BaseDirectory;
+                _dataRoot = ValOptions.DefaultDataRoot;
             }
         }
 
@@ -64,7 +65,7 @@ namespace VAL.App.Host.Startup
 
         private string ResolveStatePath()
         {
-            return Path.Combine(_productRoot, "State", "startup.json");
+            return Path.Combine(_dataRoot, "State", "startup.json");
         }
 
         private StartupCrashState? ReadState(out StartupStateReadStatus status)

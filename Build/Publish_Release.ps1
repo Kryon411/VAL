@@ -12,9 +12,18 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repoRoot "MAIN\VAL.Desktop\VAL.Desktop.csproj"
+$buildPropsPath = Join-Path $repoRoot "Directory.Build.props"
 $productPath = Join-Path $repoRoot "PRODUCT"
 $outputPath = Join-Path $productPath "Publish"
-$archivePath = Join-Path $productPath "VAL-$RuntimeIdentifier.zip"
+
+[xml]$buildProps = Get-Content -LiteralPath $buildPropsPath -Raw
+$versionNode = $buildProps.SelectSingleNode("/Project/PropertyGroup/VersionPrefix")
+if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerText)) {
+    throw "Directory.Build.props does not define VersionPrefix."
+}
+$version = $versionNode.InnerText.Trim()
+$archivePath = Join-Path $productPath "VAL-v$version-$RuntimeIdentifier.zip"
+$symbolsArchivePath = Join-Path $productPath "VAL-v$version-$RuntimeIdentifier-symbols.zip"
 
 if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
     throw "Could not find MAIN\VAL.Desktop\VAL.Desktop.csproj."
@@ -66,6 +75,18 @@ if ($missing.Count -gt 0) {
     throw "Publish output is missing required content:`n - $($missing -join "`n - ")"
 }
 
+$symbolPaths = @(Get-ChildItem -LiteralPath $resolvedOutput -Recurse -File -Filter "*.pdb")
+if (Test-Path -LiteralPath $symbolsArchivePath) {
+    Remove-Item -LiteralPath $symbolsArchivePath -Force
+}
+if ($symbolPaths.Count -gt 0) {
+    Compress-Archive `
+        -LiteralPath $symbolPaths.FullName `
+        -DestinationPath $symbolsArchivePath `
+        -CompressionLevel Optimal
+    $symbolPaths | Remove-Item -Force
+}
+
 $executablePath = Join-Path $resolvedOutput "VAL.exe"
 if (-not [string]::IsNullOrWhiteSpace($CertificatePath)) {
     if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
@@ -105,4 +126,7 @@ Compress-Archive `
 Write-Host "Publish successful."
 Write-Host "Output:  $resolvedOutput"
 Write-Host "Archive: $archivePath"
+if (Test-Path -LiteralPath $symbolsArchivePath) {
+    Write-Host "Symbols: $symbolsArchivePath"
+}
 Write-Host "Run:     $resolvedOutput\VAL.exe"

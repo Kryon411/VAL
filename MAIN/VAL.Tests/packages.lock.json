@@ -295,9 +295,9 @@
       "val.abyss": {
         "type": "Project",
         "dependencies": {
-          "VAL.Contracts": "[0.1.0, )",
-          "VAL.Host": "[0.1.0, )",
-          "VAL.Truth": "[0.1.0, )"
+          "VAL.Contracts": "[5.0.0, )",
+          "VAL.Host": "[5.0.0, )",
+          "VAL.Truth": "[5.0.0, )"
         }
       },
       "val.app": {
@@ -307,17 +307,17 @@
           "Microsoft.Extensions.Hosting": "[8.0.1, )",
           "Microsoft.Extensions.Options": "[8.0.2, )",
           "Microsoft.Web.WebView2": "[1.0.4078.44, )",
-          "VAL.Abyss": "[0.1.0, )",
-          "VAL.Continuum": "[0.1.0, )",
-          "VAL.Host": "[0.1.0, )"
+          "VAL.Abyss": "[5.0.0, )",
+          "VAL.Continuum": "[5.0.0, )",
+          "VAL.Host": "[5.0.0, )"
         }
       },
       "val.continuum": {
         "type": "Project",
         "dependencies": {
-          "VAL.Contracts": "[0.1.0, )",
-          "VAL.Host": "[0.1.0, )",
-          "VAL.Truth": "[0.1.0, )"
+          "VAL.Contracts": "[5.0.0, )",
+          "VAL.Host": "[5.0.0, )",
+          "VAL.Truth": "[5.0.0, )"
         }
       },
       "val.contracts": {
@@ -331,8 +331,8 @@
           "Microsoft.Extensions.Options": "[8.0.2, )",
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[8.0.0, )",
           "Microsoft.Web.WebView2": "[1.0.4078.44, )",
-          "VAL.Contracts": "[0.1.0, )",
-          "VAL.Truth": "[0.1.0, )"
+          "VAL.Contracts": "[5.0.0, )",
+          "VAL.Truth": "[5.0.0, )"
         }
       },
       "val.truth": {

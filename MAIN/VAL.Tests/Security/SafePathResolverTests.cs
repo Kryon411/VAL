@@ -13,13 +13,13 @@ namespace VAL.Tests.Security
         [Fact]
         public void TryResolveChatTruthPathAllowsValidGuid()
         {
-            var productRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"));
+            var memoryChatsRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"), "Memory", "Chats");
             var chatId = Guid.NewGuid().ToString();
 
-            var result = SafePathResolver.TryResolveChatTruthPath(productRoot, chatId, out var truthPath, out var chatDir);
+            var result = SafePathResolver.TryResolveChatTruthPath(memoryChatsRoot, chatId, out var truthPath, out var chatDir);
 
             Assert.True(result);
-            var expectedChatDir = Path.GetFullPath(Path.Combine(productRoot, "Memory", "Chats", chatId));
+            var expectedChatDir = Path.GetFullPath(Path.Combine(memoryChatsRoot, chatId));
             Assert.Equal(expectedChatDir, chatDir);
             Assert.Equal(Path.Combine(expectedChatDir, TruthStore.DefaultTruthFileName), truthPath);
         }
@@ -29,9 +29,9 @@ namespace VAL.Tests.Security
         [InlineData("not-a-guid")]
         public void TryResolveChatTruthPathRejectsInvalidChatId(string chatId)
         {
-            var productRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"));
+            var memoryChatsRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"), "Memory", "Chats");
 
-            var result = SafePathResolver.TryResolveChatTruthPath(productRoot, chatId, out _, out _);
+            var result = SafePathResolver.TryResolveChatTruthPath(memoryChatsRoot, chatId, out _, out _);
 
             Assert.False(result);
         }
@@ -41,9 +41,9 @@ namespace VAL.Tests.Security
         [InlineData("../etc/passwd")]
         public void TryResolveChatTruthPathRejectsTraversal(string chatId)
         {
-            var productRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"));
+            var memoryChatsRoot = Path.Combine(Path.GetTempPath(), "VAL", Guid.NewGuid().ToString("N"), "Memory", "Chats");
 
-            var result = SafePathResolver.TryResolveChatTruthPath(productRoot, chatId, out _, out _);
+            var result = SafePathResolver.TryResolveChatTruthPath(memoryChatsRoot, chatId, out _, out _);
 
             Assert.False(result);
         }
@@ -51,13 +51,13 @@ namespace VAL.Tests.Security
         [Fact]
         public void TryResolveChatTruthPathEnforcesContainment()
         {
-            var productRoot = Path.Combine(Path.GetTempPath(), "VAL", "Product", "..", "Product");
+            var memoryChatsRoot = Path.Combine(Path.GetTempPath(), "VAL", "Memory", "..", "Memory", "Chats");
             var chatId = Guid.NewGuid().ToString();
 
-            var result = SafePathResolver.TryResolveChatTruthPath(productRoot, chatId, out var truthPath, out var chatDir);
+            var result = SafePathResolver.TryResolveChatTruthPath(memoryChatsRoot, chatId, out var truthPath, out var chatDir);
 
             Assert.True(result);
-            var expectedRoot = Path.GetFullPath(Path.Combine(productRoot, "Memory", "Chats")) + Path.DirectorySeparatorChar;
+            var expectedRoot = Path.GetFullPath(memoryChatsRoot) + Path.DirectorySeparatorChar;
             Assert.StartsWith(expectedRoot, chatDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
             Assert.StartsWith(expectedRoot, Path.GetDirectoryName(truthPath) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
         }

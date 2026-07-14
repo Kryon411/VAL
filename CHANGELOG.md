@@ -4,6 +4,8 @@ Notable changes are recorded here. VAL follows semantic versioning once a public
 
 ## Unreleased
 
+## 5.0.0 - 2026-07-14
+
 ### Changed
 
 - Separated desktop packaging, WPF composition, host services, feature workflows, contracts, and storage into enforced project boundaries.
@@ -13,6 +15,8 @@ Notable changes are recorded here. VAL follows semantic versioning once a public
 - Centralized and locked NuGet dependencies with vulnerability auditing.
 - Added architecture, module asset, JavaScript command, startup recovery, and workflow lifecycle tests.
 - Added reproducible publish output, checksums, ZIP packaging, optional Authenticode signing, and published smoke testing.
+- Added a version-validated Inno Setup pipeline with a stable upgrade identity and data-retaining uninstall behavior.
+- Separated mutable per-user state and conversation memory from the installed program directory.
 
 ### Fixed
 

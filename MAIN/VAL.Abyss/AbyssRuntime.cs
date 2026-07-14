@@ -318,7 +318,7 @@ namespace VAL.Host.Abyss
             if (string.IsNullOrWhiteSpace(chatId))
                 return;
 
-            if (!SafePathResolver.TryResolveChatTruthPath(_appPaths.ProductRoot, chatId, out var truthPath, out var chatDir))
+            if (!SafePathResolver.TryResolveChatTruthPath(_appPaths.MemoryChatsRoot, chatId, out var truthPath, out var chatDir))
                 return;
 
             try

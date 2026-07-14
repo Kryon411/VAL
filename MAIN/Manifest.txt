@@ -7,6 +7,8 @@
 Assets/Screenshots/control-centre.png
 Assets/Screenshots/ui.png
 Build.cmd
+Build/Build_Installer.cmd
+Build/Build_Installer.ps1
 Build/Publish_Release.cmd
 Build/Publish_Release.ps1
 Build/README.md
@@ -19,7 +21,9 @@ Docs/BuildSmokeChecklist.md
 Docs/Modules.md
 Docs/Privacy.md
 Docs/ReleaseReadiness.md
+Docs/Releases/VAL-v5.0.0.md
 Docs/ThreatModel.md
+Installer/VAL.iss
 MAIN/Dock/Dock.main.js
 MAIN/Dock/Dock.module.json
 MAIN/Dock/Dock.styles.css
@@ -111,7 +115,6 @@ MAIN/VAL.App/Host/Services/MessageBoxDesktopDialogService.cs
 MAIN/VAL.App/Host/Services/ModelessWindowHost.cs
 MAIN/VAL.App/Host/Services/ModuleRuntimeService.cs
 MAIN/VAL.App/Host/Services/PrivacySettingsService.cs
-MAIN/VAL.App/Host/Services/ProductRootResolver.cs
 MAIN/VAL.App/Host/Services/SafeBoot.cs
 MAIN/VAL.App/Host/Services/ShellNavigationRefreshPlan.cs
 MAIN/VAL.App/Host/Services/SmokeTestRunner.cs

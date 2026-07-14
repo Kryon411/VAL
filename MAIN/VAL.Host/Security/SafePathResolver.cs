@@ -7,12 +7,12 @@ namespace VAL.Host.Security
 {
     public static class SafePathResolver
     {
-        public static bool TryResolveChatTruthPath(string productRoot, string chatId, out string truthPath, out string chatDir)
+        public static bool TryResolveChatTruthPath(string memoryChatsRoot, string chatId, out string truthPath, out string chatDir)
         {
             truthPath = string.Empty;
             chatDir = string.Empty;
 
-            if (string.IsNullOrWhiteSpace(productRoot) || string.IsNullOrWhiteSpace(chatId))
+            if (string.IsNullOrWhiteSpace(memoryChatsRoot) || string.IsNullOrWhiteSpace(chatId))
                 return false;
 
             if (!Guid.TryParse(chatId, out _))
@@ -23,9 +23,8 @@ namespace VAL.Host.Security
 
             try
             {
-                var memoryRoot = Path.Combine(productRoot, "Memory", "Chats");
-                var fullMemoryRoot = Path.GetFullPath(memoryRoot);
-                var fullChatDir = Path.GetFullPath(Path.Combine(memoryRoot, chatId));
+                var fullMemoryRoot = Path.GetFullPath(memoryChatsRoot);
+                var fullChatDir = Path.GetFullPath(Path.Combine(fullMemoryRoot, chatId));
 
                 if (!fullMemoryRoot.EndsWith(Path.DirectorySeparatorChar))
                     fullMemoryRoot += Path.DirectorySeparatorChar;

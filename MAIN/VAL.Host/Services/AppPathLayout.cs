@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
+using VAL.Host.Options;
+
 namespace VAL.Host.Services
 {
     public static class AppPathLayout
@@ -51,9 +53,9 @@ namespace VAL.Host.Services
             return root;
         }
 
-        public static string ResolveMemoryChatsRoot(string? productRoot = null)
+        public static string ResolveMemoryChatsRoot(string? dataRoot = null)
         {
-            var root = NormalizeRoot(productRoot, ResolveProductRoot());
+            var root = NormalizeRoot(dataRoot, ValOptions.DefaultDataRoot);
             return Path.Combine(root, "Memory", "Chats");
         }
 

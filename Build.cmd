@@ -9,7 +9,8 @@ REM   Build.cmd --manifest
 REM   Build.cmd --publish         (DEFAULT: self-contained win-x64)
 REM   Build.cmd --publish-sc      (self-contained win-x64)
 REM   Build.cmd --publish-fdd     (framework-dependent; disables single-file compression)
-REM   Build.cmd --release         (test + manifest + publish)
+REM   Build.cmd --installer       (publish + compile installer)
+REM   Build.cmd --release         (test + manifest + installer)
 REM ============================================================
 
 for %%I in ("%~dp0.") do set "ROOT=%%~fI"
@@ -21,6 +22,7 @@ if /I "%~1"=="--manifest"    goto :manifest
 if /I "%~1"=="--publish"     goto :publish_sc
 if /I "%~1"=="--publish-sc"  goto :publish_sc
 if /I "%~1"=="--publish-fdd" goto :publish_fdd
+if /I "%~1"=="--installer"   goto :installer
 if /I "%~1"=="--release"     goto :release
 
 echo.
@@ -30,7 +32,8 @@ echo   Build.cmd --manifest
 echo   Build.cmd --publish         ^(default: self-contained win-x64^)
 echo   Build.cmd --publish-sc      ^(self-contained win-x64^)
 echo   Build.cmd --publish-fdd     ^(framework-dependent^)
-echo   Build.cmd --release         ^(test + manifest + publish^)
+echo   Build.cmd --installer       ^(publish + compile installer^)
+echo   Build.cmd --release         ^(test + manifest + installer^)
 echo.
 exit /b 0
 
@@ -84,10 +87,21 @@ if errorlevel 1 (
 )
 exit /b 0
 
+:installer
+set "PS_EXE=pwsh"
+where /q pwsh || set "PS_EXE=powershell"
+"%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\Build\Build_Installer.ps1"
+if errorlevel 1 (
+  echo.
+  echo ERROR: Installer build failed.
+  exit /b 1
+)
+exit /b 0
+
 :release
 call "%~f0" --test || exit /b 1
 call "%~f0" --manifest || exit /b 1
-call "%~f0" --publish || exit /b 1
+call "%~f0" --installer || exit /b 1
 echo.
 echo RELEASE pipeline complete.
 exit /b 0

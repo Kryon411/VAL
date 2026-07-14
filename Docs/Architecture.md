@@ -30,6 +30,8 @@ The executable is a leaf composition project. Tests reference the assemblies the
 5. `IBackgroundTaskSupervisor` owns non-UI background work, observes failures, and drains work during bounded shutdown.
 6. `ITruthStore` and atomic file helpers protect conversation data and rebuild operations.
 
+Program content and mutable data have separate roots. Installed binaries, modules, icons, and Dock assets live under `%LOCALAPPDATA%\Programs\VAL`; state, conversation memory, logs, profiles, and settings live under `%LOCALAPPDATA%\VAL` and survive application uninstall.
+
 ## Rules
 
 - Put wire names and shared message contracts in `VAL.Contracts`.
@@ -44,4 +46,4 @@ The executable is a leaf composition project. Tests reference the assemblies the
 
 ## Quality Gates
 
-`VAL.sln` is the authoritative build surface. CI verifies formatting, locked restore, all projects, unit and architecture tests, JavaScript command/manifests, dependency vulnerabilities, manifest freshness, self-contained publish, and a published executable smoke test.
+`VAL.sln` is the authoritative build surface. CI verifies formatting, locked restore, all projects, unit and architecture tests, JavaScript command/manifests, dependency vulnerabilities, manifest freshness, self-contained publish, and a published executable smoke test. The release pipeline adds version validation, symbol separation, installer compilation, checksums, and optional Authenticode signing.
