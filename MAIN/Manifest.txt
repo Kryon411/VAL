@@ -363,6 +363,7 @@ MAIN/VAL.Tests/Hosting/MainWindowStartupCoordinatorTests.cs
 MAIN/VAL.Tests/Hosting/NativeControlKeyboardNavigationTests.cs
 MAIN/VAL.Tests/Hosting/NativeNavigationRecoveryTests.cs
 MAIN/VAL.Tests/Hosting/NativeRecoveryStyleTests.cs
+MAIN/VAL.Tests/Hosting/NativeUiTestGroup.cs
 MAIN/VAL.Tests/Hosting/NavigationRecoveryOverlayTests.cs
 MAIN/VAL.Tests/Hosting/PortalImageSignatureTests.cs
 MAIN/VAL.Tests/Hosting/PortalImageTransferTests.cs

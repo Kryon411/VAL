@@ -14,6 +14,7 @@ using Xunit;
 
 namespace VAL.Tests.Hosting;
 
+[Collection(NativeUiTestGroup.Name)]
 public sealed class NativeRecoveryStyleTests
 {
     private static readonly string[] StateLabels = ["Rest", "Hover", "Pressed", "Selected", "Disabled", "Keyboard focus"];
@@ -90,7 +91,7 @@ public sealed class NativeRecoveryStyleTests
         })
         { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await completion.Task.WaitAsync(NativeUiTestGroup.InitializationTimeout);
     }
 
     [Fact]
@@ -146,6 +147,6 @@ public sealed class NativeRecoveryStyleTests
         { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await completion.Task.WaitAsync(NativeUiTestGroup.InitializationTimeout);
     }
 }

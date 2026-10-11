@@ -17,6 +17,7 @@ using Xunit;
 
 namespace VAL.Tests.Hosting;
 
+[Collection(NativeUiTestGroup.Name)]
 public sealed class NativeControlKeyboardNavigationTests
 {
     [Theory]
@@ -75,7 +76,7 @@ public sealed class NativeControlKeyboardNavigationTests
         { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await completion.Task.WaitAsync(NativeUiTestGroup.InitializationTimeout);
     }
 
     private sealed class NullLog : ILog

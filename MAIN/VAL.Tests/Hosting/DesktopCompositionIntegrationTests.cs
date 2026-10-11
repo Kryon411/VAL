@@ -28,6 +28,7 @@ using Xunit;
 
 namespace VAL.Tests.Hosting;
 
+[Collection(NativeUiTestGroup.Name)]
 public sealed class DesktopCompositionIntegrationTests
 {
     [Fact]
@@ -42,7 +43,7 @@ public sealed class DesktopCompositionIntegrationTests
         { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        await completion.Task.WaitAsync(NativeUiTestGroup.InitializationTimeout);
     }
 
     private static void ExerciseComposition()
