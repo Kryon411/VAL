@@ -2,7 +2,7 @@ namespace VAL.App.Host.Services
 {
     public interface IDataWipeService
     {
-        DataWipeResult WipeData();
+        void ScheduleWipe();
     }
 
     public sealed record DataWipeResult(

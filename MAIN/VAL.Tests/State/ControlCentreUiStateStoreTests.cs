@@ -36,6 +36,36 @@ namespace VAL.Tests.State
             Assert.Equal(88, state.Dock.Y);
             Assert.Equal(720, state.Dock.W);
             Assert.Equal(520, state.Dock.H);
+            Assert.True(state.Dock.IsCustom);
+        }
+
+        [Fact]
+        public void OldGeometryIsPreservedAndNewStateDefaultsToAutomaticPlacement()
+        {
+            var legacy = new ControlCentreUiState
+            {
+                Version = 1,
+                ControlCentre = new GeometryState(900, 20, 40, 40),
+                Dock = new DockGeometryState { X = 300, W = 700 }
+            }.Normalize();
+            Assert.True(legacy.ControlCentreIsCustom);
+            Assert.True(legacy.Dock.IsCustom);
+            Assert.Equal(2, legacy.Version);
+            Assert.False(ControlCentreUiState.Default.Normalize().ControlCentreIsCustom);
+            Assert.False(ControlCentreUiState.Default.Normalize().Dock.IsCustom);
+        }
+
+        [Fact]
+        public void InvalidNumericGeometryCannotReachNativeWindows()
+        {
+            var state = new ControlCentreUiState
+            {
+                ControlCentre = new GeometryState(double.NaN, 10, 40, 40),
+                Dock = new DockGeometryState { X = double.NaN, W = double.PositiveInfinity }
+            }.Normalize();
+            Assert.False(state.ControlCentre.HasPosition);
+            Assert.Equal(72, state.Dock.X);
+            Assert.Equal(560, state.Dock.W);
         }
 
         [Fact]

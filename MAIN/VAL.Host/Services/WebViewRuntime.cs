@@ -25,8 +25,10 @@ namespace VAL.Host.Services
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private Task? _initTask;
         private bool _eventsWired;
+        private int _disposed;
         private volatile bool _bridgeArmed;
         private Uri? _currentUri;
+        private long _navigationGeneration;
         private Dispatcher? _dispatcher;
         private EventHandler<CoreWebView2NavigationCompletedEventArgs>? _navigationCompletedHandler;
         private EventHandler<CoreWebView2NavigationStartingEventArgs>? _navigationStartingHandler;
@@ -36,6 +38,8 @@ namespace VAL.Host.Services
         private Uri? _lastChatUri;
 
         public bool IsReady => Core != null;
+        public bool IsBridgeReady => Core != null && _bridgeArmed;
+        public long NavigationGeneration => Interlocked.Read(ref _navigationGeneration);
         public CoreWebView2? Core { get; private set; }
         public Uri? LastChatUri => _lastChatUri;
 
@@ -49,6 +53,7 @@ namespace VAL.Host.Services
 
         public event Action<WebMessageEnvelope>? WebMessageJsonReceived;
         public event Action? NavigationCompleted;
+        public event Action? NavigationStateChanged;
         private static readonly long RejectedLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
         private static readonly long BridgeLogIntervalTicks = TimeSpan.FromSeconds(10).Ticks;
         private long _lastRejectedLogTicks;
@@ -59,6 +64,7 @@ namespace VAL.Host.Services
         public async Task InitializeAsync(WebView2 control)
         {
             ArgumentNullException.ThrowIfNull(control);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 
             _dispatcher ??= control.Dispatcher;
 
@@ -102,6 +108,8 @@ namespace VAL.Host.Services
 
                 try
                 {
+                    if (!_bridgeArmed || !WebOriginPolicy.TryIsBridgeAllowed(core.Source, out _))
+                        return;
                     core.PostWebMessageAsJson(json);
                 }
                 catch
@@ -113,6 +121,12 @@ namespace VAL.Host.Services
 
         public async Task ExecuteScriptAsync(string js)
         {
+            await EvaluateScriptAsync(js);
+        }
+
+        public async Task<string?> EvaluateScriptAsync(string js)
+        {
+            string? result = null;
             await RunOnUiAsync(async () =>
             {
                 var core = Core;
@@ -124,13 +138,21 @@ namespace VAL.Host.Services
 
                 try
                 {
-                    await core.ExecuteScriptAsync(js);
+                    if (!_bridgeArmed || !WebOriginPolicy.TryIsBridgeAllowed(core.Source, out _))
+                        return;
+                    var generation = NavigationGeneration;
+                    var source = core.Source;
+                    var evaluated = await core.ExecuteScriptAsync(js);
+                    if (_bridgeArmed && generation == NavigationGeneration &&
+                        string.Equals(source, core.Source, StringComparison.Ordinal))
+                        result = evaluated;
                 }
                 catch
                 {
                     _log.Warn(nameof(WebViewRuntime), "Failed to execute script in WebView2.");
                 }
             });
+            return result;
         }
 
         public void Navigate(string url)
@@ -220,7 +242,11 @@ namespace VAL.Host.Services
 
                 if (!_eventsWired)
                 {
-                    _navigationCompletedHandler ??= (_, __) => NavigationCompleted?.Invoke();
+                    _navigationCompletedHandler ??= (_, __) =>
+                    {
+                        UpdateBridgeState(Core?.Source);
+                        NavigationCompleted?.Invoke();
+                    };
                     _navigationStartingHandler ??= (_, e) => HandleNavigationStarting(e);
                     _sourceChangedHandler ??= (_, __) => UpdateBridgeState(Core?.Source);
                     _webMessageReceivedHandler ??= (_, e) =>
@@ -316,6 +342,11 @@ namespace VAL.Host.Services
                 e.Cancel = true;
                 LogBlockedNavigation(uri);
             }
+            else
+            {
+                Interlocked.Increment(ref _navigationGeneration);
+                _bridgeArmed = false;
+            }
         }
 
         private void UpdateBridgeState(string? source)
@@ -324,6 +355,8 @@ namespace VAL.Host.Services
             if (Uri.TryCreate(source, UriKind.Absolute, out var candidate))
                 parsed = candidate;
 
+            if (!Equals(_currentUri, parsed))
+                Interlocked.Increment(ref _navigationGeneration);
             _currentUri = parsed;
             TrackLastChatUri(parsed);
 
@@ -332,6 +365,8 @@ namespace VAL.Host.Services
 
             if (wasArmed && !_bridgeArmed)
                 LogBridgeDisarmed(source);
+
+            NavigationStateChanged?.Invoke();
         }
 
         private void LogRejectedWebMessage(string? source, string reason)
@@ -340,7 +375,7 @@ namespace VAL.Host.Services
                 return;
 
             _log.Warn(nameof(WebViewRuntime),
-                $"Rejected web message ({reason}): {source ?? "<null>"}");
+                $"Rejected web message ({reason}): {WebViewScriptPolicy.LogOrigin(source)}");
         }
 
         private void LogBridgeDisarmed(string? source)
@@ -349,7 +384,7 @@ namespace VAL.Host.Services
                 return;
 
             _log.Warn(nameof(WebViewRuntime),
-                $"Bridge disarmed due to untrusted origin: {source ?? "<null>"}");
+                $"Bridge disarmed due to untrusted page: {WebViewScriptPolicy.LogOrigin(source)}");
         }
 
         private void LogBridgeIgnoredMessage()
@@ -357,7 +392,7 @@ namespace VAL.Host.Services
             if (!ShouldLog(ref _lastBridgeIgnoredLogTicks, BridgeLogIntervalTicks))
                 return;
 
-            var origin = _currentUri?.ToString() ?? "<null>";
+            var origin = WebViewScriptPolicy.LogOrigin(_currentUri?.ToString());
             _log.Warn(nameof(WebViewRuntime),
                 $"Ignoring web message while bridge disarmed (current origin: {origin})");
         }
@@ -368,12 +403,12 @@ namespace VAL.Host.Services
                 return;
 
             _log.Warn(nameof(WebViewRuntime),
-                $"Canceled navigation to unsafe or unknown URI: {uri ?? "<null>"}");
+                $"Canceled navigation to unsafe or unknown URI: {WebViewScriptPolicy.LogOrigin(uri)}");
         }
 
         private void TrackLastChatUri(Uri? candidate)
         {
-            if (candidate == null)
+            if (candidate == null || !WebOriginPolicy.TryIsBridgeAllowed(candidate.AbsoluteUri, out _))
                 return;
 
             var host = candidate.Host?.Trim();
@@ -408,7 +443,7 @@ namespace VAL.Host.Services
                 return;
 
             var nonceJson = JsonSerializer.Serialize(nonce);
-            var script = $"window.__VAL_NONCE = {nonceJson};";
+            var script = WebViewScriptPolicy.Guard($"window.__VAL_NONCE = {nonceJson};");
 
             await RunOnUiAsync(async () =>
             {
@@ -451,7 +486,57 @@ namespace VAL.Host.Services
 
         public void Dispose()
         {
-            _initLock.Dispose();
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
+
+            void UnwireEvents()
+            {
+                try
+                {
+                    if (Core != null && _eventsWired)
+                    {
+                        Core.NavigationCompleted -= _navigationCompletedHandler;
+                        Core.NavigationStarting -= _navigationStartingHandler;
+                        Core.SourceChanged -= _sourceChangedHandler;
+                        Core.WebMessageReceived -= _webMessageReceivedHandler;
+                        Core.NewWindowRequested -= _newWindowRequestedHandler;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // The owning WPF control may already have disposed its native browser.
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    // Native browser shutdown can finish before managed host disposal.
+                }
+                finally
+                {
+                    _eventsWired = false;
+                    _bridgeArmed = false;
+                    Core = null;
+                    WebMessageJsonReceived = null;
+                    NavigationCompleted = null;
+                    NavigationStateChanged = null;
+                }
+            }
+
+            var dispatcher = _dispatcher;
+            if (dispatcher == null || dispatcher.CheckAccess())
+                UnwireEvents();
+            else if (!dispatcher.HasShutdownStarted && !dispatcher.HasShutdownFinished)
+            {
+                try { dispatcher.Invoke(UnwireEvents); }
+                catch (TaskCanceledException) { }
+                catch (InvalidOperationException) when (dispatcher.HasShutdownStarted) { }
+            }
+
+            _bridgeArmed = false;
+            Core = null;
+            WebMessageJsonReceived = null;
+            NavigationCompleted = null;
+            NavigationStateChanged = null;
+            // Initialization can still be unwinding during shutdown; do not dispose its gate underneath it.
         }
     }
 }

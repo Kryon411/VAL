@@ -9,12 +9,14 @@ namespace VAL.Host.Services
         public bool Enabled { get; }
         public TimeSpan Timeout { get; }
         public string? ReportPath { get; }
+        public string? DataRoot { get; }
 
-        public SmokeTestSettings(bool enabled, TimeSpan timeout, string? reportPath)
+        public SmokeTestSettings(bool enabled, TimeSpan timeout, string? reportPath, string? dataRoot = null)
         {
             Enabled = enabled;
             Timeout = timeout;
             ReportPath = reportPath;
+            DataRoot = dataRoot;
         }
 
         public static SmokeTestSettings FromArgs(string[]? args)
@@ -24,6 +26,7 @@ namespace VAL.Host.Services
             var enabled = false;
             var timeoutMs = DefaultTimeoutMs;
             string? reportPath = null;
+            string? dataRoot = null;
 
             for (var i = 0; i < args.Length; i++)
             {
@@ -51,9 +54,13 @@ namespace VAL.Host.Services
                         reportPath = reportValue.Trim();
                     }
                 }
+                if (TryParseArgValue(arg, "--smoke-data-root", args, ref i, out var rootValue))
+                    dataRoot = rootValue;
             }
 
-            return new SmokeTestSettings(enabled, TimeSpan.FromMilliseconds(timeoutMs), reportPath);
+            if (!enabled && dataRoot != null)
+                throw new ArgumentException("A smoke data root requires --smoke.");
+            return new SmokeTestSettings(enabled, TimeSpan.FromMilliseconds(timeoutMs), reportPath, dataRoot);
         }
 
         private static bool TryParseArgValue(string arg, string key, string[] args, ref int index, out string? value)

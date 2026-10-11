@@ -26,12 +26,47 @@ namespace VAL.Tests.Security
         [InlineData("https://accounts.google.com/")]
         [InlineData("http://chatgpt.com/")]
         [InlineData("file:///C:/x")]
+        [InlineData("https://chatgpt.com:8443/")]
+        [InlineData("https://user:password@chatgpt.com/")]
         public void TryIsBridgeAllowedRejectsNonChatGptHosts(string source)
         {
             var result = WebOriginPolicy.TryIsBridgeAllowed(source, out var uri);
 
             Assert.False(result);
             Assert.Null(uri);
+        }
+
+        [Theory]
+        [InlineData("https://chatgpt.com/auth/login?returnTo=%2Fc%2Fprivate")]
+        [InlineData("https://chat.openai.com/api/auth/session")]
+        [InlineData("https://chatgpt.com/login")]
+        [InlineData("https://chatgpt.com/logout/")]
+        [InlineData("https://chatgpt.com/signin")]
+        [InlineData("https://chatgpt.com/signup")]
+        [InlineData("https://chatgpt.com/sign-in")]
+        [InlineData("https://chatgpt.com/sign-up")]
+        [InlineData("https://chatgpt.com/oauth/callback")]
+        [InlineData("https://chatgpt.com/oauth2/callback")]
+        [InlineData("https://chatgpt.com/AUTH/login")]
+        [InlineData("https://chatgpt.com/%61uth/login")]
+        [InlineData("https://chatgpt.com/auth%2Flogin")]
+        [InlineData("https://chatgpt.com/auth%5Clogin")]
+        [InlineData("https://chatgpt.com/%2561uth/login")]
+        public void AuthenticationRoutesAllowNavigationButNeverTheBridge(string source)
+        {
+            Assert.True(WebOriginPolicy.TryIsNavigationAllowed(source, out _));
+            Assert.False(WebOriginPolicy.TryIsBridgeAllowed(source, out var uri));
+            Assert.Null(uri);
+        }
+
+        [Theory]
+        [InlineData("https://chatgpt.com/authentication")]
+        [InlineData("https://chatgpt.com/c/auth")]
+        [InlineData("https://chatgpt.com/g/project-login")]
+        [InlineData("https://chatgpt.com/?next=/auth/login")]
+        public void AuthenticationRouteMatchingUsesOnlyWholePathSegments(string source)
+        {
+            Assert.True(WebOriginPolicy.TryIsBridgeAllowed(source, out _));
         }
 
         [Theory]

@@ -1,12 +1,37 @@
 using System;
+using System.Threading.Tasks;
 
 using VAL.Host.Portal;
 
 namespace VAL.Host.Services
 {
-    public sealed class PortalRuntimeService : IPortalRuntimeService
+    public sealed class PortalRuntimeService : IPortalRuntimeService, IDisposable
     {
-        private const string FocusScript = "(()=>{try{const selectors=['form textarea','textarea[placeholder]','div[contenteditable=\\\"true\\\"][role=\\\"textbox\\\"]','div.ProseMirror[contenteditable=\\\"true\\\"]','div[contenteditable=\\\"true\\\"][data-slate-editor=\\\"true\\\"]'];for(const s of selectors){  const el=document.querySelector(s);  if(el){ try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true; }}// fallback: find any visible contenteditable in the bottom composer regionconst cands=[...document.querySelectorAll('div[contenteditable=\\\"true\\\"]')].filter(e=>{  const r=e.getBoundingClientRect();  return r.width>100 && r.height>20 && r.bottom> (window.innerHeight*0.55);});if(cands.length){  const el=cands[cands.length-1];  try{ el.focus(); }catch{}; try{ el.click(); }catch{}; return true;}}catch(e){} return false;})()";
+        internal const string FocusScript = """
+            (() => {
+              try {
+                const selectors = ['form[data-chatgpt-composer] [data-composer-markdown][contenteditable="true"][role="textbox"]',
+                  '#prompt-textarea[contenteditable="true"]',
+                  '#mobile-composer-prompt[contenteditable="true"]',
+                  'textarea#prompt-textarea', 'textarea#mobile-composer-prompt',
+                  'textarea[data-testid="prompt-textarea"]'];
+                for (const selector of selectors) {
+                  for (const element of document.querySelectorAll(selector)) {
+                    if (!element.isConnected || element.disabled || element.readOnly ||
+                      element.getAttribute('aria-disabled') === 'true') continue;
+                    const rect = element.getBoundingClientRect();
+                    const style = getComputedStyle(element);
+                    if (rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 ||
+                      rect.top >= window.innerHeight || style.display === 'none' ||
+                      style.visibility === 'hidden') continue;
+                    element.focus();
+                    if (document.activeElement === element || element.contains(document.activeElement)) return true;
+                  }
+                }
+              } catch {}
+              return false;
+            })()
+            """;
 
         private readonly PortalRuntime _portalRuntime;
         private readonly IWebViewRuntime _webViewRuntime;
@@ -38,7 +63,7 @@ namespace VAL.Host.Services
             try
             {
                 _portalRuntime.Initialize(
-                    () =>
+                    async () =>
                     {
                         try
                         {
@@ -47,9 +72,10 @@ namespace VAL.Host.Services
                         catch
                         {
                             _log.Warn(nameof(PortalRuntimeService), "Focus callback failed.");
+                            return false;
                         }
 
-                        _ = _webViewRuntime.ExecuteScriptAsync(FocusScript);
+                        return await FocusComposerAsync();
                     }
                 );
 
@@ -80,6 +106,23 @@ namespace VAL.Host.Services
         private void OnPrivacySettingsChanged(PrivacySettingsSnapshot snapshot)
         {
             ApplyPrivacySettings(snapshot);
+        }
+
+        private async Task<bool> FocusComposerAsync()
+        {
+            try
+            {
+                var result = await _webViewRuntime.EvaluateScriptAsync(FocusScript)
+                    .WaitAsync(TimeSpan.FromSeconds(3));
+                return string.Equals(result, "true", StringComparison.Ordinal);
+            }
+            catch { _log.Warn(nameof(PortalRuntimeService), "Composer focus was unavailable."); }
+            return false;
+        }
+
+        public void Dispose()
+        {
+            _privacySettingsService.SettingsChanged -= OnPrivacySettingsChanged;
         }
 
         private void ApplyPrivacySettings(PrivacySettingsSnapshot snapshot)

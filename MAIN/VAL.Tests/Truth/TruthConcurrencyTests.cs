@@ -79,6 +79,10 @@ namespace VAL.Tests.Truth
                             }
                         }
                     }
+                    catch (IOException ex) when ((ex.HResult & 0xffff) is 32 or 33)
+                    {
+                        // Active append ownership correctly excludes this simulated crash writer.
+                    }
                     catch (Exception ex)
                     {
                         exceptions.Enqueue(ex);

@@ -15,7 +15,7 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Continuum
 {
-    internal sealed class ContinuumHost
+    internal sealed class ContinuumHost : IDisposable
     {
         private readonly IWebMessageSender _messageSender;
         private readonly IToastHub _toastHub;
@@ -61,6 +61,8 @@ namespace VAL.Continuum
                 operationCoordinator,
                 toastLedger ?? throw new ArgumentNullException(nameof(toastLedger)),
                 _archives,
+                _backgroundTasks,
+                PostToUi,
                 IsRefreshInFlight,
                 MarkChronicleAttemptFinished,
                 MarkChronicleCompleted);
@@ -78,6 +80,12 @@ namespace VAL.Continuum
         }
 
         public bool IsMessageSenderWired => _messageSender != null;
+
+        public void Dispose()
+        {
+            _chronicle.Dispose();
+            _pulse.Dispose();
+        }
 
         private Action<MessageEnvelope> PostToWebMessage => _messageSender.Send;
         private IToastHub Toasts => _toastHub;
@@ -259,7 +267,7 @@ namespace VAL.Continuum
             if (type.Equals(WebCommandNames.InjectSuccess, StringComparison.OrdinalIgnoreCase) ||
                 type.Equals("refresh.inject.success", StringComparison.OrdinalIgnoreCase))
             {
-                _pulse.CompleteInjection(msg.ChatId);
+                _pulse.CompleteInjection(msg.ChatId, msg.RequestId);
                 return;
             }
         }

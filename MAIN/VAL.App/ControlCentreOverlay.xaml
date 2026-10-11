@@ -3,7 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="clr-namespace:VAL.App.UI"
         mc:Ignorable="d"
+        Title="VAL - Control Centre"
         Width="36"
         Height="36"
         MinWidth="34"
@@ -31,25 +33,10 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToolTip">
-                        <Border BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="12"
-                                SnapsToDevicePixels="True">
-                            <Grid>
-                                <Border CornerRadius="12">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="1,0" EndPoint="0,1">
-                                            <GradientStop Color="#0FFFFFFF" Offset="0" />
-                                            <GradientStop Color="#05FFFFFF" Offset="1" />
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                </Border>
-                                <ContentPresenter Margin="{TemplateBinding Padding}"
-                                                  TextElement.Foreground="{TemplateBinding Foreground}"
-                                                  TextElement.FontSize="{TemplateBinding FontSize}" />
-                            </Grid>
-                        </Border>
+                        <ui:BezelChrome Radius="22" Rim="3.2" IsPanel="True" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"
+                                              TextElement.FontSize="{TemplateBinding FontSize}" />
+                        </ui:BezelChrome>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -63,17 +50,21 @@
                 Width="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualWidth}"
                 Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}"
                 AutomationProperties.Name="Control Centre"
+                AutomationProperties.AcceleratorKey="F6"
+                AutomationProperties.HelpText="Press F6 from the page to focus this icon, then Enter or Space to open Control Centre. Tab or Escape returns to the page. Alt+arrow keys move the icon."
+                Style="{DynamicResource VAL.CircularButton}"
                 Cursor="Hand"
                 BorderThickness="0"
                 BorderBrush="Transparent"
                 Background="Transparent"
-                Foreground="#E8F4FF"
+                Foreground="{DynamicResource VAL.TextForegroundBrush}"
                 Padding="0"
                 Click="LauncherButton_Click"
                 PreviewMouseLeftButtonDown="LauncherButton_PreviewMouseLeftButtonDown"
                 PreviewMouseMove="LauncherButton_PreviewMouseMove"
                 PreviewMouseLeftButtonUp="LauncherButton_PreviewMouseLeftButtonUp"
-                PreviewMouseRightButtonUp="LauncherButton_PreviewMouseRightButtonUp"
+                LostMouseCapture="LauncherButton_LostMouseCapture"
+                PreviewKeyDown="LauncherButton_PreviewKeyDown"
                 FocusVisualStyle="{x:Null}">
             <Button.ToolTip>
                 <ToolTip Style="{StaticResource LauncherToolTipStyle}">
@@ -84,44 +75,14 @@
                                LineHeight="15">
                         <Run Text="Control Centre" />
                         <LineBreak />
-                        <Run Text="Right-click: Toggle layout mode" />
+                        <Run Text="F6 to focus. Enter or Space to open." />
                         <LineBreak />
-                        <Run Text="Hotkey: Ctrl+Alt+Shift+L" />
+                        <Run Text="Drag to move. Alt+arrow keys also move." />
+                        <LineBreak />
+                        <Run Text="Reset placement: Ctrl+Alt+Shift+L" />
                     </TextBlock>
                 </ToolTip>
             </Button.ToolTip>
-            <Button.Style>
-                <Style TargetType="Button">
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="LauncherBorder"
-                                        CornerRadius="999"
-                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                        Background="{TemplateBinding Background}" />
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="Transparent" />
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="Transparent" />
-                                        <Setter TargetName="LauncherBorder" Property="Effect" Value="{x:Null}" />
-                                    </Trigger>
-                                    <Trigger Property="IsPressed" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="Transparent" />
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="Transparent" />
-                                        <Setter TargetName="LauncherBorder" Property="Effect" Value="{x:Null}" />
-                                    </Trigger>
-                                    <Trigger Property="IsKeyboardFocused" Value="True">
-                                        <Setter TargetName="LauncherBorder" Property="BorderBrush" Value="Transparent" />
-                                        <Setter TargetName="LauncherBorder" Property="Background" Value="Transparent" />
-                                        <Setter TargetName="LauncherBorder" Property="Effect" Value="{x:Null}" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </Button.Style>
         </Button>
 
         <Grid x:Name="LauncherGlyphLayer"

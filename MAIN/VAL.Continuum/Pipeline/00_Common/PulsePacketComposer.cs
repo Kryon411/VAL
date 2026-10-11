@@ -265,7 +265,7 @@ namespace VAL.Continuum.Pipeline
             if (min == int.MaxValue || max == int.MinValue)
                 return "?-?";
 
-            return $"{min}-{max}";
+            return $"{min + 1}-{max + 1}";
         }
 
         private static string SelectExchangeText(string uncut, string sliced)

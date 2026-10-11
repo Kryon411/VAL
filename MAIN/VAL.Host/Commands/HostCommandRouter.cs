@@ -79,9 +79,6 @@ namespace VAL.Host.Commands
                 return HostCommandExecutionResult.Blocked(commandName, "Command is not allowed by host policy.", isDockInvocation, diagnosticDetail: "command-allowlist");
             }
 
-            // Central session tracking.
-            _sessionContext.Observe(commandName, parsedEnvelope.ChatId);
-
             var payload = parsedEnvelope.Payload;
             var payloadRoot = payload.HasValue && payload.Value.ValueKind == JsonValueKind.Object
                 ? payload.Value
@@ -93,7 +90,7 @@ namespace VAL.Host.Commands
 
         private HostCommandExecutionResult Dispatch(HostCommand cmd, bool isDockInvocation)
         {
-            var result = _commandRegistry.Dispatch(cmd);
+            var result = _commandRegistry.Dispatch(cmd, () => _sessionContext.Observe(cmd.Type, cmd.ChatId));
             if (result.IsAccepted)
                 return HostCommandExecutionResult.Success(cmd.Type, isDockInvocation);
 

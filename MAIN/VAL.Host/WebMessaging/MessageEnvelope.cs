@@ -9,6 +9,7 @@ namespace VAL.Host.WebMessaging
 {
     public sealed class MessageEnvelope
     {
+        internal const int MaxJsonCharacters = 4 * 1024 * 1024;
         [JsonPropertyName("type")]
         public string? Type { get; init; }
 
@@ -37,6 +38,12 @@ namespace VAL.Host.WebMessaging
             if (string.IsNullOrWhiteSpace(json))
             {
                 LogParseIssue("empty JSON payload");
+                return false;
+            }
+
+            if (json.Length > MaxJsonCharacters)
+            {
+                LogParseIssue("JSON payload exceeds the host size limit");
                 return false;
             }
 

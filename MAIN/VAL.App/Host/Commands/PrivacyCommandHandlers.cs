@@ -16,9 +16,12 @@ namespace VAL.App.Host.Commands
         private readonly IAppPaths _appPaths;
         private readonly IProcessLauncher _processLauncher;
         private readonly IDataWipeService _dataWipeService;
+        private readonly IDesktopDialogService _dialogService;
+        private readonly IOperationCoordinator _operations;
         private readonly IToastHub _toastHub;
         private readonly IWebMessageSender _webMessageSender;
         private readonly ILog _log;
+        private readonly IDesktopShutdownService _shutdown;
         private readonly RateLimiter _rateLimiter = new();
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
 
@@ -27,17 +30,23 @@ namespace VAL.App.Host.Commands
             IAppPaths appPaths,
             IProcessLauncher processLauncher,
             IDataWipeService dataWipeService,
+            IDesktopDialogService dialogService,
+            IOperationCoordinator operations,
             IToastHub toastHub,
             IWebMessageSender webMessageSender,
-            ILog log)
+            ILog log,
+            IDesktopShutdownService shutdown)
         {
             _privacySettingsService = privacySettingsService ?? throw new ArgumentNullException(nameof(privacySettingsService));
             _appPaths = appPaths ?? throw new ArgumentNullException(nameof(appPaths));
             _processLauncher = processLauncher ?? throw new ArgumentNullException(nameof(processLauncher));
             _dataWipeService = dataWipeService ?? throw new ArgumentNullException(nameof(dataWipeService));
+            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+            _operations = operations ?? throw new ArgumentNullException(nameof(operations));
             _toastHub = toastHub ?? throw new ArgumentNullException(nameof(toastHub));
             _webMessageSender = webMessageSender ?? throw new ArgumentNullException(nameof(webMessageSender));
             _log = log ?? throw new ArgumentNullException(nameof(log));
+            _shutdown = shutdown ?? throw new ArgumentNullException(nameof(shutdown));
         }
 
         public void Register(CommandRegistry registry)
@@ -80,6 +89,7 @@ namespace VAL.App.Host.Commands
             catch (Exception ex)
             {
                 LogCommandFailure("continuum_logging", cmd, ex);
+                _dialogService.ShowError("VAL could not save this privacy setting. The previous setting is unchanged.", "Privacy Settings");
             }
         }
 
@@ -97,6 +107,7 @@ namespace VAL.App.Host.Commands
             catch (Exception ex)
             {
                 LogCommandFailure("portal_capture", cmd, ex);
+                _dialogService.ShowError("VAL could not save this privacy setting. The previous setting is unchanged.", "Privacy Settings");
             }
         }
 
@@ -114,31 +125,34 @@ namespace VAL.App.Host.Commands
 
         public void HandleWipeData(HostCommand cmd)
         {
+            var disabled = false;
             try
             {
-                var result = _dataWipeService.WipeData();
-                var reason = ToastReasonParser.Parse(cmd.TryGetString("reason", out var rawReason) ? rawReason : null, ToastReason.DockClick);
+                if (_operations.IsBusy)
+                {
+                    _dialogService.ShowError("Finish or cancel the current operation before deleting VAL data.", "Delete VAL Data");
+                    return;
+                }
+                if (!_dialogService.ConfirmWarning(
+                        "Delete VAL's local conversation archives, staged images, logs, and browser profile? " +
+                        "This cannot be undone. Capture will be disabled and VAL will close. " +
+                        "Deletion will be completed and checked before VAL starts on your next launch. Preferences are kept.",
+                        "Delete VAL Data"))
+                    return;
 
-                if (result.Success)
-                {
-                    _toastHub.TryShow(
-                        ToastKey.DataWipeCompleted,
-                        bypassLaunchQuiet: true,
-                        origin: ToastOrigin.HostCommand,
-                        reason: reason);
-                }
-                else
-                {
-                    _toastHub.TryShow(
-                        ToastKey.DataWipePartial,
-                        bypassLaunchQuiet: true,
-                        origin: ToastOrigin.HostCommand,
-                        reason: reason);
-                }
+                _privacySettingsService.DisableCapture();
+                disabled = true;
+                SendSettingsSync(_privacySettingsService.GetSnapshot());
+
+                _dataWipeService.ScheduleWipe();
+                _shutdown.Shutdown();
             }
             catch (Exception ex)
             {
                 LogCommandFailure("wipe_data", cmd, ex);
+                _dialogService.ShowError("VAL could not complete the deletion request. " +
+                    (disabled ? "Capture is disabled. " : "Privacy settings could not be saved; deletion was not scheduled. ") +
+                    "Check your configured data folders and permissions before retrying.", "Delete VAL Data");
                 _toastHub.TryShow(
                     ToastKey.DataWipePartial,
                     bypassLaunchQuiet: true,

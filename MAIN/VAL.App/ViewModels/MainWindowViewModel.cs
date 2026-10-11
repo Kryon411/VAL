@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -10,7 +11,7 @@ using VAL.Host.Startup;
 
 namespace VAL.App.ViewModels
 {
-    public sealed class MainWindowViewModel
+    public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         private readonly IOperationCoordinator _operationCoordinator;
         private readonly HostCommandRouter _commandRouter;
@@ -21,8 +22,8 @@ namespace VAL.App.ViewModels
         private readonly IToastService _toastService;
         private readonly StartupOptions _startupOptions;
         private readonly ILog _log;
-
-        private long _lastExitWarnedOperationId;
+        private readonly NativeNavigationRecoveryService _navigationRecovery;
+        private readonly RelayCommand _returnToChatGptCommand;
 
         public MainWindowViewModel(
             IOperationCoordinator operationCoordinator,
@@ -33,7 +34,8 @@ namespace VAL.App.ViewModels
             IDiagnosticsWindowService diagnosticsWindowService,
             IToastService toastService,
             StartupOptions startupOptions,
-            ILog log)
+            ILog log,
+            NativeNavigationRecoveryService navigationRecovery)
         {
             _operationCoordinator = operationCoordinator;
             _commandRouter = commandRouter;
@@ -44,11 +46,29 @@ namespace VAL.App.ViewModels
             _toastService = toastService;
             _startupOptions = startupOptions;
             _log = log ?? throw new ArgumentNullException(nameof(log));
+            _navigationRecovery = navigationRecovery ?? throw new ArgumentNullException(nameof(navigationRecovery));
 
             OpenDiagnosticsCommand = new RelayCommand(() => _diagnosticsWindowService.ShowDiagnostics());
+            _returnToChatGptCommand = new RelayCommand(
+                () => _navigationRecovery.TryReturnToChatGpt(),
+                () => _navigationRecovery.IsAvailable);
         }
 
         public ICommand OpenDiagnosticsCommand { get; }
+        public ICommand ReturnToChatGptCommand => _returnToChatGptCommand;
+        public bool IsNavigationRecoveryVisible { get; private set; }
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public void RefreshNavigationAvailability()
+        {
+            var isAvailable = _navigationRecovery.IsAvailable;
+            if (IsNavigationRecoveryVisible == isAvailable)
+                return;
+
+            IsNavigationRecoveryVisible = isAvailable;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsNavigationRecoveryVisible)));
+            _returnToChatGptCommand.RaiseCanExecuteChanged();
+        }
 
         public async Task OnLoadedAsync(Action focusControl)
         {
@@ -147,15 +167,6 @@ namespace VAL.App.ViewModels
             {
                 if (!_operationCoordinator.IsBusy)
                     return false;
-
-                var opId = _operationCoordinator.CurrentOperationId;
-                if (opId != 0 && opId == _lastExitWarnedOperationId)
-                {
-                    _operationCoordinator.RequestCancel();
-                    return false;
-                }
-
-                _lastExitWarnedOperationId = opId;
 
                 if (!confirmExit())
                     return true;

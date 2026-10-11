@@ -35,7 +35,6 @@ namespace VAL.App.Host.Commands
 
         public void HandleGoChat(HostCommand cmd)
         {
-            ArgumentNullException.ThrowIfNull(cmd);
 
             var target = _webViewRuntime.LastChatUri?.ToString();
             if (string.IsNullOrWhiteSpace(target))
@@ -46,7 +45,6 @@ namespace VAL.App.Host.Commands
 
         public void HandleGoBack(HostCommand cmd)
         {
-            ArgumentNullException.ThrowIfNull(cmd);
 
             var wentBack = _webViewRuntime.TryGoBack();
             if (wentBack)

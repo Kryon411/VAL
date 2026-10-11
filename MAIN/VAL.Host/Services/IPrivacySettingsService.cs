@@ -11,6 +11,8 @@ namespace VAL.Host.Services
         bool UpdateContinuumLogging(bool enabled);
 
         bool UpdatePortalCapture(bool enabled);
+
+        bool DisableCapture();
     }
 
     public sealed record PrivacySettingsSnapshot(

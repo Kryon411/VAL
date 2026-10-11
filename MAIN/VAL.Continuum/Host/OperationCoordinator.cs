@@ -107,6 +107,17 @@ namespace VAL.Host
             }
         }
 
+        public bool RequestCancel(GuardedOperationKind kind, long expectedOperationId)
+        {
+            lock (_gate)
+            {
+                if (_cts == null || _currentKind != kind || _currentOperationId != expectedOperationId)
+                    return false;
+                _cts.Cancel();
+                return true;
+            }
+        }
+
         public CancellationToken GetTokenIfRunning(GuardedOperationKind kind)
         {
             lock (_gate)
@@ -135,7 +146,6 @@ namespace VAL.Host
                 try { _cts?.Dispose(); } catch { }
                 _cts = null;
                 _currentKind = null;
-                _currentOperationId = 0;
             }
         }
 

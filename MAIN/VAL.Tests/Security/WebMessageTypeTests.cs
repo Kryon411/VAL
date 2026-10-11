@@ -1,5 +1,6 @@
 using VAL.Contracts;
 using VAL.Host.Security;
+using VAL.Host.WebMessaging;
 
 using Xunit;
 
@@ -7,6 +8,12 @@ namespace VAL.Tests.Security
 {
     public sealed class WebMessageTypeTests
     {
+        [Fact]
+        public void OversizedEnvelopeIsRejectedBeforeParsing()
+        {
+            Assert.False(MessageEnvelope.TryParse(new string('x', MessageEnvelope.MaxJsonCharacters + 1), out _));
+        }
+
         [Fact]
         public void TryGetTypeReturnsTypeWhenPresent()
         {

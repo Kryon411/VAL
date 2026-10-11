@@ -463,8 +463,8 @@ namespace VAL.App.Host
                     ToastKey.DataWipeCompleted,
                     new ToastDef(
                         ToastKey.DataWipeCompleted,
-                        "Data wipe complete. Logs, profiles, and local memory have been cleared.",
-                        "Privacy settings were preserved.",
+                        "Managed local data folders have been cleared.",
+                        "Deletion was verified before startup. Capture remains disabled.",
                         ToastDuration.M,
                         "data_wipe",
                         ReplaceGroup: true,
@@ -478,8 +478,8 @@ namespace VAL.App.Host
                     ToastKey.DataWipePartial,
                     new ToastDef(
                         ToastKey.DataWipePartial,
-                        "Data wipe completed with some locked files.",
-                        "Close any open logs or folders and try again.",
+                        "Local data deletion could not be scheduled.",
+                        "Capture is disabled. Check data folder permissions and configuration.",
                         ToastDuration.M,
                         "data_wipe",
                         ReplaceGroup: true,

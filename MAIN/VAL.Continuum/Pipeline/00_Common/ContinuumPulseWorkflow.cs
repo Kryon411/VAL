@@ -11,7 +11,7 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Continuum
 {
-    internal sealed class ContinuumPulseWorkflow
+    internal sealed class ContinuumPulseWorkflow : IDisposable
     {
         private static readonly TimeSpan GuidanceSuppressWindow = TimeSpan.FromSeconds(25);
         private static readonly TimeSpan RefreshCooldown = TimeSpan.FromSeconds(10);
@@ -29,9 +29,14 @@ namespace VAL.Continuum
         private readonly ContinuumArchiveService _archives;
         private readonly Func<bool> _isChronicleInFlight;
         private readonly Action<Action> _postToUi;
+        private readonly TimeSpan _operationTimeout;
+        private CancellationTokenSource? _lifetimeCancellation;
+        private long _refreshOperationId;
+        private string? _injectionRequestId;
         private string? _pendingPulseChatId;
         private string? _pendingFlushRequestId;
         private bool _refreshInFlight;
+        private string? _refreshChatId;
         private DateTime _lastRefreshCompletedUtc = DateTime.MinValue;
         private DateTime _suppressGuidanceUntilUtc = DateTime.MinValue;
         private PendingSignalPulse? _pendingSignalPulse;
@@ -46,7 +51,8 @@ namespace VAL.Continuum
             IBackgroundTaskSupervisor backgroundTasks,
             ContinuumArchiveService archives,
             Func<bool> isChronicleInFlight,
-            Action<Action> postToUi)
+            Action<Action> postToUi,
+            TimeSpan? operationTimeout = null)
         {
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _toasts = toasts ?? throw new ArgumentNullException(nameof(toasts));
@@ -58,6 +64,8 @@ namespace VAL.Continuum
             _archives = archives ?? throw new ArgumentNullException(nameof(archives));
             _isChronicleInFlight = isChronicleInFlight ?? throw new ArgumentNullException(nameof(isChronicleInFlight));
             _postToUi = postToUi ?? throw new ArgumentNullException(nameof(postToUi));
+            _operationTimeout = operationTimeout ?? TimeSpan.FromMinutes(3);
+            if (_operationTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(operationTimeout));
         }
 
         public bool IsInFlight
@@ -126,6 +134,8 @@ namespace VAL.Continuum
                 return;
             }
 
+            StartLifetimeWatch(resolvedChatId);
+
             _toasts.TryShow(
                 ToastKey.PulseInitiated,
                 chatId: resolvedChatId,
@@ -156,7 +166,24 @@ namespace VAL.Continuum
             }
 
             if (eventName.StartsWith("refresh.inject.success", StringComparison.OrdinalIgnoreCase))
-                HandleInjectSuccessEvent(message.ChatId, eventName);
+                HandleInjectSuccessEvent(message.ChatId, message.RequestId, eventName);
+            else if (eventName.StartsWith("refresh.inject.failed:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (TryGetPendingSignalPulse(message.ChatId ?? string.Empty, out var signal) &&
+                    string.Equals(message.RequestId, signal.SignalRequestId, StringComparison.Ordinal))
+                {
+                    HandleSignalFailure(message.ChatId, message.RequestId);
+                    return;
+                }
+                bool matches;
+                lock (_sync)
+                    matches = MatchesInjection(message.RequestId);
+                if (matches)
+                {
+                    FinishRefresh(message.ChatId!, showReadyToast: false);
+                    ShowActionUnavailable(message.ChatId, ToastReason.Background);
+                }
+            }
         }
 
         public void HandleCaptureFlushAck(ContinuumCommandMessage message)
@@ -171,24 +198,26 @@ namespace VAL.Continuum
                 string? pendingRequestId;
                 lock (_sync)
                 {
-                    resolvedChatId = _sessionContext.ResolveChatId(message.ChatId);
+                    resolvedChatId = message.ChatId;
                     pendingRequestId = _pendingFlushRequestId;
-                }
+                    if (string.IsNullOrWhiteSpace(resolvedChatId) ||
+                        !string.Equals(resolvedChatId, _pendingPulseChatId, StringComparison.OrdinalIgnoreCase) ||
+                        !requestId.Equals(pendingRequestId, StringComparison.Ordinal))
+                        return;
 
-                if (string.IsNullOrWhiteSpace(resolvedChatId) ||
-                    !requestId.Equals(pendingRequestId, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                lock (_sync)
-                {
                     _pendingPulseChatId = null;
                     _pendingFlushRequestId = null;
                 }
 
                 if (!_operations.IsRunning(GuardedOperationKind.Pulse))
                     return;
+
+                if (!string.IsNullOrWhiteSpace(message.Error))
+                {
+                    FinishRefresh(resolvedChatId, showReadyToast: false);
+                    ShowActionUnavailable(resolvedChatId, ToastReason.Background);
+                    return;
+                }
 
                 if (_operations.IsCancellationRequested(GuardedOperationKind.Pulse))
                 {
@@ -205,12 +234,23 @@ namespace VAL.Continuum
             }
         }
 
-        public void CompleteInjection(string? chatId)
+        public void CompleteInjection(string? chatId, string? requestId)
         {
-            var resolvedChatId = _sessionContext.ResolveChatId(chatId);
-            if (!string.IsNullOrWhiteSpace(resolvedChatId))
-                FinishRefresh(resolvedChatId, showReadyToast: true);
+            lock (_sync)
+            {
+                if (!MatchesInjection(requestId) || _pendingSignalPulse != null ||
+                    string.IsNullOrWhiteSpace(chatId) || !_sessionContext.IsValidChatId(chatId))
+                    return;
+            }
+            FinishRefresh(chatId, showReadyToast: true);
         }
+
+        private bool MatchesInjection(string? requestId) =>
+            _refreshInFlight && !string.IsNullOrWhiteSpace(requestId) &&
+            requestId.Equals(_injectionRequestId, StringComparison.Ordinal) &&
+            _operations.IsRunning(GuardedOperationKind.Pulse) &&
+            _operations.CurrentOperationId == _refreshOperationId &&
+            !_operations.IsCancellationRequested(GuardedOperationKind.Pulse);
 
         private bool TryBeginRefresh(string chatId, ToastReason reason)
         {
@@ -241,6 +281,9 @@ namespace VAL.Continuum
                 }
 
                 _refreshInFlight = true;
+                _refreshChatId = chatId;
+                _refreshOperationId = _operations.CurrentOperationId;
+                _injectionRequestId = Guid.NewGuid().ToString("N");
                 _suppressGuidanceUntilUtc = DateTime.UtcNow + GuidanceSuppressWindow;
                 return true;
             }
@@ -250,11 +293,21 @@ namespace VAL.Continuum
         {
             var endedRefresh = false;
             PendingSignalPulse? pendingSignal = null;
+            CancellationTokenSource? lifetime = null;
+            string? injectionRequestId = null;
             lock (_sync)
             {
                 if (_refreshInFlight)
                 {
                     _refreshInFlight = false;
+                    _refreshChatId = null;
+                    _refreshOperationId = 0;
+                    injectionRequestId = _injectionRequestId;
+                    _injectionRequestId = null;
+                    _pendingPulseChatId = null;
+                    _pendingFlushRequestId = null;
+                    lifetime = _lifetimeCancellation;
+                    _lifetimeCancellation = null;
                     _lastRefreshCompletedUtc = DateTime.UtcNow;
                     pendingSignal = _pendingSignalPulse;
                     _pendingSignalPulse = null;
@@ -263,6 +316,10 @@ namespace VAL.Continuum
             }
 
             CancelTimeout(pendingSignal);
+            lifetime?.Cancel();
+            lifetime?.Dispose();
+            CancelClientInjection(injectionRequestId);
+            CancelClientInjection(pendingSignal?.SignalRequestId);
 
             if (endedRefresh)
                 _operations.End(GuardedOperationKind.Pulse);
@@ -278,7 +335,7 @@ namespace VAL.Continuum
             }
         }
 
-        private void HandleInjectSuccessEvent(string? chatId, string eventName)
+        private void HandleInjectSuccessEvent(string? chatId, string? requestId, string eventName)
         {
             var resolvedChatId = _sessionContext.ResolveChatId(chatId);
             if (string.IsNullOrWhiteSpace(resolvedChatId))
@@ -292,13 +349,11 @@ namespace VAL.Continuum
                 if (mode.Equals("Pulse", StringComparison.OrdinalIgnoreCase))
                 {
                     if (ContinuumEventParser.IsPulseCompletionTarget(label))
-                        FinishRefresh(resolvedChatId, showReadyToast: true);
+                        CompleteInjection(chatId, requestId);
                     return;
                 }
             }
 
-            if (!HasPendingSignalPulse(resolvedChatId))
-                FinishRefresh(resolvedChatId, showReadyToast: true);
         }
 
         private void HandleSignalReplySettled(ContinuumCommandMessage message)
@@ -343,7 +398,7 @@ namespace VAL.Continuum
                     renderedPulsePacket,
                     "PulsePacketComposer",
                     token);
-                _injectQueue.Enqueue(seed);
+                EnqueueFinalSeed(seed);
             }
             catch (OperationCanceledException)
             {
@@ -352,7 +407,7 @@ namespace VAL.Continuum
             }
             catch
             {
-                _injectQueue.Enqueue(pending.DeterministicFallbackSeed);
+                EnqueueFinalSeed(pending.DeterministicFallbackSeed);
             }
         }
 
@@ -365,16 +420,7 @@ namespace VAL.Continuum
                 return;
             }
 
-            _injectQueue.Enqueue(pending.DeterministicFallbackSeed);
-        }
-
-        private bool HasPendingSignalPulse(string chatId)
-        {
-            lock (_sync)
-            {
-                return _pendingSignalPulse != null &&
-                       _pendingSignalPulse.ChatId.Equals(chatId, StringComparison.OrdinalIgnoreCase);
-            }
+            EnqueueFinalSeed(pending.DeterministicFallbackSeed);
         }
 
         private bool TryGetPendingSignalPulse(string chatId, out PendingSignalPulse pending)
@@ -434,6 +480,7 @@ namespace VAL.Continuum
                 pending = _pendingSignalPulse;
                 _pendingSignalPulse = null;
                 CancelTimeout(pending);
+                CancelClientInjection(pending.SignalRequestId);
                 return true;
             }
         }
@@ -459,7 +506,7 @@ namespace VAL.Continuum
                                 pending.SignalRequestId,
                                 out var timedOutPending))
                         {
-                            _injectQueue.Enqueue(timedOutPending.DeterministicFallbackSeed);
+                            EnqueueFinalSeed(timedOutPending.DeterministicFallbackSeed);
                         }
                     });
                 },
@@ -471,6 +518,7 @@ namespace VAL.Continuum
             try
             {
                 var requestId = Guid.NewGuid().ToString("N");
+                var operationId = _operations.CurrentOperationId;
                 lock (_sync)
                 {
                     _pendingPulseChatId = chatId;
@@ -510,7 +558,7 @@ namespace VAL.Continuum
 
                     _postToUi(() =>
                     {
-                        if (!_operations.IsRunning(GuardedOperationKind.Pulse))
+                        if (!_operations.IsRunning(GuardedOperationKind.Pulse) || _operations.CurrentOperationId != operationId)
                             return;
 
                         if (_operations.IsCancellationRequested(GuardedOperationKind.Pulse))
@@ -580,7 +628,7 @@ namespace VAL.Continuum
             var signalPrompt = (ContinuumAssetLoader.LoadSignalPrompt(chatId) ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(signalPrompt))
             {
-                _injectQueue.Enqueue(deterministicFallbackSeed);
+                EnqueueFinalSeed(deterministicFallbackSeed);
                 return;
             }
 
@@ -589,7 +637,7 @@ namespace VAL.Continuum
             if (string.IsNullOrWhiteSpace(signalInput) ||
                 operationId <= 0)
             {
-                _injectQueue.Enqueue(deterministicFallbackSeed);
+                EnqueueFinalSeed(deterministicFallbackSeed);
                 return;
             }
 
@@ -615,11 +663,70 @@ namespace VAL.Continuum
                 OpenNewChat = false,
                 AutoSend = true,
                 RequestId = signalRequestId,
+                CancellationToken = token,
                 SourceFileName = "SignalInputBuilder",
                 EssenceFileName = "Signal.Prompt.v1.txt",
             });
 
             StartSignalTimeout(pending);
+        }
+
+        private void EnqueueFinalSeed(EssenceInjectController.InjectSeed seed)
+        {
+            lock (_sync)
+            {
+                if (!_refreshInFlight || _operations.CurrentOperationId != _refreshOperationId)
+                    return;
+                seed.RequestId = _injectionRequestId!;
+                seed.CancellationToken = _operations.GetTokenIfRunning(GuardedOperationKind.Pulse);
+                if (!seed.CancellationToken.IsCancellationRequested)
+                    _injectQueue.Enqueue(seed);
+            }
+        }
+
+        private void StartLifetimeWatch(string chatId)
+        {
+            var operationId = _refreshOperationId;
+            var lifetime = CancellationTokenSource.CreateLinkedTokenSource(
+                _operations.GetTokenIfRunning(GuardedOperationKind.Pulse));
+            var lifetimeToken = lifetime.Token;
+            lock (_sync) _lifetimeCancellation = lifetime;
+            _backgroundTasks.Run("Pulse lifetime", async token =>
+            {
+                // The delegate must run even when cancellation precedes task scheduling.
+                using var watchCancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken, token);
+                var cancelled = false;
+                try { await Task.Delay(_operationTimeout, watchCancellation.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) { cancelled = true; }
+                if (!cancelled)
+                    _operations.RequestCancel(GuardedOperationKind.Pulse, operationId);
+                _postToUi(() =>
+                {
+                    lock (_sync)
+                    {
+                        if (!_refreshInFlight || _refreshOperationId != operationId)
+                            return;
+                    }
+                    FinishRefresh(chatId, showReadyToast: false);
+                    if (cancelled) ShowOperationCancelled();
+                    else ShowActionUnavailable(chatId, ToastReason.Background);
+                });
+            });
+        }
+
+        private void CancelClientInjection(string? requestId)
+        {
+            if (string.IsNullOrWhiteSpace(requestId)) return;
+            try
+            {
+                _messageSender.Send(new MessageEnvelope
+                {
+                    Type = WebMessageTypes.Command,
+                    Name = WebCommandNames.ContinuumInjectCancel,
+                    Payload = JsonSerializer.SerializeToElement(new { requestId }),
+                });
+            }
+            catch { }
         }
 
         private void ShowActionUnavailable(string? chatId, ToastReason reason)
@@ -679,6 +786,11 @@ namespace VAL.Continuum
             public DeterministicPulseSections DeterministicSections { get; init; } = new();
             public EssenceInjectController.InjectSeed DeterministicFallbackSeed { get; init; } = new();
             public CancellationTokenSource TimeoutCancellation { get; } = new();
+        }
+
+        public void Dispose()
+        {
+            FinishRefresh(_refreshChatId ?? string.Empty, showReadyToast: false);
         }
     }
 }

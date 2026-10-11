@@ -10,13 +10,17 @@ namespace VAL.Host.Services
     {
         Task InitializeAsync(WebView2 control);
         bool IsReady { get; }
+        bool IsBridgeReady => IsReady;
+        long NavigationGeneration { get; }
         CoreWebView2? Core { get; }
         Uri? LastChatUri { get; }
         void PostJson(string json);
         Task ExecuteScriptAsync(string js);
+        Task<string?> EvaluateScriptAsync(string js);
         void Navigate(string url);
         bool TryGoBack();
         event Action<VAL.Host.WebMessaging.WebMessageEnvelope>? WebMessageJsonReceived;
         event Action? NavigationCompleted;
+        event Action? NavigationStateChanged;
     }
 }

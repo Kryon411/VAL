@@ -13,6 +13,7 @@ using Microsoft.Web.WebView2.Core;
 using VAL.Host.Json;
 using VAL.Host.Logging;
 using VAL.Host.Options;
+using VAL.Host.Security;
 
 namespace VAL.Host.Services
 {
@@ -376,7 +377,7 @@ namespace VAL.Host.Services
 
                     try
                     {
-                        var script = File.ReadAllText(scriptPath);
+                        var script = WebViewScriptPolicy.Guard(File.ReadAllText(scriptPath));
                         // Persist across navigations + run immediately for current document.
                         await coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(script);
                         await coreWebView2.ExecuteScriptAsync(script);
@@ -397,27 +398,7 @@ namespace VAL.Host.Services
 
                         // Important: document.head can be null at DocumentCreated time (especially during auth/login flows).
                         // Inject the style in a head-safe way so modules remain styled across navigations without requiring a relaunch.
-                        var safeName = new string(moduleNameFromFile
-                            .Select(ch => char.IsLetterOrDigit(ch) ? char.ToLowerInvariant(ch) : '-')
-                            .ToArray());
-                        var styleId = "val-style-" + safeName;
-
-                        var js = "(() => { try {"
-                               + "const id = " + JsonSerializer.Serialize(styleId) + ";"
-                               + "const css = " + JsonSerializer.Serialize(css) + ";"
-                               + "const add = () => { try {"
-                               + "  if (document.getElementById(id)) return;"
-                               + "  const s = document.createElement('style');"
-                               + "  s.id = id;"
-                               + "  s.textContent = css;"
-                               + "  const t = document.head || document.documentElement || document.body;"
-                               + "  if (t) t.appendChild(s);"
-                               + "} catch {} };"
-                               + "if (document.getElementById(id)) return;"
-                               + "if (document.head || document.documentElement || document.body) { add(); }"
-                               + "else if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', add, { once: true }); }"
-                               + "else { setTimeout(add, 0); }"
-                               + "} catch {} })();";
+                        var js = ModuleStylesheetScript.Create(moduleNameFromFile, rel, css);
 
                         await coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(js);
                         await coreWebView2.ExecuteScriptAsync(js);

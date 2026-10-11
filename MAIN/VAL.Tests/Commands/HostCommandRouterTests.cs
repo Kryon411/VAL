@@ -12,6 +12,26 @@ namespace VAL.Tests.Commands
     public sealed class HostCommandRouterTests
     {
         private static readonly Uri TestSourceUri = new("https://chatgpt.com");
+        private static readonly string[] RequiredTestFields = { "required" };
+
+        [Fact]
+        public void BlockedAttachAndDelayedCompletionCannotChangeActiveChat()
+        {
+            var session = new SessionContext();
+            session.SetActiveChatId("current");
+            var registry = new CommandRegistry();
+            registry.Register(new CommandSpec(WebCommandNames.ContinuumSessionAttach,
+                "Continuum", RequiredTestFields, _ => { }));
+            var router = new HostCommandRouter(registry, new FakeLog(), sessionContext: session);
+            var json = "{\"type\":\"continuum.session.attach\",\"chatId\":\"stale\"}";
+            Assert.Equal(HostCommandExecutionStatus.Blocked,
+                router.HandleWebMessage(new WebMessageEnvelope(json, TestSourceUri)).Status);
+            Assert.Equal("current", session.ActiveChatId);
+            session.Observe(WebCommandNames.ContinuumChronicleDone, "stale");
+            Assert.Equal("current", session.ActiveChatId);
+            session.Observe(WebCommandNames.ContinuumSessionAttached, "new");
+            Assert.Equal("new", session.ActiveChatId);
+        }
 
         [Fact]
         public void HandleWebMessageReturnsBlockedResultForEmptyJson()

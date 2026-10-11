@@ -1,5 +1,5 @@
 try { console.log("[VAL Continuum] script loaded"); } catch (_) {}
-/* Continuum.Client.js — v3.1.34
+/* Continuum.Client.js — v3.1.37
  * Pulse new-chat sequencing:
  *  - On openNewChat, inject only after navigation has moved away from the origin chat
  *    and the destination composer passes explicit readiness checks.
@@ -12,7 +12,8 @@ try {
 (function () {
   "use strict";
 
-  const CONTINUUM_VERSION = "3.1.34";
+  const CONTINUUM_VERSION = "3.1.39";
+  window.__VAL_CONTINUUM_HEALTH = { initialized: false, failed: false };
   const INJECT_READY_STABILIZE_MS = 120;
   const NEW_CHAT_TURN_LIMIT = 1;
   const NEW_CHAT_RETRY_INTERVAL_MS = 20000;
@@ -79,6 +80,7 @@ try {
     lastMutationAtById: new Map(),
 
     pendingSeed: null,
+    cancelledInjectionIds: new Set(),
     signalAwaiting: null,
     injectorTimer: null,
     injectorLastStatusAt: 0,
@@ -102,6 +104,12 @@ try {
       lastProgressPct: -1
     },
   };
+
+  Object.defineProperties(window.__VAL_CONTINUUM_HEALTH, {
+    pendingInjection: { get: () => !!state.pendingSeed },
+    awaitingNewChat: { get: () => state.pendingSeed?.requireNewChat === true },
+    awaitingSignal: { get: () => !!state.signalAwaiting }
+  });
 
   function clearSignalAwaiting(requestId) {
     try {
@@ -257,7 +265,7 @@ try {
 
           const isPrompt =
             (t.id === "prompt-textarea") ||
-            (t.closest && (t.closest("#prompt-textarea") || t.closest("textarea")));
+            (t.closest && t.closest("#prompt-textarea, #mobile-composer-prompt, form[data-chatgpt-composer] [data-composer-markdown]"));
 
           if (!isPrompt) return;
 
@@ -271,7 +279,7 @@ try {
           const t = e && (e.target || e.srcElement);
           if (!t || !t.closest) return;
 
-          const btn = t.closest("button[data-testid='send-button'], button[aria-label='Send prompt'], button[aria-label='Send message']");
+          const btn = t.closest("form[data-chatgpt-composer] button[aria-label='Send'], button[data-testid='send-button'], button[aria-label='Send prompt'], button[aria-label='Send message']");
           if (!btn) return;
 
           sendSafetyEnsureAttach();
@@ -319,7 +327,7 @@ try {
     return true;
   }
 
-  const STOP_SELECTOR = "button[data-testid=\"stop-button\"][aria-label=\"Stop streaming\"]";
+  const STOP_SELECTOR = "button[data-testid='stop-button'], form[data-chatgpt-composer] button[aria-label='Stop'], form[data-chatgpt-composer] button[aria-label='Stop streaming']";
 
   const ACTIONS_SELECTOR = [
     "button[data-testid='copy-turn-action-button']",
@@ -332,14 +340,39 @@ try {
     "button[aria-label='Share']"
   ].join(",");
 
-  const TURN_SELECTOR = "[data-testid^='conversation-turn-'], [data-message-id]";
+  const TURN_SELECTOR = "[data-testid^='conversation-turn-'], [data-message-id], [data-chatgpt-search-unit-key]";
   const ASSISTANT_SETTLE_STABLE_MS = 450;
+
+  function isTurnRendered(turn) {
+    try {
+      if (!turn || !turn.isConnected || !document.contains(turn)) return false;
+      if (turn.closest("[hidden], [inert], [aria-hidden='true']")) return false;
+      const rect = turn.getBoundingClientRect();
+      const style = getComputedStyle(turn);
+      // Keep offscreen history, but exclude SPA-retained hidden conversations.
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    } catch (_) { return false; }
+  }
+
+  function isTurnForCurrentChat(turn) {
+    try {
+      const owner = turn.closest("[data-turn-key]") || turn;
+      const selection = owner.querySelector("[data-chatgpt-selection-conversation-id]");
+      const conversationId = selection && selection.getAttribute("data-chatgpt-selection-conversation-id");
+      return !conversationId || conversationId === getChatIdFromLocation();
+    } catch (_) { return false; }
+  }
+
+  function getConversationTurns() {
+    return Array.from(document.querySelectorAll(TURN_SELECTOR))
+      .filter(turn => isTurnRendered(turn) && isTurnForCurrentChat(turn));
+  }
 
   function collectAssistantTurnIds() {
     const ids = new Set();
 
     try {
-      const turns = Array.from(document.querySelectorAll(TURN_SELECTOR));
+      const turns = getConversationTurns();
       for (const turnEl of turns) {
         const id = getTurnId(turnEl);
         if (!id) continue;
@@ -377,6 +410,12 @@ try {
       if (!turnEl) return false;
       if (turnEl.querySelector(ACTIONS_SELECTOR)) return true;
 
+      // The current UI places response actions outside the message unit, within its turn.
+      if (turnEl.matches("[data-chatgpt-search-unit-key]")) {
+        const turn = turnEl.closest("[data-turn-key]");
+        if (turn && turn.querySelector(ACTIONS_SELECTOR)) return true;
+      }
+
       const parent = turnEl.parentElement;
       if (parent && parent.querySelector(ACTIONS_SELECTOR)) return true;
 
@@ -402,16 +441,22 @@ try {
     const t = turnEl.getAttribute("data-testid");
     if (t) return t;
 
+    const unitKey = turnEl.getAttribute("data-chatgpt-search-unit-key");
+    if (unitKey) return "unit:" + unitKey;
+
     return null;
   }
 
   function inferRoleFromTurn(turnEl) {
     try {
-      const roleNode = turnEl.querySelector("[data-message-author-role]");
+      const roleNode = turnEl.matches("[data-message-author-role]") ? turnEl : turnEl.querySelector("[data-message-author-role]");
       if (roleNode) {
         const r = roleNode.getAttribute("data-message-author-role");
         if (r === "user" || r === "assistant") return r;
       }
+      if (turnEl.matches("[data-user-message-bubble]") || turnEl.querySelector("[data-user-message-bubble]")) return "user";
+      if (turnEl.querySelector("[data-conversation-role='assistant']") ||
+          turnEl.querySelector("[data-chatgpt-selection-message-id] [data-markdown-text-style]")) return "assistant";
     } catch (_) {}
 
     if (actionsPresentInOrNear(turnEl)) return "assistant";
@@ -420,6 +465,14 @@ try {
 
   function extractTurnText(turnEl, role) {
     if (!turnEl) return "";
+
+    try {
+      const body = turnEl.querySelector(role === "user" ? "[data-user-message-bubble]" : "[data-markdown-text-style]");
+      if (body) {
+        const text = (body.innerText || "").trim();
+        if (text) return text;
+      }
+    } catch (_) {}
 
     try {
       const md = turnEl.querySelector(".markdown.prose");
@@ -467,6 +520,7 @@ try {
   function handleTurn(turnEl) {
     try {
       if (!ensureAttachedIfReady()) return false;
+      if (!isTurnRendered(turnEl) || !isTurnForCurrentChat(turnEl)) return false;
 
       const id = getTurnId(turnEl);
       if (!id) return false;
@@ -506,7 +560,7 @@ try {
     if (!ensureAttachedIfReady()) return false;
 
     try {
-      const all = Array.from(document.querySelectorAll(TURN_SELECTOR));
+      const all = getConversationTurns();
       const seen = new Set();
       const turns = [];
 
@@ -544,7 +598,7 @@ try {
           const t = m && m.target;
           if (!t || !t.closest) continue;
 
-          const turnEl = t.closest("[data-message-id]") || t.closest("[data-testid^='conversation-turn-']");
+          const turnEl = t.closest("[data-message-id]") || t.closest("[data-testid^='conversation-turn-']") || t.closest("[data-chatgpt-search-unit-key]");
           if (!turnEl) continue;
 
           const id = getTurnId(turnEl);
@@ -561,7 +615,7 @@ try {
 
     try {
       const now = (performance && performance.now) ? performance.now() : Date.now();
-      for (const el of document.querySelectorAll(TURN_SELECTOR)) {
+      for (const el of getConversationTurns()) {
         const id = getTurnId(el);
         if (id && !state.lastMutationAtById.has(id)) state.lastMutationAtById.set(id, now);
       }
@@ -683,10 +737,20 @@ try {
   // Dedicated injector loop
   function composerReady() {
     try {
-      const prose = document.querySelector("#prompt-textarea.ProseMirror[contenteditable='true']");
-      if (prose) return { kind: "prosemirror", el: prose };
-      const textarea = document.querySelector("textarea");
-      if (textarea) return { kind: "textarea", el: textarea };
+      const selectors = [
+        ["form[data-chatgpt-composer] [data-composer-markdown][contenteditable='true'][role='textbox']", "prosemirror"],
+        ["#prompt-textarea[contenteditable='true']", "prosemirror"],
+        ["#mobile-composer-prompt[contenteditable='true']", "prosemirror"],
+        ["textarea#prompt-textarea", "textarea"],
+        ["textarea#mobile-composer-prompt", "textarea"],
+        ["textarea[data-testid='prompt-textarea']", "textarea"]
+      ];
+      for (const [selector, kind] of selectors) {
+        for (const el of document.querySelectorAll(selector)) {
+          if (isElementVisible(el) && !el.disabled && !el.readOnly &&
+              el.getAttribute("aria-disabled") !== "true") return { kind, el };
+        }
+      }
     } catch (_) {}
     return null;
   }
@@ -753,7 +817,7 @@ try {
   function getConversationTurnCount() {
     try {
       const els = document.querySelectorAll(TURN_SELECTOR);
-      return els ? els.length : 0;
+      return Array.from(els).filter(isTurnRendered).length;
     } catch (_) { return 0; }
   }
 
@@ -805,9 +869,11 @@ try {
   function injectIntoComposer(text, composerTarget) {
     const c = composerTarget || composerReady();
     if (!c) return false;
+    if (!isComposerBlank(c)) return false;
 
     try {
-      if (!c.el || !c.el.isConnected || !document.contains(c.el)) return false;
+      if (!isElementVisible(c.el) || c.el.disabled || c.el.readOnly ||
+          c.el.getAttribute("aria-disabled") === "true") return false;
       try { c.el.focus(); } catch (_) {}
       if (c.kind === "prosemirror") {
         // Preserve paragraphs/line-breaks so the injected Essence-M remains readable in the composer.
@@ -826,6 +892,7 @@ try {
 
   function findSendButton() {
     const selectors = [
+      "form[data-chatgpt-composer] button[aria-label='Send']",
       "button[data-testid='send-button']",
       "button[aria-label='Send prompt']",
       "button[aria-label='Send message']"
@@ -847,6 +914,13 @@ try {
   function tryAutoSendSeed(seed, chatIdForEvent) {
     try {
       if (!seed || !seed.autoSend) return true;
+      if (state.cancelledInjectionIds.has(seed.requestId)) return false;
+      if (chatIdForEvent && getChatIdFromLocation() !== chatIdForEvent) {
+        clearSignalAwaiting(seed.requestId);
+        post({ type: "continuum.event", chatId: chatIdForEvent,
+          evt: "signal.send.failed:chat_changed", requestId: seed.requestId || "" });
+        return false;
+      }
 
       const btn = findSendButton();
       if (!btn) {
@@ -970,7 +1044,21 @@ try {
       state.chatId = getChatIdFromLocation();
 
       const seed = state.pendingSeed;
+      if (!seed.requireNewChat && seed.targetChatId && seed.targetChatId !== getChatIdFromLocation()) {
+        state.pendingSeed = null;
+        stopInjectorLoopIfIdle();
+        post({ type: "continuum.event", chatId: seed.targetChatId,
+          evt: "refresh.inject.failed:chat_changed", requestId: seed.requestId || "" });
+        return false;
+      }
       const now = Date.now();
+        if (now - (seed.createdAt || seed.requestedAt || now) >= 120000) {
+          state.pendingSeed = null;
+          stopInjectorLoopIfIdle();
+          post({ type: "continuum.event", chatId: seed.originChatId || seed.targetChatId || "unknown",
+            evt: "refresh.inject.failed:timeout", requestId: seed.requestId || "" });
+          return false;
+        }
       const started = seed.requestedAt || now;
       const mode = seed.mode || "Quick";
       let injectionTarget = null;
@@ -1034,7 +1122,8 @@ try {
       }
 
       post({ type: "continuum.event", chatId: currentId || originId || "unknown", evt: "rehydrate.seed_inserted:" + mode + ":" + label });
-      post({ type: "continuum.event", chatId: currentId || originId || "unknown", evt: "refresh.inject.success:" + mode + ":" + label });
+      post({ type: "continuum.event", chatId: currentId || originId || "unknown",
+        evt: "refresh.inject.success:" + mode + ":" + label, requestId: seed.requestId || "" });
 
       state.pendingSeed = null;
       stopInjectorLoopIfIdle();
@@ -1057,6 +1146,11 @@ try {
     try {
       const rid = (requestId || "").toString().trim();
       if (!rid) return;
+      if (requestedChatId && requestedChatId !== getChatIdFromLocation()) {
+        post({ type: "continuum.capture.flush_ack", chatId: requestedChatId,
+          requestId: rid, error: "chat_changed" });
+        return;
+      }
 
       // Best-effort: align chatId for outgoing truth lines during this flush.
       if (requestedChatId && typeof requestedChatId === "string" && requestedChatId.trim()) {
@@ -1077,7 +1171,7 @@ try {
         // Include a tiny tail breadcrumb for debugging (ids only; text is already in Truth.log).
         let tailIds = [];
         try {
-          const turns = Array.from(document.querySelectorAll(TURN_SELECTOR));
+          const turns = getConversationTurns();
           const ids = [];
           for (let i = Math.max(0, turns.length - 6); i < turns.length; i++) {
             const id = getTurnId(turns[i]);
@@ -1254,37 +1348,39 @@ try {
   function findScrollContainer(){
     try {
       const root = document.scrollingElement || document.documentElement || document.body;
-      if (root && root.scrollHeight > (root.clientHeight + 200)) return root;
-
-      const candidates = Array.from(document.querySelectorAll("main, [role='main'], #__next, body, html, div"));
-      let best = null;
-      let bestScore = 0;
-
-      for (let i = 0; i < candidates.length; i++){
-        const el = candidates[i];
-        if (!el || !el.getBoundingClientRect) continue;
-        const sh = el.scrollHeight || 0;
-        const ch = el.clientHeight || 0;
-        if (sh <= ch + 200) continue;
-
-        let oy = "";
-        try { oy = (getComputedStyle(el).overflowY || "").toLowerCase(); } catch(_) { oy = ""; }
-        if (oy !== "auto" && oy !== "scroll") continue;
-
-        if (sh > bestScore){
-          best = el;
-          bestScore = sh;
+      for (const turn of getConversationTurns()) {
+        for (let el = turn.parentElement; el; el = el.parentElement) {
+          if (!el.isConnected || el.clientHeight <= 0 || el.scrollHeight <= el.clientHeight + 1) continue;
+          const overflow = (getComputedStyle(el).overflowY || "").toLowerCase();
+          if (overflow === "auto" || overflow === "scroll") return el;
         }
       }
-
-      return best || root;
+      return root;
     } catch (_) {}
     return document.scrollingElement || document.documentElement || document.body;
   }
 
+  function getChronicleScrollMetrics(scroller) {
+    const max = Math.max(0, (scroller.scrollHeight || 0) - (scroller.clientHeight || 0));
+    const reversed = getComputedStyle(scroller).flexDirection === "column-reverse";
+    const rawTop = scroller.scrollTop || 0;
+    return { max, reversed, top: Math.max(0, Math.min(max, reversed ? max + rawTop : rawTop)) };
+  }
+
+  function setChronicleScrollTop(scroller, top) {
+    const metrics = getChronicleScrollMetrics(scroller);
+    const bounded = Math.max(0, Math.min(metrics.max, top));
+    // Reversed flex containers use negative scrollTop above their bottom origin.
+    scroller.scrollTop = metrics.reversed ? bounded - metrics.max : bounded;
+  }
+
+  function chronicleScrollIsStalled(scroller, previousTop, requestedTop) {
+    return requestedTop > previousTop + 1 && getChronicleScrollMetrics(scroller).top <= previousTop + 1;
+  }
+
   function getFirstAndLastTurnIds(){
     try {
-      const turns = Array.from(document.querySelectorAll(TURN_SELECTOR));
+      const turns = getConversationTurns();
       if (!turns || !turns.length) return { firstId: null, lastId: null, count: 0 };
       const firstId = getTurnId(turns[0]);
       const lastId = getTurnId(turns[turns.length - 1]);
@@ -1317,7 +1413,13 @@ try {
     const c = state.chronicle;
     if (c.active) return;
 
-    const resolveChatId = () => (state.chatId || getChatIdFromLocation() || requestedChatId || "unknown");
+    const originalChatId = requestedChatId || getChatIdFromLocation();
+    if (!originalChatId || originalChatId !== getChatIdFromLocation()) {
+      post({ type: "continuum.chronicle.done", chatId: originalChatId,
+        requestId, capturedTurns: 0, error: "chat_changed" });
+      return;
+    }
+    const resolveChatId = () => originalChatId;
 
     c.active = true;
     c.requestId = (requestId || "").toString().trim() || ("chronicle-" + Date.now());
@@ -1351,12 +1453,16 @@ try {
       e.__valChronicleCancelled = true;
       return e;
     };
+    const checkContext = () => {
+      if (c.cancelRequested) throw cancelErr();
+      if (getChatIdFromLocation() !== originalChatId) throw new Error("chat_changed");
+    };
 
     try {
       // Give the UI a moment so our freezeWrites gate is active before background scans run.
       await sleep(120);
 
-      if (c.cancelRequested) throw cancelErr();
+      checkContext();
 
       const sc = findScrollContainer();
 
@@ -1365,16 +1471,16 @@ try {
       let lastFirst = null;
 
       for (let i = 0; i < 140; i++){
-        if (c.cancelRequested) throw cancelErr();
-        try { sc.scrollTop = 0; } catch(_) {}
+        checkContext();
+        try { setChronicleScrollTop(sc, 0); } catch(_) {}
         await sleep(420);
 
-        if (c.cancelRequested) throw cancelErr();
+        checkContext();
 
         const ids = getFirstAndLastTurnIds();
         const firstId = ids.firstId;
 
-        if (firstId && firstId === lastFirst) stable++;
+        if (firstId && firstId === lastFirst && getChronicleScrollMetrics(sc).top <= 1) stable++;
         else stable = 0;
 
         lastFirst = firstId;
@@ -1385,15 +1491,17 @@ try {
 
         if (stable >= 4) break;
       }
+      if (stable < 4) throw new Error("top_not_reached");
 
       // Phase 2: enable writes and scan+scroll down to capture in order.
-      if (c.cancelRequested) throw cancelErr();
+      checkContext();
       c.phase = "capture";
       c.freezeWrites = false;
 
       // Initial scan at top.
       try { scanAllTurns(); } catch(_) {}
       await sleep(200);
+      checkContext();
       try { scanAllTurns(); } catch(_) {}
 
       chronicleSetOverlay("Chronicle: capturing down…", 20);
@@ -1401,13 +1509,12 @@ try {
 
       let bottomStable = 0;
       let lastLastId = null;
+      let stalledScrolls = 0;
+      let reachedBottom = false;
 
       for (let i = 0; i < 2400; i++){
-        if (c.cancelRequested) throw cancelErr();
-        let max = 0;
-        try { max = Math.max(0, (sc.scrollHeight || 0) - (sc.clientHeight || 0)); } catch(_) { max = 0; }
-        let top = 0;
-        try { top = sc.scrollTop || 0; } catch(_) { top = 0; }
+        checkContext();
+        const { max, top } = getChronicleScrollMetrics(sc);
 
         const pct = max > 0 ? Math.round((top / max) * 100) : 100;
         const uiPct = Math.max(20, Math.min(99, pct));
@@ -1418,31 +1525,39 @@ try {
         const step = Math.max(180, Math.floor((sc.clientHeight || 800) * 0.85));
         const next = Math.min(max, top + step);
 
-        if (next === top) bottomStable++;
-        try { sc.scrollTop = next; } catch(_) {}
+        try { setChronicleScrollTop(sc, next); } catch(_) {}
 
         await sleep(420);
-        if (c.cancelRequested) throw cancelErr();
+        checkContext();
+        stalledScrolls = chronicleScrollIsStalled(sc, top, next) ? stalledScrolls + 1 : 0;
+        if (stalledScrolls >= 5) throw new Error("scroll_stalled");
         try { scanAllTurns(); } catch(_) {}
         await sleep(140);
-        if (c.cancelRequested) throw cancelErr();
+        checkContext();
         try { scanAllTurns(); } catch(_) {}
 
         const ids = getFirstAndLastTurnIds();
         const lastId = ids.lastId;
+        const afterScroll = getChronicleScrollMetrics(sc);
+        const atBottom = afterScroll.max - afterScroll.top <= 1;
 
-        if (next >= max && lastId && lastId === lastLastId) bottomStable++;
-        else if (next < max) bottomStable = 0;
+        if (atBottom && lastId && lastId === lastLastId) bottomStable++;
+        else bottomStable = 0;
 
         lastLastId = lastId;
 
-        if (max === 0 && i > 6) break; // nothing to scroll
-        if (next >= max && bottomStable >= 5) break;
+        if ((afterScroll.max === 0 && i > 6) || (atBottom && bottomStable >= 5)) {
+          reachedBottom = true;
+          break;
+        }
       }
+      if (!reachedBottom) throw new Error("capture_incomplete");
 
       // Final settle scans
+      checkContext();
       try { scanAllTurns(); } catch(_) {}
       await sleep(250);
+      checkContext();
       try { scanAllTurns(); } catch(_) {}
 
       const elapsed = Date.now() - (c.startedAt || Date.now());
@@ -1557,9 +1672,29 @@ function handleHostMessage(event) {
       return;
     }
 
+    if (msg.type === "continuum.inject.cancel") {
+      const requestId = (msg.requestId || "").toString();
+      if (!requestId) return;
+      state.cancelledInjectionIds.add(requestId);
+      if (state.cancelledInjectionIds.size > 128)
+        state.cancelledInjectionIds.delete(state.cancelledInjectionIds.values().next().value);
+      if (state.pendingSeed && state.pendingSeed.requestId === requestId) {
+        state.pendingSeed = null;
+        stopInjectorLoopIfIdle();
+      }
+      clearSignalAwaiting(requestId);
+      return;
+    }
+
     if (msg.type === "continuum.inject_text") {
+      if (msg.requestId && state.cancelledInjectionIds.has(msg.requestId)) return;
       const essence = ((msg.text ?? msg.essence) || "").toString();
       if (!essence) return;
+      if (msg.chatId && msg.chatId !== getChatIdFromLocation()) {
+        post({ type: "continuum.event", chatId: msg.chatId,
+          evt: "refresh.inject.failed:chat_changed", requestId: msg.requestId || "" });
+        return;
+      }
 
       const openNewChat = msg.openNewChat === true;
       const mode = (msg.capsuleMode || msg.mode || "Quick");
@@ -1569,7 +1704,9 @@ function handleHostMessage(event) {
         mode,
         requireNewChat: openNewChat,
         originChatId: getChatIdFromLocation(),
+        targetChatId: msg.chatId || getChatIdFromLocation(),
         requestedAt: Date.now(),
+          createdAt: Date.now(),
         readySignature: null,
         readyAt: 0,
         autoSend: msg.autoSend === true,
@@ -1604,12 +1741,21 @@ function handleHostMessage(event) {
     scanAllTurns();
     startPollingScan();
     startInjectorLoop();
+    window.__VAL_CONTINUUM_HEALTH.initialized = true;
+  }
+
+  function initializeSafely() {
+    try { init(); }
+    catch (error) {
+      window.__VAL_CONTINUUM_HEALTH.failed = true;
+      try { console.error("[VAL Continuum] initialization failed", error); } catch (_) {}
+    }
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
+    document.addEventListener("DOMContentLoaded", initializeSafely, { once: true });
   } else {
-    init();
+    initializeSafely();
   }
 })();
 } catch (e) {

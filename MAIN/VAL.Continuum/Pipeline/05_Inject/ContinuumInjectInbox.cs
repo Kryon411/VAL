@@ -7,7 +7,7 @@ namespace VAL.Continuum.Pipeline.Inject
     {
         private readonly Channel<EssenceInjectController.InjectSeed> _channel =
             Channel.CreateUnbounded<EssenceInjectController.InjectSeed>(
-                new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+                new UnboundedChannelOptions { SingleReader = false, SingleWriter = false });
         private int _count;
 
         public void Enqueue(EssenceInjectController.InjectSeed seed)
@@ -15,8 +15,10 @@ namespace VAL.Continuum.Pipeline.Inject
             if (seed == null) return;
             if (string.IsNullOrWhiteSpace(seed.EssenceText)) return;
 
-            if (_channel.Writer.TryWrite(seed))
-                Interlocked.Increment(ref _count);
+            if (seed.CancellationToken.IsCancellationRequested) return;
+            Interlocked.Increment(ref _count);
+            if (!_channel.Writer.TryWrite(seed))
+                Interlocked.Decrement(ref _count);
         }
 
         public EssenceInjectController.InjectSeed? Dequeue()

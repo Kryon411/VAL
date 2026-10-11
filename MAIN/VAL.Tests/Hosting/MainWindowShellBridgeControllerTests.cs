@@ -44,6 +44,99 @@ namespace VAL.Tests.Hosting
         }
 
         [Fact]
+        public void AcceptedLauncherClicksTransferFocusBeforeOpeningAndClosingTheDock()
+        {
+            var stateController = CreateStateController();
+            stateController.Load();
+            var sender = new FakeWebMessageSender();
+            var controller = new MainWindowShellBridgeController(
+                stateController, new FakeWebViewRuntime { IsReady = true }, sender, new FakeLog());
+            var now = DateTime.UtcNow;
+            var focusCount = 0;
+
+            void FocusWebView()
+            {
+                Assert.Equal(focusCount, sender.Envelopes.Count);
+                focusCount++;
+            }
+
+            Assert.True(controller.TryHandleLauncherClick(now, out _, FocusWebView));
+            Assert.True(controller.TryHandleLauncherClick(now.AddMilliseconds(300), out _, FocusWebView));
+
+            Assert.Equal(2, focusCount);
+            Assert.Equal("dock.open", sender.Envelopes[0].Name);
+            Assert.Equal("dock.close", sender.Envelopes[1].Name);
+        }
+
+        [Fact]
+        public void DebouncedLauncherClickDoesNotTransferFocusOrSendAnotherMessage()
+        {
+            var stateController = CreateStateController();
+            stateController.Load();
+            var sender = new FakeWebMessageSender();
+            var controller = new MainWindowShellBridgeController(
+                stateController, new FakeWebViewRuntime { IsReady = true }, sender, new FakeLog());
+            var now = DateTime.UtcNow;
+            var focusCount = 0;
+
+            Assert.True(controller.TryHandleLauncherClick(now, out _, () => focusCount++));
+            Assert.False(controller.TryHandleLauncherClick(now.AddMilliseconds(100), out _, () => focusCount++));
+
+            Assert.Equal(1, focusCount);
+            Assert.Single(sender.Envelopes);
+            Assert.True(stateController.IsDockOpen);
+        }
+
+        [Fact]
+        public void DisarmedLauncherNeverTransfersFocus()
+        {
+            var controller = new MainWindowShellBridgeController(
+                CreateStateController(),
+                new FakeWebViewRuntime { IsReady = true, BridgeEnabled = false },
+                new FakeWebMessageSender(), new FakeLog());
+            var focused = false;
+
+            Assert.False(controller.TryHandleLauncherClick(DateTime.UtcNow, out _, () => focused = true));
+
+            Assert.False(focused);
+        }
+
+        [Fact]
+        public void DisarmedLauncherDoesNotTogglePersistedDockOrConsumeTheNextClick()
+        {
+            var stateController = CreateStateController();
+            stateController.Load();
+            var originalOpen = stateController.IsDockOpen;
+            var runtime = new FakeWebViewRuntime { IsReady = true, BridgeEnabled = false };
+            var sender = new FakeWebMessageSender();
+            var controller = new MainWindowShellBridgeController(stateController, runtime, sender, new FakeLog());
+            var now = DateTime.UtcNow;
+
+            Assert.False(controller.TryHandleLauncherClick(now, out var sync));
+            Assert.False(sync);
+            Assert.Equal(originalOpen, stateController.IsDockOpen);
+            Assert.Empty(sender.Envelopes);
+
+            runtime.BridgeEnabled = true;
+            Assert.True(controller.TryHandleLauncherClick(now, out _));
+            Assert.NotEqual(originalOpen, stateController.IsDockOpen);
+            Assert.Single(sender.Envelopes);
+        }
+
+        [Fact]
+        public void DockStateIsNotPublishedOnAnAuthenticationPage()
+        {
+            var runtime = new FakeWebViewRuntime { IsReady = true, BridgeEnabled = false };
+            var sender = new FakeWebMessageSender();
+            var controller = new MainWindowShellBridgeController(CreateStateController(), runtime, sender, new FakeLog());
+
+            controller.SendDockUiState();
+            controller.PublishLayoutMode();
+
+            Assert.Empty(sender.Envelopes);
+        }
+
+        [Fact]
         public void SendDockUiStateLogsNotReadyOnlyOnceUntilWebViewRecovers()
         {
             var stateController = CreateStateController();
@@ -58,7 +151,7 @@ namespace VAL.Tests.Hosting
 
             Assert.Empty(sender.Envelopes);
             Assert.Single(log.Infos);
-            Assert.Contains("Shell message ignored because WebView2 is not ready.", log.Infos[0]);
+            Assert.Contains("Shell message ignored because the WebView2 bridge is not ready.", log.Infos[0]);
 
             runtime.IsReady = true;
             controller.SendDockUiState();
@@ -69,7 +162,7 @@ namespace VAL.Tests.Hosting
             runtime.IsReady = false;
             controller.SendDockUiState();
 
-            Assert.Equal(2, log.Infos.Count(info => info.Contains("Shell message ignored because WebView2 is not ready.", StringComparison.Ordinal)));
+            Assert.Equal(2, log.Infos.Count(info => info.Contains("Shell message ignored because the WebView2 bridge is not ready.", StringComparison.Ordinal)));
         }
 
         [Fact]
@@ -176,14 +269,19 @@ namespace VAL.Tests.Hosting
         private sealed class FakeWebViewRuntime : IWebViewRuntime
         {
             public bool IsReady { get; set; }
+            public bool BridgeEnabled { get; set; } = true;
+            public bool IsBridgeReady => IsReady && BridgeEnabled;
+            public long NavigationGeneration => 0;
             public CoreWebView2? Core => null;
             public Uri? LastChatUri => null;
             public event Action<WebMessageEnvelope>? WebMessageJsonReceived { add { } remove { } }
             public event Action? NavigationCompleted { add { } remove { } }
+            public event Action? NavigationStateChanged { add { } remove { } }
 
             public System.Threading.Tasks.Task InitializeAsync(WebView2 control) => System.Threading.Tasks.Task.CompletedTask;
             public void PostJson(string json) { }
             public System.Threading.Tasks.Task ExecuteScriptAsync(string js) => System.Threading.Tasks.Task.CompletedTask;
+            public System.Threading.Tasks.Task<string?> EvaluateScriptAsync(string js) => System.Threading.Tasks.Task.FromResult<string?>(null);
             public void Navigate(string url) { }
             public bool TryGoBack() => false;
         }

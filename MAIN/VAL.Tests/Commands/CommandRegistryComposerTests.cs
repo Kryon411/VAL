@@ -26,6 +26,37 @@ namespace VAL.Tests.Commands
         private static readonly Uri TestSourceUri = new("https://chatgpt.com");
 
         [Fact]
+        public void WipeRequiresConfirmationAndRefusesAnActiveOperation()
+        {
+            var wipe = new FakeDataWipeService();
+            var dialog = new FakeDialogService();
+            var operations = new FakeOperations();
+            var shutdown = new FakeShutdown();
+            var handler = new PrivacyCommandHandlers(new FakePrivacySettingsService(), new FakeAppPaths(),
+                new FakeProcessLauncher(), wipe, dialog, operations, new FakeToastHub(),
+                new FakeWebMessageSender(), new FakeLog(), shutdown);
+            using var doc = JsonDocument.Parse("{}");
+            var command = CreateHostCommand(WebCommandNames.PrivacyCommandWipeData, doc.RootElement);
+
+            handler.HandleWipeData(command);
+            Assert.Equal(1, dialog.Confirmations);
+            Assert.Equal(0, wipe.Calls);
+            Assert.Equal(0, shutdown.Calls);
+
+            dialog.Confirmed = true;
+            operations.IsBusy = true;
+            handler.HandleWipeData(command);
+            Assert.Equal(1, dialog.Confirmations);
+            Assert.Equal(0, wipe.Calls);
+
+            operations.IsBusy = false;
+            handler.HandleWipeData(command);
+            Assert.Equal(2, dialog.Confirmations);
+            Assert.Equal(1, wipe.Calls);
+            Assert.Equal(1, shutdown.Calls);
+        }
+
+        [Fact]
         public void RegisterBuildsRegistryWithoutThrowing()
         {
             var registry = new CommandRegistry();
@@ -66,9 +97,11 @@ namespace VAL.Tests.Commands
                     new FakeAppPaths(),
                     new FakeProcessLauncher(),
                     new FakeDataWipeService(),
+                    new FakeDialogService(),
+                    new FakeOperations(),
                     new FakeToastHub(),
                     new FakeWebMessageSender(),
-                    new FakeLog()),
+                    new FakeLog(), new FakeShutdown()),
                 new ToolsCommandHandlers(
                     new FakeUiThread(),
                     new FakeTruthHealthWindowService(),
@@ -164,6 +197,7 @@ namespace VAL.Tests.Commands
             public event Action<PrivacySettingsSnapshot>? SettingsChanged;
 
             public PrivacySettingsSnapshot GetSnapshot() => new(1, true, true);
+            public bool DisableCapture() => true;
 
             public bool UpdateContinuumLogging(bool enabled)
             {
@@ -199,7 +233,36 @@ namespace VAL.Tests.Commands
 
         private sealed class FakeDataWipeService : IDataWipeService
         {
-            public DataWipeResult WipeData() => new(true, false, 0, 0);
+            public int Calls { get; private set; }
+            public void ScheduleWipe()
+            {
+                Calls++;
+            }
+        }
+
+        private sealed class FakeShutdown : IDesktopShutdownService
+        {
+            public int Calls { get; private set; }
+            public void Shutdown() => Calls++;
+        }
+
+        private sealed class FakeDialogService : IDesktopDialogService
+        {
+            public bool Confirmed { get; set; }
+            public int Confirmations { get; private set; }
+            public bool ConfirmWarning(string message, string caption)
+            {
+                Confirmations++;
+                return Confirmed;
+            }
+            public void ShowError(string message, string caption) { }
+        }
+
+        private sealed class FakeOperations : IOperationCoordinator
+        {
+            public bool IsBusy { get; set; }
+            public long CurrentOperationId => 0;
+            public void RequestCancel() { }
         }
 
         private sealed class FakeWebMessageSender : IWebMessageSender
@@ -247,14 +310,17 @@ namespace VAL.Tests.Commands
         {
             public string? LastNavigatedUrl { get; private set; }
             public bool IsReady => false;
+            public long NavigationGeneration => 0;
             public CoreWebView2? Core => null;
             public Uri? LastChatUri => null;
             public event Action<WebMessageEnvelope>? WebMessageJsonReceived { add { } remove { } }
             public event Action? NavigationCompleted { add { } remove { } }
+            public event Action? NavigationStateChanged { add { } remove { } }
 
             public System.Threading.Tasks.Task InitializeAsync(WebView2 control) => System.Threading.Tasks.Task.CompletedTask;
             public void PostJson(string json) { }
             public System.Threading.Tasks.Task ExecuteScriptAsync(string js) => System.Threading.Tasks.Task.CompletedTask;
+            public System.Threading.Tasks.Task<string?> EvaluateScriptAsync(string js) => System.Threading.Tasks.Task.FromResult<string?>(null);
             public void Navigate(string url) => LastNavigatedUrl = url;
             public bool TryGoBack() => false;
         }

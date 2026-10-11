@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -33,6 +34,9 @@ namespace VAL.App
         public event EventHandler? Clicked;
         public event EventHandler? GeometryChanged;
         public event EventHandler? LayoutToggleRequested;
+        public event EventHandler? BrowserFocusRequested;
+        internal bool OwnerShutdownAllowed { get; set; }
+        internal bool IsPointerInteraction => _isDragging || _isResizing;
 
         public bool LayoutModeEnabled
         {
@@ -122,47 +126,79 @@ namespace VAL.App
 
         private void LauncherButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (!LayoutModeEnabled)
-            {
-                return;
-            }
-
             _isDragging = true;
             _suppressClickOnce = false;
             _dragStartWindowPos = new Point(Left, Top);
             _dragOffset = e.GetPosition(this);
-            LauncherButton.CaptureMouse();
-            e.Handled = true;
         }
 
         private void LauncherButton_PreviewMouseMove(object sender, MouseEventArgs e)
         {
-            if (!_isDragging || !LayoutModeEnabled || e.LeftButton != MouseButtonState.Pressed)
+            if (!_isDragging || e.LeftButton != MouseButtonState.Pressed)
             {
                 return;
             }
 
             var screenDip = GetMouseScreenDip(e);
-            Left = screenDip.X - _dragOffset.X;
-            Top = screenDip.Y - _dragOffset.Y;
+            var next = new Point(screenDip.X - _dragOffset.X, screenDip.Y - _dragOffset.Y);
+            if (!_suppressClickOnce &&
+                Math.Abs(next.X - _dragStartWindowPos.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(next.Y - _dragStartWindowPos.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
 
-            var movement = Math.Abs(Left - _dragStartWindowPos.X) + Math.Abs(Top - _dragStartWindowPos.Y);
-            if (movement > 2)
-            {
-                _suppressClickOnce = true;
-            }
-
-            GeometryChanged?.Invoke(this, EventArgs.Empty);
+            _suppressClickOnce = true;
+            Left = next.X;
+            Top = next.Y;
+            e.Handled = true;
         }
 
         private void LauncherButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
+            var moved = _suppressClickOnce;
             EndDrag();
+            if (moved) e.Handled = true;
+        }
 
-            if (_suppressClickOnce && !LauncherButton.IsMouseOver)
+        private void LauncherButton_LostMouseCapture(object sender, MouseEventArgs e) => EndDrag();
+
+        private void LauncherButton_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            var modifiers = Keyboard.Modifiers;
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (NativeControlKeyboardNavigation.IsReturnToPage(key, modifiers))
             {
-                _suppressClickOnce = false;
+                e.Handled = true;
+                if (!e.IsRepeat) BrowserFocusRequested?.Invoke(this, EventArgs.Empty);
+                return;
             }
+            if (key == Key.L && modifiers == (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))
+            {
+                LayoutToggleRequested?.Invoke(this, EventArgs.Empty);
+                e.Handled = true;
+                return;
+            }
+            if (!modifiers.HasFlag(ModifierKeys.Alt)) return;
+            var step = modifiers.HasFlag(ModifierKeys.Shift) ? 32 : 8;
+            switch (key)
+            {
+                case Key.Left: Left -= step; break;
+                case Key.Right: Left += step; break;
+                case Key.Up: Top -= step; break;
+                case Key.Down: Top += step; break;
+                default: return;
+            }
+            GeometryChanged?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            if (!OwnerShutdownAllowed && Owner is { } owner)
+            {
+                e.Cancel = true;
+                _ = Dispatcher.InvokeAsync(owner.Close);
+            }
+            base.OnClosing(e);
         }
 
         private void ResizeHandle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -200,12 +236,6 @@ namespace VAL.App
             EndResize();
         }
 
-        private void LauncherButton_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            LayoutToggleRequested?.Invoke(this, EventArgs.Empty);
-            e.Handled = true;
-        }
-
         private Point GetMouseScreenDip(MouseEventArgs e)
         {
             var screenPx = PointToScreen(e.GetPosition(this));
@@ -231,8 +261,12 @@ namespace VAL.App
             }
 
             _isDragging = false;
-            LauncherButton.ReleaseMouseCapture();
-            GeometryChanged?.Invoke(this, EventArgs.Empty);
+            if (_suppressClickOnce)
+            {
+                LauncherButton.ReleaseMouseCapture();
+                GeometryChanged?.Invoke(this, EventArgs.Empty);
+                _suppressClickOnce = false;
+            }
         }
 
         private void EndResize()

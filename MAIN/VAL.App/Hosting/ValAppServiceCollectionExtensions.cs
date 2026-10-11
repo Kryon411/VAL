@@ -10,6 +10,9 @@ namespace VAL.App.Hosting
         {
             services.AddSingleton<IControlCentreUiStateStore, ControlCentreUiStateStore>();
             services.AddSingleton<IDesktopDialogService, MessageBoxDesktopDialogService>();
+            services.AddSingleton<NativeNavigationRecoveryService>();
+            services.AddSingleton<NavigationRecoveryOverlayHost>();
+            services.AddTransient<NavigationRecoveryOverlay>();
             services.AddSingleton<IDeferredActionFactory, DispatcherDeferredActionFactory>();
             services.AddSingleton<MainWindowShellStateController>();
             services.AddSingleton<MainWindowShellBridgeController>();
@@ -23,7 +26,6 @@ namespace VAL.App.Hosting
             services.AddTransient(typeof(IWindowFactory<,>), typeof(ServiceProviderWindowFactory<,>));
             services.AddTransient<ControlCentreOverlay>();
             services.AddTransient<CrashWindowViewModel>();
-            services.AddTransient<CrashWindow>();
             services.AddTransient<DiagnosticsViewModel>();
             services.AddTransient<DiagnosticsWindow>();
             services.AddTransient<TruthHealthViewModel>();

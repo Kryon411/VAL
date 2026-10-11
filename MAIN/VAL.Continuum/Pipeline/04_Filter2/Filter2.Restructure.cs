@@ -106,7 +106,7 @@ namespace VAL.Continuum.Pipeline.Filter2
 
         private static List<PulseExchangeBlock> BuildTruthWalkbackHighlights(
             IReadOnlyList<Filter1BuildSeed.SeedExchange> exchanges,
-            IReadOnlyList<Filter1BuildSeed.SeedExchange> pinnedTail)
+            List<Filter1BuildSeed.SeedExchange> pinnedTail)
         {
             var highlights = new List<PulseExchangeBlock>();
 
@@ -300,7 +300,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             }
         }
 
-        private static List<string> DeduplicateFacts(IReadOnlyList<string> facts)
+        private static List<string> DeduplicateFacts(List<string> facts)
         {
             if (facts == null || facts.Count == 0)
                 return new List<string>();
@@ -420,7 +420,7 @@ namespace VAL.Continuum.Pipeline.Filter2
             if (min == int.MaxValue || max == int.MinValue)
                 return "?-?";
 
-            return $"{min}-{max}";
+            return $"{min + 1}-{max + 1}";
         }
 
         private static string SelectWwloText(string uncut, string sliced)

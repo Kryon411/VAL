@@ -16,6 +16,7 @@ REM ============================================================
 for %%I in ("%~dp0.") do set "ROOT=%%~fI"
 set "CONFIG=Release"
 set "TEST_PROJ=%ROOT%\MAIN\VAL.Tests\VAL.Tests.csproj"
+if exist "%ROOT%\artifacts\tools\dotnet\dotnet.exe" set "PATH=%ROOT%\artifacts\tools\dotnet;%PATH%"
 
 if /I "%~1"=="--test"        goto :test
 if /I "%~1"=="--manifest"    goto :manifest
@@ -39,8 +40,11 @@ exit /b 0
 
 :test
 echo Running tests (%CONFIG%)...
+pushd "%ROOT%"
 dotnet test "%TEST_PROJ%" -c %CONFIG%
-if errorlevel 1 (
+set "TEST_EXIT=!errorlevel!"
+popd
+if not "!TEST_EXIT!"=="0" (
   echo.
   echo ERROR: Tests failed.
   exit /b 1

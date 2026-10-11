@@ -92,6 +92,9 @@ namespace VAL.App.State
             if (result.Value.H.HasValue)
                 state.Dock.H = result.Value.H.Value;
 
+            state.Dock.IsCustom = state.Dock.X != 72 || state.Dock.Y != 56 ||
+                state.Dock.W != 560 || state.Dock.H != 460;
+
             return state;
         }
 

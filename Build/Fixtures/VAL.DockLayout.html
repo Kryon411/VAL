@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VAL adaptive layout regression fixture</title>
+<link rel="stylesheet" href="../../MAIN/Dock/Dock.styles.css">
+<link rel="stylesheet" href="../../MAIN/Dock/VAL.Controls.css">
+<style>
+  body{margin:0;background:#111820;color:#dce4ed;font:14px "Segoe UI",sans-serif}
+  .fixture-sidebar{position:fixed;inset:0 auto 0 0;width:240px;background:#090e14;border-right:1px solid #283747;padding:20px;box-sizing:border-box}
+  .fixture-header{position:fixed;top:8px;left:260px;right:12px;height:40px;display:flex;justify-content:space-between;align-items:center}
+  .fixture-actions{display:flex;gap:8px;align-items:center}
+  .fixture-actions button{border:1px solid #555;border-radius:999px;padding:10px 18px;background:#222;color:#eee;font:inherit}
+  .fixture-tools{position:fixed;left:16px;bottom:16px;display:grid;gap:8px;z-index:10}
+  .fixture-tools button{padding:8px;background:#1b2531;color:#dce4ed;border:1px solid #66768b}
+  #fixture-orb{position:fixed;width:40px;height:40px;z-index:2147483646}
+  #fixture-status{max-width:220px;font-size:12px}
+  @media(max-width:600px){.fixture-sidebar{display:none}.fixture-header{left:12px}.fixture-actions button{padding:8px}}
+</style>
+<aside class="fixture-sidebar">Synthetic sidebar, not ChatGPT</aside>
+<header class="fixture-header"><span>Header fixture</span><div class="fixture-actions"><button>Log in</button><button>Sign up for free</button></div></header>
+<button id="fixture-orb" class="valdock-launcher" data-val-ui="1" aria-label="Open fixture Control Centre">CC</button>
+<div class="fixture-tools"><button id="fixture-state">Show signed-in header</button><button id="fixture-sidebar">Toggle sidebar</button><output id="fixture-status">Synthetic bridge only. No network commands.</output></div>
+<script>
+  let receive;
+  let latestAnchor;
+  let hostState = JSON.parse(localStorage.getItem('VAL-layout-fixture-state') || '{"isOpen":true,"isCustom":false,"x":72,"y":56,"w":560,"h":460}');
+  const status = document.getElementById('fixture-status');
+  const orb = document.getElementById('fixture-orb');
+  const button = label => ({type:'button',label,command:{name:'fixture.noop'}});
+  const model = {
+    sections:[
+      {title:'CONTINUUM',headerControl:{type:'toggle',label:'Continuum logging',state:false},blocks:[{type:'row',className:'valdock-grid',items:[button('Pulse'),button('Chronicle'),button('Session Files')]},{type:'hint',text:'Session tools for jumps and memory.'}]},
+      {title:'PORTAL',subtitle:'Synthetic disabled fixture',blocks:[{type:'row',items:[{type:'toggle',label:'Capture & Stage',state:false,disabled:true},{type:'count',count:0,max:10},{...button('Send'),disabled:true}]}]},
+      {title:'ABYSS',subtitle:'Recall & search',blocks:[{type:'row',items:[button('Search'),button('Last Result'),button('A deliberately long label to verify narrow panel wrapping without changing real functionality')]}]}
+    ],advancedSections:[{title:'ADVANCED',blocks:[{type:'hint',text:'No real commands or cloud conversation.'}]}],status:{text:'Layout regression fixture only.'}
+  };
+  const send = (name,payload) => queueMicrotask(() => receive?.({data:{type:'event',name,payload,source:'host'}}));
+  window.chrome.webview = {
+    addEventListener(name,handler){if(name==='message') receive=handler;},
+    postMessage(message){
+      const p=message.payload || {};
+      if(message.name==='dock.ui_state.get') send(message.name,hostState);
+      if(message.name==='dock.command.request_model') send('val.dock.model',model);
+      if(message.name==='dock.ui_state.set'){
+        if(p.headerAnchor){latestAnchor=p.headerAnchor;orb.style.left=latestAnchor.x+'px';orb.style.top=latestAnchor.y+'px';return;}
+        hostState={...hostState,...p}; localStorage.setItem('VAL-layout-fixture-state',JSON.stringify(hostState));
+        status.textContent=JSON.stringify({custom:hostState.isCustom,x:hostState.x,y:hostState.y,w:hostState.w,h:hostState.h});
+      }
+    }
+  };
+  orb.addEventListener('click',()=>send(hostState.isOpen?'dock.close':'dock.open',{}));
+  document.getElementById('fixture-state').onclick=e=>{
+    const signedIn=e.currentTarget.textContent.includes('signed-in');
+    document.querySelector('.fixture-actions').innerHTML=signedIn?'<button>Share</button><button aria-label="Toggle Summary">Summary</button><button aria-label="More options">...</button>':'<button>Log in</button><button>Sign up for free</button>';
+    e.currentTarget.textContent=signedIn?'Show signed-out header':'Show signed-in header';
+  };
+  document.getElementById('fixture-sidebar').onclick=()=>{
+    const sidebar=document.querySelector('.fixture-sidebar');
+    sidebar.hidden=!sidebar.hidden;
+    document.querySelector('.fixture-header').style.left=sidebar.hidden?'12px':'260px';
+  };
+</script>
+<script src="../../MAIN/Dock/Dock.Layout.js"></script>
+<script src="../../MAIN/Dock/Dock.main.js"></script>
+</html>

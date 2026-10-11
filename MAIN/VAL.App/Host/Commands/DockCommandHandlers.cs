@@ -12,7 +12,7 @@ namespace VAL.App.Host.Commands
 {
     internal sealed class DockCommandHandlers : ICommandRegistryContributor
     {
-        private const int DockUiStateVersion = 1;
+        private const int DockUiStateVersion = 2;
         private const string DockUiMode = "shelf";
         private readonly IDockModelService _modelService;
         private readonly IControlCentreUiStateStore _stateStore;
@@ -78,6 +78,7 @@ namespace VAL.App.Host.Commands
                     w = (int)Math.Round(state.Dock.W),
                     h = (int)Math.Round(state.Dock.H),
                     mode = DockUiMode,
+                    isCustom = state.Dock.IsCustom,
                     updatedUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)
                 });
                 _webMessageSender.Send(new MessageEnvelope
@@ -100,8 +101,14 @@ namespace VAL.App.Host.Commands
         {
             try
             {
+                // Header observations are ephemeral geometry, not persisted UI changes.
+                if (cmd.Root.TryGetProperty("headerAnchor", out _)) return;
                 var current = _stateStore.Load();
                 var dock = current.Dock;
+
+                if (cmd.TryGetBool("resetPlacement", out var reset) && reset)
+                    current.ControlCentreIsCustom = false;
+                if (cmd.TryGetBool("isCustom", out var custom)) dock.IsCustom = custom;
 
                 if (cmd.TryGetBool("isOpen", out var isOpen))
                     dock.IsOpen = isOpen;

@@ -115,6 +115,7 @@ namespace VAL.App.Hosting
             services.AddSingleton<ICrashWindowService, CrashWindowService>();
             services.AddSingleton<IPrivacySettingsService, PrivacySettingsService>();
             services.AddSingleton<IDataWipeService, DataWipeService>();
+            services.AddSingleton<IDesktopShutdownService, DesktopShutdownService>();
             services.AddSingleton<IDiagnosticsWindowService, DiagnosticsWindowService>();
             services.AddSingleton<ITruthHealthReportService, TruthHealthReportService>();
             services.AddSingleton<ITruthHealthWindowService, TruthHealthWindowService>();

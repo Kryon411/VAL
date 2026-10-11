@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 
+using VAL.Contracts;
 using VAL.Host.Services;
 
 namespace VAL.Host
@@ -9,8 +10,8 @@ namespace VAL.Host
     /// SessionContext is the single authoritative place for "what chat are we in".
     ///
     /// It is intentionally small and resilient:
-    /// - Stores the last non-empty chatId observed from any WebView message.
-    /// - Exposes a best-effort "attached" signal once we've seen any chatId.
+    /// - Changes the active chat only on validated session attach messages.
+    /// - Delayed capture and completion messages do not change the active chat.
     ///
     /// This removes duplicated "active chat" tracking across modules.
     /// </summary>
@@ -63,7 +64,7 @@ namespace VAL.Host
         }
 
         /// <summary>
-        /// True once the host has observed any message containing a chatId.
+        /// True once the host has observed a session attach containing a chatId.
         /// (Used as a coarse readiness gate for long-running operations.)
         /// </summary>
         public bool IsSessionAttached
@@ -94,16 +95,15 @@ namespace VAL.Host
         /// </summary>
         public void Observe(string? type, string? chatId)
         {
-            // For now, "attached" is intentionally loose: any chatId implies we have a usable session context.
-            // (Continuum still applies its own deeper gating for Pulse/Chronicle availability.)
-            if (!string.IsNullOrWhiteSpace(chatId))
+            // Delayed completion/capture messages must not change the current conversation.
+            if ((string.Equals(type, WebCommandNames.ContinuumSessionAttach, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(type, WebCommandNames.ContinuumSessionAttached, StringComparison.OrdinalIgnoreCase)) &&
+                !string.IsNullOrWhiteSpace(chatId))
             {
                 SetActiveChatId(chatId);
                 return;
             }
 
-            // Reserved: in the future we may treat specific types as attach/detach signals.
-            _ = type;
         }
 
         public void SetActiveChatId(string chatId)

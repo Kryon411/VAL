@@ -124,6 +124,10 @@ namespace TruthStress
                 {
                     // expected during shutdown
                 }
+                catch (IOException ex) when ((ex.HResult & 0xffff) is 32 or 33)
+                {
+                    Console.WriteLine("Tail truncation skipped: an active writer owns the file.");
+                }
                 catch (Exception ex)
                 {
                     exceptions.Enqueue(ex);

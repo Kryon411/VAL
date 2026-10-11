@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
           cache: true
@@ -42,8 +42,20 @@ jobs:
       - name: Run tests
         run: dotnet test MAIN/VAL.Tests/VAL.Tests.csproj -c Release --no-build --no-restore
 
+      - name: Validate client scripts
+        run: node Build/Verify_ClientScripts.js
+
+      - name: Validate release scripts and compatibility probe
+        shell: pwsh
+        run: |
+          ./Build/Verify_BuildScripts.ps1
+          dotnet restore Build/UpgradeProbe/UpgradeProbe.csproj --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build Build/UpgradeProbe/UpgradeProbe.csproj -c Release --no-restore
+
       - name: Audit dependencies
-        run: dotnet list MAIN/VAL.Desktop/VAL.Desktop.csproj package --vulnerable --include-transitive
+        shell: pwsh
+        run: ./Build/Verify_Dependencies.ps1
 
       - name: Verify source manifest
         shell: pwsh
@@ -52,26 +64,17 @@ jobs:
           git diff --exit-code -- MAIN/Manifest.txt
 
       - name: Publish desktop application
-        run: dotnet publish MAIN/VAL.Desktop/VAL.Desktop.csproj -c Release -r win-x64 --self-contained true --no-restore -o artifacts/publish
-
-      - name: Run published smoke test
         shell: pwsh
-        run: |
-          $report = Join-Path $env:RUNNER_TEMP "VAL.SmokeReport.txt"
-          $process = Start-Process `
-            -FilePath "./artifacts/publish/VAL.exe" `
-            -ArgumentList @("--smoke", "--smoke-timeout-ms=30000", "--smoke-report-path=$report") `
-            -Wait `
-            -PassThru
-          Get-Content $report
-          if ($process.ExitCode -ne 0) {
-            throw "Published smoke test failed with exit code $($process.ExitCode)."
-          }
+        run: ./Build/Publish_Release.ps1 -ValidationOutputRoot artifacts/ci
+
+      - name: Validate published startup and deferred cleanup
+        shell: pwsh
+        run: ./Build/Verify_PublishedRelease.ps1 -ValidationOutputRoot artifacts/ci
 
       - name: Upload publish artifact
         uses: actions/upload-artifact@v7
         with:
           name: VAL-win-x64
-          path: artifacts/publish
+          path: artifacts/ci
           if-no-files-found: error
           retention-days: 14

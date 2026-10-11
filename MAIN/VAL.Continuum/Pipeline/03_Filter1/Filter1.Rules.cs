@@ -253,8 +253,6 @@ namespace VAL.Continuum.Pipeline.Filter1
                     inWs = false;
                 }
 
-                if (sb.Length >= 512)
-                    break;
             }
 
             return sb.ToString().Trim();

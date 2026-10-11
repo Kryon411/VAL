@@ -14,7 +14,7 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Host.Portal
 {
-    public sealed class PortalRuntime
+    public sealed class PortalRuntime : IDisposable
     {
         private const int HOTKEY_ID = 0xB001;
         private const int WM_HOTKEY = 0x0312;
@@ -23,13 +23,15 @@ namespace VAL.Host.Portal
         private readonly IWebMessageSender _messageSender;
         private readonly IDockModelService _dockModelService;
         private readonly IDesktopUiContext _uiContext;
+        private readonly IWebViewRuntime _webViewRuntime;
         private readonly PortalStaging _staging = new();
         private bool _enabled;
         private bool _privacyAllowed = true;
         private IntPtr _hwnd = IntPtr.Zero;
         private HwndSource? _source;
         private bool _clipboardListenerRegistered;
-        private Action? _focusWebView;
+        private Func<Task<bool>>? _focusWebView;
+        private long _stagingRevision;
         private uint _lastClipSeq;
 
         // Debounce & dedupe
@@ -77,20 +79,27 @@ namespace VAL.Host.Portal
         public PortalRuntime(
             IWebMessageSender messageSender,
             IDockModelService dockModelService,
-            IDesktopUiContext uiContext)
+            IDesktopUiContext uiContext,
+            IWebViewRuntime webViewRuntime)
         {
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _dockModelService = dockModelService ?? throw new ArgumentNullException(nameof(dockModelService));
             _uiContext = uiContext ?? throw new ArgumentNullException(nameof(uiContext));
+            _webViewRuntime = webViewRuntime ?? throw new ArgumentNullException(nameof(webViewRuntime));
         }
 
-        public void Initialize(Action focusWebView)
+        public void Initialize(Func<Task<bool>> focusWebView)
         {
             _focusWebView = focusWebView ?? throw new ArgumentNullException(nameof(focusWebView));
         }
 
         public void AttachWindow(IntPtr hwnd)
         {
+            if (hwnd == _hwnd && _source != null)
+                return;
+            UnregisterHotkey();
+            StopClipboardWatch();
+            _source?.RemoveHook(WndProc);
             _hwnd = hwnd;
 
             try
@@ -149,6 +158,7 @@ namespace VAL.Host.Portal
                 }
                 else
                 {
+                    _stagingRevision++;
                     UnregisterHotkey();
                     StopClipboardWatch();
                     _staging.Clear();
@@ -171,6 +181,7 @@ namespace VAL.Host.Portal
                 _privacyAllowed = allowed;
                 if (!allowed && _enabled)
                 {
+                    _stagingRevision++;
                     PostDebug("Privacy disabled: forcing Portal off");
                     _enabled = false;
                     UnregisterHotkey();
@@ -191,6 +202,7 @@ namespace VAL.Host.Portal
         {
             RunOnUI(() =>
             {
+                _stagingRevision++;
                 _staging.Clear();
                 _lastSig = "";
                 _recentSigSet.Clear();
@@ -216,57 +228,31 @@ namespace VAL.Host.Portal
 
             RunOnUI(async () =>
             {
+                if (_sending || !_enabled || !_privacyAllowed)
+                    return;
                 _sending = true;
                 _suppressStage = true;
+                var revision = _stagingRevision;
+                var navigation = _webViewRuntime.NavigationGeneration;
 
                 try
                 {
-                    max = Math.Max(1, Math.Min(10, max));
-
-                    // Focus the webview/composer before pasting.
-                    _focusWebView?.Invoke();
-                    await Task.Delay(120);
-
-                    var items = _staging.Drain(max);
-                    PostDebug($"SendStaged: draining {items.Length}");
-
-                    if (items.Length == 0)
-                    {
-                        PostDebug("SendStaged: nothing staged");
-                        return;
-                    }
-
-                    // Paste each staged image with conservative delays + a retry.
-                    for (int i = 0; i < items.Length; i++)
-                    {
-                        var img = items[i];
-                        try
-                        {
-                            Clipboard.SetImage(img);
-                        }
-                        catch (Exception ex)
-                        {
-                            PostDebug("Clipboard.SetImage failed: " + ex.Message);
-                            continue;
-                        }
-
-                        // Let clipboard settle.
-                        await Task.Delay(180);
-
-                        // First paste attempt.
-                        _focusWebView?.Invoke();
-                        await Task.Delay(40);
-                        SendCtrlV();
-
-                        // Let the web app ingest the image.
-                        await Task.Delay(450); await Task.Delay(260);
-                    }
+                    var pasted = await PortalImageTransfer.PasteAsync(
+                        _staging, max,
+                        () => revision == _stagingRevision && navigation == _webViewRuntime.NavigationGeneration && CanPasteIntoVal(),
+                        () => revision == _stagingRevision && _enabled && _privacyAllowed,
+                        () => _focusWebView?.Invoke() ?? Task.FromResult(false),
+                        Clipboard.SetImage, SendCtrlV, milliseconds => Task.Delay(milliseconds));
+                    PostDebug($"SendStaged: dispatched {pasted} paste(s)");
 
                     // After sending, clear + reset counters.
-                    _staging.Clear();
-                    _recentSigSet.Clear();
-                    _recentSigQueue.Clear();
-                    PostCleared();
+                    if (_staging.Count == 0)
+                    {
+                        _recentSigSet.Clear();
+                        _recentSigQueue.Clear();
+                        PostCleared();
+                    }
+                    PostCount();
 
                     // Reset clipboard sequence to avoid instant re-stage when we were manipulating it.
                     try { _lastClipSeq = GetClipboardSequenceNumber(); } catch { }
@@ -277,12 +263,19 @@ namespace VAL.Host.Portal
                 }
                 finally
                 {
+                    PostCount();
                     // Small delay before allowing staging again (helps avoid double-count from post-send clipboard churn).
                     await Task.Delay(500);
                     _suppressStage = false;
                     _sending = false;
                 }
             });
+        }
+
+        private bool CanPasteIntoVal()
+        {
+            return _enabled && _privacyAllowed && _webViewRuntime.IsBridgeReady &&
+                   _hwnd != IntPtr.Zero && GetForegroundWindow() == _hwnd;
         }
 
         private void StartClipboardWatch()
@@ -398,7 +391,7 @@ namespace VAL.Host.Portal
             }
         }
 
-        private static string ComputeSignature(BitmapSource img)
+        internal static string ComputeSignature(BitmapSource img)
         {
             try
             {
@@ -417,28 +410,22 @@ namespace VAL.Host.Portal
 
                 int w = src.PixelWidth;
                 int h = src.PixelHeight;
-                int stride = w * 4;
-
-                int rows = Math.Min(8, h);
-                if (rows <= 0 || w <= 0) return "";
-
-                // Sample top and bottom blocks.
-                int blockBytes = Math.Min(stride * rows, 32768);
-                var bufTop = new byte[blockBytes];
-                var bufBot = new byte[blockBytes];
-
-                src.CopyPixels(new Int32Rect(0, 0, w, rows), bufTop, stride, 0);
-
-                int yBot = Math.Max(0, h - rows);
-                src.CopyPixels(new Int32Rect(0, yBot, w, rows), bufBot, stride, 0);
-
-                using var sha = System.Security.Cryptography.SHA256.Create();
-                sha.TransformBlock(BitConverter.GetBytes(w), 0, 4, null, 0);
-                sha.TransformBlock(BitConverter.GetBytes(h), 0, 4, null, 0);
-                sha.TransformBlock(bufTop, 0, bufTop.Length, null, 0);
-                sha.TransformFinalBlock(bufBot, 0, bufBot.Length);
-
-                return Convert.ToBase64String(sha.Hash ?? Array.Empty<byte>());
+                if (h <= 0 || w <= 0) return "";
+                int stride = checked(w * 4);
+                int rowsPerBlock = Math.Max(1, Math.Min(h, 65536 / stride));
+                var buffer = new byte[checked(stride * rowsPerBlock)];
+                using var hash = System.Security.Cryptography.IncrementalHash.CreateHash(
+                    System.Security.Cryptography.HashAlgorithmName.SHA256);
+                hash.AppendData(BitConverter.GetBytes(w));
+                hash.AppendData(BitConverter.GetBytes(h));
+                // Hash the complete image in bounded blocks; identical window chrome is not identical content.
+                for (int y = 0; y < h; y += rowsPerBlock)
+                {
+                    int rows = Math.Min(rowsPerBlock, h - y);
+                    src.CopyPixels(new Int32Rect(0, y, w, rows), buffer, stride, 0);
+                    hash.AppendData(buffer, 0, stride * rows);
+                }
+                return Convert.ToBase64String(hash.GetHashAndReset());
             }
             catch
             {
@@ -597,13 +584,34 @@ namespace VAL.Host.Portal
             try
             {
                 var dispatcher = _uiContext.Dispatcher;
+                if (dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+                    return;
                 if (dispatcher.CheckAccess()) action();
                 else dispatcher.Invoke(action);
             }
-            catch
+            catch (Exception ex)
             {
-                try { action(); } catch { }
+                System.Diagnostics.Trace.WriteLine($"[VAL] Portal UI action failed: {ex.GetType().Name}");
             }
+        }
+
+        public void Dispose()
+        {
+            RunOnUI(() =>
+            {
+                _stagingRevision++;
+                _enabled = false;
+                _privacyAllowed = false;
+                UnregisterHotkey();
+                StopClipboardWatch();
+                _source?.RemoveHook(WndProc);
+                _source = null;
+                _hwnd = IntPtr.Zero;
+                _focusWebView = null;
+                _staging.Clear();
+                _recentSigSet.Clear();
+                _recentSigQueue.Clear();
+            });
         }
 
         // --- Input simulation ---
@@ -637,6 +645,10 @@ namespace VAL.Host.Portal
 
         [DllImport("user32.dll")]
         private static extern uint GetClipboardSequenceNumber();
+
+        [DllImport("user32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static extern IntPtr GetForegroundWindow();
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool AddClipboardFormatListener(IntPtr hWnd);

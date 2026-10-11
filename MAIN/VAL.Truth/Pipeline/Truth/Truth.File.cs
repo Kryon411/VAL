@@ -17,7 +17,7 @@ namespace VAL.Continuum.Pipeline.Truth
                 if (!File.Exists(truthPath))
                     return false;
 
-                using var fs = new FileStream(truthPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+                using var fs = new FileStream(truthPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
                 if (fs.Length == 0)
                     return false;
 

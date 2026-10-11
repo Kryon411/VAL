@@ -2,6 +2,7 @@
 param(
     [string]$RuntimeIdentifier = "win-x64",
     [switch]$FrameworkDependent,
+    [string]$ValidationOutputRoot,
     [string]$CertificatePath = $env:VAL_SIGNING_CERTIFICATE_PATH,
     [string]$CertificatePassword = $env:VAL_SIGNING_CERTIFICATE_PASSWORD,
     [string]$TimestampServer = "http://timestamp.digicert.com"
@@ -11,10 +12,14 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "Release_Paths.ps1")
+$validationRoot = Resolve-ValValidationRoot -RepoRoot $repoRoot -RequestedRoot $ValidationOutputRoot
 $projectPath = Join-Path $repoRoot "MAIN\VAL.Desktop\VAL.Desktop.csproj"
 $buildPropsPath = Join-Path $repoRoot "Directory.Build.props"
-$productPath = Join-Path $repoRoot "PRODUCT"
+$productPath = if ($null -eq $validationRoot) { Join-Path $repoRoot "PRODUCT" } else { $validationRoot }
 $outputPath = Join-Path $productPath "Publish"
+$dotnet = Join-Path $repoRoot "artifacts\tools\dotnet\dotnet.exe"
+if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) { $dotnet = "dotnet" }
 
 [xml]$buildProps = Get-Content -LiteralPath $buildPropsPath -Raw
 $versionNode = $buildProps.SelectSingleNode("/Project/PropertyGroup/VersionPrefix")
@@ -30,14 +35,19 @@ if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
 }
 
 Write-Host "Restoring locked dependencies..."
-dotnet restore $projectPath --locked-mode
-if ($LASTEXITCODE -ne 0) { throw "Restore failed." }
+Push-Location $repoRoot
+try {
+    & $dotnet restore $projectPath --locked-mode
+    if ($LASTEXITCODE -ne 0) { throw "Restore failed. Install the exact SDK specified in global.json." }
+}
+finally { Pop-Location }
 
 $resolvedProduct = [System.IO.Path]::GetFullPath($productPath)
 $resolvedOutput = [System.IO.Path]::GetFullPath($outputPath)
+Assert-ValBuildDirectory -RepoRoot $repoRoot -Path $resolvedOutput
 $expectedPrefix = $resolvedProduct.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 if (-not $resolvedOutput.StartsWith($expectedPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing to clean publish output outside PRODUCT."
+    throw "Refusing to clean publish output outside the selected product directory."
 }
 
 if (Test-Path -LiteralPath $resolvedOutput) {
@@ -60,8 +70,12 @@ if ($FrameworkDependent.IsPresent) {
 }
 
 Write-Host "Publishing VAL..."
-dotnet @publishArgs
-if ($LASTEXITCODE -ne 0) { throw "Publish failed." }
+Push-Location $repoRoot
+try {
+    & $dotnet @publishArgs
+    if ($LASTEXITCODE -ne 0) { throw "Publish failed." }
+}
+finally { Pop-Location }
 
 $requiredPaths = @(
     (Join-Path $resolvedOutput "VAL.exe"),

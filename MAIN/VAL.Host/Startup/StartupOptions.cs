@@ -13,6 +13,8 @@ namespace VAL.Host.Startup
 
         public bool SafeMode { get; set; }
 
+        public bool ValidationSession { get; set; }
+
         public bool SafeModeExplicit { get; }
 
         public string[] RawArgs { get; }

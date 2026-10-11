@@ -1,0 +1,119 @@
+/* Approved 2026-10-11 gunmetal/glass skin. Only VAL-created nodes carry this boundary. */
+[data-val-ui="1"] {
+  --val-rim: 4px;
+  --val-radius: 999px;
+  --val-panel-radius: 22px;
+  --val-highlight: #66768b;
+  --val-mid: #283747;
+  --val-reflection: #1a314a;
+  --val-blue: #193f6b;
+  --val-blue-soft: rgba(23,77,142,0.35);
+  --val-sheen: rgba(117,148,182,0.10510510510510511);
+  --val-face-top: #152130;
+  --val-face-bottom: #0a111b;
+  --val-text: #dce4ed;
+  --val-muted: #a8b4c2;
+}
+
+[data-val-ui="1"]:is(.valdock-panel,.valdock-shelf,.valdock-section,.valdock-advanced,
+  .valdock-advanced-summary,.valdock-tooltip,.valdock-toast,.valdock-count,.valdock-portal-badge,
+  .valabyss-query-panel,.valabyss-panel,.valabyss-card,.val-ui-input-frame),
+button[data-val-ui="1"]:is(.valdock-btn,.valdock-close,.valdock-launcher,.valdock-tg-switch,.valabyss-btn) {
+  --val-local-radius: var(--val-radius);
+  --val-local-rim: var(--val-rim);
+  --val-face-fill: radial-gradient(ellipse at 21% 0%,var(--val-sheen),transparent 62%),linear-gradient(160deg,var(--val-face-top),var(--val-face-bottom));
+  --val-face-shadow: 0 0 0 1px #030810,inset 0 1px 1px #91add025,inset 0 -1px 1px var(--val-blue),inset -1px 0 1px var(--val-blue-soft);
+  isolation: isolate;
+  box-sizing: border-box;
+  border: 1px solid #03070b;
+  border-radius: var(--val-local-radius);
+  background: linear-gradient(165deg,rgba(230,242,255,.06),transparent 31%,transparent 76%,rgba(0,0,0,.26)),linear-gradient(135deg,var(--val-highlight) 0%,#3b4a5a 13%,var(--val-mid) 25%,#080e16 44%,#0a111b 62%,var(--val-reflection) 82%,#0a111a 100%);
+  box-shadow: 0 2px 5px #0009,inset 0 1px 0 #a4b1c929,inset 0 -1px 0 #000b;
+  color: var(--val-text);
+  text-shadow: 0 1px 1px #000a;
+}
+
+/* The face paints below real content and cannot change event targets or hit testing. */
+[data-val-ui="1"]:is(.valdock-panel,.valdock-shelf,.valdock-section,.valdock-advanced,
+  .valdock-advanced-summary,.valdock-tooltip,.valdock-toast,.valdock-count,.valdock-portal-badge,
+  .valabyss-query-panel,.valabyss-panel,.valabyss-card)::after,
+button[data-val-ui="1"]:is(.valdock-btn,.valdock-close,.valdock-launcher,.valdock-tg-switch,.valabyss-btn)::after {
+  content: "";
+  position: absolute;
+  inset: var(--val-local-rim);
+  z-index: -1;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 1px solid #03070d;
+  border-radius: max(2px,calc(var(--val-local-radius) - var(--val-local-rim) - 1px));
+  background: var(--val-face-fill);
+  box-shadow: var(--val-face-shadow);
+  transition: background .16s ease,box-shadow .16s ease,color .16s ease;
+}
+
+[data-val-ui="1"]:is(.valdock-section,.valdock-advanced,.valdock-advanced-summary,
+  .valdock-count,.valdock-portal-badge,.valabyss-query-panel,.valabyss-card,.val-ui-input-frame),
+button[data-val-ui="1"]:is(.valdock-btn,.valdock-tg-switch,.valabyss-btn) { position: relative; }
+
+[data-val-ui="1"]:is(.valdock-panel,.valdock-shelf,.valdock-section,.valdock-advanced,
+  .valdock-tooltip,.valabyss-query-panel,.valabyss-panel,.valabyss-card) {
+  --val-local-radius: var(--val-panel-radius);
+  --val-local-rim: 3.2px;
+  --val-face-fill: radial-gradient(ellipse at 15% 0%,var(--val-sheen),transparent 70%),linear-gradient(145deg,#1b2531,#111b27);
+}
+[data-val-ui="1"].valdock-advanced-summary { --val-local-radius: var(--val-panel-radius); min-height: 32px; padding: 5px 10px; }
+button[data-val-ui="1"].valdock-tg-switch { --val-local-rim: 2.6px; }
+[data-val-ui="1"].valdock-count { min-height: 28px; display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; }
+button[data-val-ui="1"]:is(.valdock-close,.valdock-launcher) { --val-local-radius: 50%; }
+button[data-val-ui="1"]:is(.valdock-close,.valdock-launcher)::after { border-radius: 50%; }
+button[data-val-ui="1"]:is(.valdock-btn,.valabyss-btn) { min-height: 32px; padding: 5px 12px; white-space: normal; overflow-wrap: anywhere; }
+button[data-val-ui="1"].valdock-btn.danger { color: #ffdcdd; }
+button[data-val-ui="1"]:is(.valdock-btn,.valdock-close,.valdock-launcher,.valdock-tg-switch,.valabyss-btn),
+[data-val-ui="1"].valdock-advanced-summary { transition: box-shadow .16s ease,transform .12s ease; }
+
+button[data-val-ui="1"]:is(.valdock-btn,.valdock-close,.valdock-launcher,.valdock-tg-switch,.valabyss-btn):not(:disabled):hover,
+[data-val-ui="1"].valdock-advanced-summary:hover {
+  --val-face-fill: radial-gradient(ellipse at 24% 0%,rgba(124,169,220,.19),transparent 70%),linear-gradient(160deg,#192a3c,#0d1826);
+  --val-face-shadow: 0 0 0 1px #030810,inset 0 1px 1px #9ec7fb40,inset 0 -1px 2px #347bcc,inset -1px 0 1px #1b4c7d;
+  box-shadow: 0 2px 6px #0009,inset 0 1px 0 #c0d5f058,inset 0 -1px 0 #000b,0 0 7px #2464a719;
+  transform: none;
+}
+button[data-val-ui="1"]:is(.valdock-btn,.valdock-close,.valdock-launcher,.valdock-tg-switch,.valabyss-btn):active:not(:disabled),
+[data-val-ui="1"].valdock-advanced-summary:active {
+  --val-face-fill: linear-gradient(165deg,#070d16,#111e2d);
+  --val-face-shadow: 0 0 0 1px #02050a,inset 0 3px 6px #0009,inset 0 -1px 1px #245e9b;
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px #000b,inset 0 1px 2px #000c;
+}
+button[data-val-ui="1"][aria-pressed="true"],
+[data-val-ui="1"].valabyss-card.expanded,
+[data-val-ui="1"].valdock-advanced[open] > .valdock-advanced-summary {
+  --val-face-fill: radial-gradient(ellipse at 50% 110%,#10477b70,transparent 76%),linear-gradient(160deg,#13243a,#0d1826);
+  --val-face-shadow: 0 0 0 1px #030810,inset 0 1px 1px #93bced29,inset 0 -1px 2px #347bcc,inset -1px 0 1px #1b4c7d;
+  color: #e5efff;
+}
+button[data-val-ui="1"]:disabled,
+button[data-val-ui="1"][aria-disabled="true"] { opacity: .44; cursor: not-allowed; transform: none; }
+button[data-val-ui="1"]:focus-visible,
+[data-val-ui="1"].valdock-advanced-summary:focus-visible { outline: 2px solid #79b8ff; outline-offset: 2px; }
+
+[data-val-ui="1"].val-ui-input-frame { --val-local-radius: 10px; padding: 4px; min-width: 0; }
+[data-val-ui="1"].val-ui-input-frame > .valabyss-query-input {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #03070d;
+  border-radius: 5px;
+  background: var(--val-face-fill);
+  box-shadow: var(--val-face-shadow);
+  color: var(--val-text);
+}
+[data-val-ui="1"].val-ui-input-frame:focus-within { outline: 2px solid #79b8ff; outline-offset: 2px; }
+[data-val-ui="1"].val-ui-input-frame > .valabyss-query-input:focus { outline: none; }
+
+/* Existing grids may shrink labels, but never clip them behind the rim. */
+[data-val-ui="1"].valdock-section-header { grid-template-columns: minmax(0,1fr) auto; }
+[data-val-ui="1"]:is(.valdock-section-heading,.valdock-toggle,.valdock-tg-label) { min-width: 0; overflow-wrap: anywhere; }
+[data-val-ui="1"].valdock-grid { grid-template-columns: repeat(auto-fit,minmax(min(140px,100%),1fr)); }
+@media (pointer:coarse) { button[data-val-ui="1"]:is(.valdock-btn,.valdock-tg-switch,.valabyss-btn) { min-height: 44px; } }
+@media (prefers-reduced-motion:reduce) { [data-val-ui="1"],[data-val-ui="1"]::after { transition: none; } }

@@ -6,6 +6,13 @@
   console.log("[VAL Abyss] booted");
 
   const MAX_RESULTS = 4;
+  const requestPrefix = "abyss-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+  const fallbackChatId = "session-" + Date.now().toString(36);
+  let requestSequence = 0;
+  const resultCommands = new Set([
+    "abyss.command.search", "abyss.command.retry_last", "abyss.command.last",
+    "abyss.command.get_results", "abyss.command.clear_results"
+  ]);
 
   const state = {
     lastQuery: "",
@@ -14,7 +21,9 @@
     results: [],
     disregarded: new Set(),
     queryOpen: false,
-    panelOpen: false
+    panelOpen: false,
+    activeRequestId: null,
+    requestChatId: null
   };
 
   function getNonce(){
@@ -57,8 +66,20 @@
   }
 
   function post(msg){
+    if (resultCommands.has(msg?.type)) {
+      clearResults();
+      state.activeRequestId = requestPrefix + "-" + (++requestSequence);
+      state.requestChatId = msg.chatId || getChatId();
+      msg = { ...msg, chatId: state.requestChatId, requestId: state.activeRequestId };
+    }
     try { window.chrome?.webview?.postMessage(toEnvelope(msg)); } catch(_) {}
   }
+
+  window.VAL_Abyss_requestResults = (commandName, payload) => {
+    if (!resultCommands.has(commandName)) return false;
+    post({ ...payload, type: commandName });
+    return true;
+  };
 
   function getChatId(){
     try {
@@ -75,7 +96,7 @@
       if (/^[a-f0-9\-]{36}$/i.test(tail)) return tail;
     } catch(_) {}
 
-    return "session-" + Date.now().toString(36);
+    return fallbackChatId;
   }
 
   function focusComposerForPaste(){
@@ -86,11 +107,25 @@
     } catch(_) {}
 
     try {
-      const el = document.querySelector("#prompt-textarea, textarea[data-testid='prompt-textarea'], div.ProseMirror[contenteditable='true']");
-      if (!el) return false;
-      try { el.focus({ preventScroll: true }); } catch(_) { try { el.focus(); } catch(__) {} }
-      try { el.click(); } catch(_) {}
-      return true;
+      const selectors = [
+        "form[data-chatgpt-composer] [data-composer-markdown][contenteditable='true'][role='textbox']",
+        "#prompt-textarea[contenteditable='true']", "#mobile-composer-prompt[contenteditable='true']",
+        "textarea#prompt-textarea", "textarea#mobile-composer-prompt",
+        "textarea[data-testid='prompt-textarea']"
+      ];
+      for (const selector of selectors) {
+        for (const el of document.querySelectorAll(selector)) {
+          if (!el.isConnected || el.disabled || el.readOnly ||
+              el.getAttribute('aria-disabled') === 'true') continue;
+          const rect = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          if (rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 ||
+              rect.top >= window.innerHeight || style.display === 'none' ||
+              style.visibility === 'hidden') continue;
+          try { el.focus({ preventScroll: true }); } catch(_) { el.focus(); }
+          if (document.activeElement === el || el.contains(document.activeElement)) return true;
+        }
+      }
     } catch(_) {}
 
     return false;
@@ -102,6 +137,7 @@
 
   function el(tag, cls, text){
     const node = document.createElement(tag);
+    node.setAttribute("data-val-ui", "1");
     if (cls) node.className = cls;
     if (text != null) node.textContent = text;
     return node;
@@ -163,7 +199,9 @@
     }, true);
 
     actions.append(goBtn, closeBtn);
-    panelEl.append(title, queryInput, actions);
+    const inputFrame = el("div", "val-ui-input-frame");
+    inputFrame.appendChild(queryInput);
+    panelEl.append(title, inputFrame, actions);
     queryWrap.appendChild(panelEl);
     document.body.appendChild(queryWrap);
   }
@@ -246,6 +284,8 @@
   }
 
   function clearResults(){
+    state.activeRequestId = null;
+    state.requestChatId = null;
     state.results = [];
     if (resultsWrap) resultsWrap.textContent = "";
     hideResultsPanel();
@@ -343,6 +383,13 @@
     if (typeof msg !== "object") return;
     msg = unwrapEnvelope(msg);
     if ((msg.type || "") !== "abyss.results") return;
+    // Host publication can already be queued when the user changes intent.
+    if (!state.activeRequestId || msg.requestId !== state.activeRequestId ||
+        msg.chatId !== state.requestChatId || getChatId() !== state.requestChatId) return;
+    if (msg.cleared === true) {
+      clearResults();
+      return;
+    }
 
     const nextQuery = (msg.queryUsed || msg.lastQuery || "").toString();
     const nextQueryOriginal = (msg.queryOriginal || nextQuery || "").toString();

@@ -7,6 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Threading;
 
 using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
@@ -104,7 +107,7 @@ namespace VAL.App.Host.Services
 
             try
             {
-                result = await ExecuteAsync();
+                result = await ExecuteAsync(app);
             }
             catch (Exception ex)
             {
@@ -125,7 +128,7 @@ namespace VAL.App.Host.Services
             }
         }
 
-        private async Task<SmokeTestResult> ExecuteAsync()
+        private async Task<SmokeTestResult> ExecuteAsync(Application app)
         {
             var reportPath = ResolveReportPath();
             var isCi = IsCiEnvironment();
@@ -141,6 +144,10 @@ namespace VAL.App.Host.Services
                 ValidateOptions(result);
                 ValidateLogSystem(result);
                 ValidateModulesRoot(result);
+
+                // Inspect resolved properties after the real application's startup, not just the dictionary.
+                await app.Dispatcher.InvokeAsync(() => ValidateNativeTheme(app, result),
+                    DispatcherPriority.Loaded, cts.Token);
 
                 result.AvailableWebViewRuntimeVersion = TryGetWebViewRuntimeVersion(out var runtimeException);
                 if (!isCi && runtimeException != null)
@@ -190,6 +197,37 @@ namespace VAL.App.Host.Services
             }
 
             return result;
+        }
+
+        private static void ValidateNativeTheme(Application app, SmokeTestResult result)
+        {
+            if (app.MainWindow is not MainWindow window ||
+                window.Style == null || window.Style != window.TryFindResource("VALWindowTheme") ||
+                window.Background is not SolidColorBrush background ||
+                background.Color != Color.FromArgb(245, 2, 10, 20) ||
+                window.NativeRecoveryOverlay is not { } recovery ||
+                !recovery.AllowsTransparency || recovery.ShowInTaskbar || recovery.ShowActivated ||
+                recovery.Background is not SolidColorBrush recoveryBackground ||
+                recoveryBackground.Color != Colors.Transparent ||
+                recovery.Content != recovery.NavigationRecoveryButton)
+            {
+                throw new SmokeTestFailureException(40, "Native shell theme resources did not resolve during application startup.");
+            }
+
+            var button = recovery.NavigationRecoveryButton;
+            button.ApplyTemplate();
+            if (button.Style == null || button.Style != window.TryFindResource("VAL.NativeRecoveryButton") ||
+                button.Background is not LinearGradientBrush || button.FontSize != 12 ||
+                button.FontWeight != FontWeights.Normal || button.MinHeight != 32 ||
+                button.Foreground != window.TryFindResource("VAL.SoftGlassForegroundBrush") ||
+                button.FontFamily != window.TryFindResource("VAL.DockFontFamily") ||
+                button.Template?.FindName("RecoveryChrome", button) is not VAL.App.UI.BezelChrome chrome ||
+                chrome.Radius != 999 || chrome.Rim != 4)
+            {
+                throw new SmokeTestFailureException(40, "Native recovery button did not receive the approved gunmetal/glass style and template.");
+            }
+
+            result.NativeThemeReady = true;
         }
 
         private void ValidateOptions(SmokeTestResult result)
@@ -454,10 +492,17 @@ namespace VAL.App.Host.Services
             builder.AppendLine(CultureInfo.InvariantCulture, $"LogAppendSucceeded: {result.LogAppendSucceeded}");
 
             builder.AppendLine();
+            builder.AppendLine("Native Shell");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"NativeThemeReady: {result.NativeThemeReady}");
+
+            builder.AppendLine();
             builder.AppendLine("WebView2");
             builder.AppendLine(CultureInfo.InvariantCulture, $"CoreReady: {result.WebViewReady}");
             builder.AppendLine(CultureInfo.InvariantCulture, $"RuntimeVersion: {result.WebViewRuntimeVersion}");
             builder.AppendLine(CultureInfo.InvariantCulture, $"AvailableRuntimeVersion: {result.AvailableWebViewRuntimeVersion}");
+            var browser = BrowserProcessIdentity.Capture(_webViewRuntime);
+            builder.AppendLine(CultureInfo.InvariantCulture, $"BrowserProcessId: {browser?.Id ?? 0}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"BrowserStartedUtcTicks: {browser?.StartedUtcTicks ?? 0}");
             if (result.WebViewCheckSkipped)
             {
                 builder.AppendLine("WebView2Check: SKIPPED (CI)");
@@ -512,6 +557,7 @@ namespace VAL.App.Host.Services
             public bool LogAppendSucceeded { get; set; }
             public bool MessageSenderWired { get; set; }
             public bool ModulesRootReady { get; set; }
+            public bool NativeThemeReady { get; set; }
             public IReadOnlyList<ModuleStatusInfo>? ModuleStatuses { get; set; }
             public ValOptions? ValOptions { get; set; }
             public WebViewOptions? WebViewOptions { get; set; }

@@ -9,7 +9,7 @@ namespace VAL.Continuum.Pipeline.Truth
 
     internal static class TruthReader
     {
-        internal static IEnumerable<TruthEntry> Read(string truthPath, bool repairTailFirst = true)
+        internal static IEnumerable<TruthEntry> Read(string truthPath, bool repairTailFirst = true, bool throwOnOpenFailure = false)
         {
             if (string.IsNullOrWhiteSpace(truthPath))
                 yield break;
@@ -33,13 +33,15 @@ namespace VAL.Continuum.Pipeline.Truth
             StreamReader? reader = null;
             try
             {
-                fs = new FileStream(truthPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                fs = new FileStream(truthPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                 reader = new StreamReader(fs, encoding, detectEncodingFromByteOrderMarks: false);
             }
             catch
             {
                 reader?.Dispose();
                 fs?.Dispose();
+                if (throwOnOpenFailure)
+                    throw;
                 yield break;
             }
 

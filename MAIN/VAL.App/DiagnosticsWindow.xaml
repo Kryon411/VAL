@@ -1,6 +1,7 @@
 <Window x:Class="VAL.App.DiagnosticsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:VAL.App.UI"
         Title="VAL Diagnostics"
         Height="620"
         Width="860"
@@ -9,7 +10,7 @@
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
         Style="{DynamicResource VALWindowTheme}">
-    <Border Style="{StaticResource VAL.ToolWindowOuterBorder}">
+    <ui:BezelChrome Style="{StaticResource VAL.ToolWindowOuterBorder}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -55,5 +56,5 @@
                 </WrapPanel>
             </StackPanel>
         </Grid>
-    </Border>
+    </ui:BezelChrome>
 </Window>

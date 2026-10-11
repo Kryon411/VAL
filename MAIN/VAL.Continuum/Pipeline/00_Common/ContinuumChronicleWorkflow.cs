@@ -9,7 +9,7 @@ using VAL.Host.WebMessaging;
 
 namespace VAL.Continuum
 {
-    internal sealed class ContinuumChronicleWorkflow
+    internal sealed class ContinuumChronicleWorkflow : IDisposable
     {
         private const string ToastGroup = "chronicle";
         private readonly object _sync = new();
@@ -20,11 +20,16 @@ namespace VAL.Continuum
         private readonly OperationCoordinator _operations;
         private readonly IToastLedger _toastLedger;
         private readonly ContinuumArchiveService _archives;
+        private readonly IBackgroundTaskSupervisor _backgroundTasks;
+        private readonly Action<Action> _postToUi;
+        private readonly TimeSpan _timeout;
         private readonly Func<bool> _isRefreshInFlight;
         private readonly Action<string> _onAttemptFinished;
         private readonly Action<string> _onCompleted;
         private bool _inFlight;
         private string? _requestId;
+        private string? _chatId;
+        private CancellationTokenSource? _timeoutCancellation;
         private DateTime _startedUtc = DateTime.MinValue;
         private ToastReason _cancelReason = ToastReason.Background;
 
@@ -36,9 +41,12 @@ namespace VAL.Continuum
             OperationCoordinator operations,
             IToastLedger toastLedger,
             ContinuumArchiveService archives,
+            IBackgroundTaskSupervisor backgroundTasks,
+            Action<Action> postToUi,
             Func<bool> isRefreshInFlight,
             Action<string> onAttemptFinished,
-            Action<string> onCompleted)
+            Action<string> onCompleted,
+            TimeSpan? timeout = null)
         {
             _messageSender = messageSender ?? throw new ArgumentNullException(nameof(messageSender));
             _toasts = toasts ?? throw new ArgumentNullException(nameof(toasts));
@@ -47,6 +55,9 @@ namespace VAL.Continuum
             _operations = operations ?? throw new ArgumentNullException(nameof(operations));
             _toastLedger = toastLedger ?? throw new ArgumentNullException(nameof(toastLedger));
             _archives = archives ?? throw new ArgumentNullException(nameof(archives));
+            _backgroundTasks = backgroundTasks ?? throw new ArgumentNullException(nameof(backgroundTasks));
+            _postToUi = postToUi ?? throw new ArgumentNullException(nameof(postToUi));
+            _timeout = timeout ?? TimeSpan.FromMinutes(30);
             _isRefreshInFlight = isRefreshInFlight ?? throw new ArgumentNullException(nameof(isRefreshInFlight));
             _onAttemptFinished = onAttemptFinished ?? throw new ArgumentNullException(nameof(onAttemptFinished));
             _onCompleted = onCompleted ?? throw new ArgumentNullException(nameof(onCompleted));
@@ -76,7 +87,9 @@ namespace VAL.Continuum
                 }
 
                 _operations.RequestCancel();
-                var resolvedChatId = _sessionContext.ResolveChatId(chatId);
+                string? resolvedChatId;
+                lock (_sync)
+                    resolvedChatId = _chatId;
                 if (string.IsNullOrWhiteSpace(resolvedChatId))
                     return;
 
@@ -120,7 +133,7 @@ namespace VAL.Continuum
                 return;
             }
 
-            if (!_sessionContext.IsSessionAttached || _isRefreshInFlight() || !TryMarkStarted())
+            if (!_sessionContext.IsSessionAttached || _isRefreshInFlight() || !TryMarkStarted(resolvedChatId))
             {
                 _operations.End(GuardedOperationKind.Chronicle);
                 ShowActionUnavailable(reason);
@@ -142,7 +155,6 @@ namespace VAL.Continuum
                     return;
                 }
 
-                _archives.TryDeleteDerivedArtifacts(resolvedChatId);
                 _archives.TryAppendChronicleAudit(
                     resolvedChatId,
                     $"Chronicle STARTED  | Utc={DateTime.UtcNow:o} | Backup={backupPath}");
@@ -159,6 +171,8 @@ namespace VAL.Continuum
                         mode = "full",
                     }),
                 });
+
+                ArmTimeout(resolvedChatId);
 
                 _toasts.TryShow(
                     ToastKey.ChronicleStarted,
@@ -183,12 +197,12 @@ namespace VAL.Continuum
 
             try
             {
-                var resolvedChatId = _sessionContext.ResolveChatId(message.ChatId);
+                var resolvedChatId = message.ChatId;
                 if (string.IsNullOrWhiteSpace(resolvedChatId))
                     return;
                 completionChatId = resolvedChatId;
 
-                if (!TryTakeActiveRequest(message.RequestId, out var startedUtc, out var cancelReason))
+                if (!TryTakeActiveRequest(resolvedChatId, message.RequestId, out var startedUtc, out var cancelReason))
                     return;
 
                 shouldEndOperation = true;
@@ -217,7 +231,7 @@ namespace VAL.Continuum
                     return;
                 }
 
-                if (!string.IsNullOrWhiteSpace(message.Error))
+                if (!string.IsNullOrWhiteSpace(message.Error) || captured <= 0)
                 {
                     _archives.TryAbortTruthRebuild(resolvedChatId);
                     ShowActionUnavailable(ToastReason.Background, replaceChronicleGroup: true);
@@ -229,6 +243,7 @@ namespace VAL.Continuum
 
                 if (!_truthStore.TryCommitTruthRebuild(resolvedChatId))
                 {
+                    _archives.TryAbortTruthRebuild(resolvedChatId);
                     ShowActionUnavailable(ToastReason.Background, replaceChronicleGroup: true);
                     _archives.TryAppendChronicleAudit(
                         resolvedChatId,
@@ -236,6 +251,7 @@ namespace VAL.Continuum
                     return;
                 }
 
+                _archives.TryDeleteDerivedArtifacts(resolvedChatId);
                 _archives.WriteChronicleMarker(resolvedChatId);
                 try
                 {
@@ -279,7 +295,7 @@ namespace VAL.Continuum
             }
         }
 
-        private bool TryMarkStarted()
+        private bool TryMarkStarted(string chatId)
         {
             lock (_sync)
             {
@@ -288,6 +304,8 @@ namespace VAL.Continuum
 
                 _inFlight = true;
                 _requestId = Guid.NewGuid().ToString("N");
+                _chatId = chatId;
+                _timeoutCancellation = new CancellationTokenSource();
                 _startedUtc = DateTime.UtcNow;
                 _cancelReason = ToastReason.Background;
                 return true;
@@ -295,6 +313,7 @@ namespace VAL.Continuum
         }
 
         private bool TryTakeActiveRequest(
+            string chatId,
             string? requestId,
             out DateTime startedUtc,
             out ToastReason cancelReason)
@@ -304,9 +323,9 @@ namespace VAL.Continuum
                 startedUtc = _startedUtc;
                 cancelReason = _cancelReason;
                 if (!_inFlight ||
-                    (!string.IsNullOrWhiteSpace(requestId) &&
-                     !string.IsNullOrWhiteSpace(_requestId) &&
-                     !requestId.Equals(_requestId, StringComparison.OrdinalIgnoreCase)))
+                    !string.Equals(chatId, _chatId, StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(requestId) ||
+                    !string.Equals(requestId, _requestId, StringComparison.Ordinal))
                 {
                     return false;
                 }
@@ -322,6 +341,37 @@ namespace VAL.Continuum
                 return _requestId ?? Guid.NewGuid().ToString("N");
         }
 
+        private void ArmTimeout(string chatId)
+        {
+            string requestId;
+            CancellationToken token;
+            lock (_sync)
+            {
+                requestId = _requestId!;
+                token = _timeoutCancellation!.Token;
+            }
+
+            _backgroundTasks.Run("Chronicle completion timeout", async cancellationToken =>
+            {
+                await Task.Delay(_timeout, cancellationToken).ConfigureAwait(false);
+                _postToUi(() =>
+                {
+                    if (!TryTakeActiveRequest(chatId, requestId, out _, out _))
+                        return;
+                    try
+                    {
+                        _archives.TryAbortTruthRebuild(chatId);
+                        _archives.TryAppendChronicleAudit(chatId, $"Chronicle FAILED | Utc={DateTime.UtcNow:o} | Error=timeout");
+                        ShowActionUnavailable(ToastReason.Background, replaceChronicleGroup: true);
+                    }
+                    finally
+                    {
+                        _operations.End(GuardedOperationKind.Chronicle);
+                    }
+                });
+            }, cancellationToken: token);
+        }
+
         private void ResetState()
         {
             lock (_sync)
@@ -330,8 +380,12 @@ namespace VAL.Continuum
 
         private void ResetStateLocked()
         {
+            _timeoutCancellation?.Cancel();
+            _timeoutCancellation?.Dispose();
+            _timeoutCancellation = null;
             _inFlight = false;
             _requestId = null;
+            _chatId = null;
             _startedUtc = DateTime.MinValue;
             _cancelReason = ToastReason.Background;
         }
@@ -343,6 +397,21 @@ namespace VAL.Continuum
                 bypassLaunchQuiet: true,
                 origin: ToastOrigin.Continuum,
                 reason: reason);
+        }
+
+        public void Dispose()
+        {
+            string? chatId;
+            lock (_sync)
+            {
+                chatId = _chatId;
+                ResetStateLocked();
+            }
+            if (!string.IsNullOrWhiteSpace(chatId))
+            {
+                _archives.TryAbortTruthRebuild(chatId);
+                _operations.End(GuardedOperationKind.Chronicle);
+            }
         }
 
         private void ShowActionUnavailable(ToastReason reason, bool replaceChronicleGroup = false)

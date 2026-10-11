@@ -27,15 +27,20 @@ namespace VAL.App.Host.Services
             _log = log ?? throw new ArgumentNullException(nameof(log));
         }
 
-        public bool TryHandleLauncherClick(DateTime nowUtc, out bool requiresDockStateSync)
+        public bool TryHandleLauncherClick(DateTime nowUtc, out bool requiresDockStateSync, Action? focusWebView = null)
         {
             requiresDockStateSync = false;
+
+            if (!_webViewRuntime.IsBridgeReady)
+                return false;
 
             if (!_shellStateController.TryHandleLauncherClick(nowUtc, out var message, out requiresDockStateSync))
             {
                 return false;
             }
 
+            // DOM focus is ineffective while the native launcher owns keyboard focus.
+            focusWebView?.Invoke();
             TrySendHostMessage(message);
             return true;
         }
@@ -60,7 +65,7 @@ namespace VAL.App.Host.Services
         {
             try
             {
-                if (!_webViewRuntime.IsReady)
+                if (!_webViewRuntime.IsBridgeReady)
                 {
                     if (_loggedNotReady)
                     {
@@ -68,7 +73,7 @@ namespace VAL.App.Host.Services
                     }
 
                     _loggedNotReady = true;
-                    _log.Info(nameof(MainWindowShellBridgeController), "Shell message ignored because WebView2 is not ready.");
+                    _log.Info(nameof(MainWindowShellBridgeController), "Shell message ignored because the WebView2 bridge is not ready.");
                     return;
                 }
 

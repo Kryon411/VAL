@@ -63,6 +63,13 @@ namespace VAL.App.Host.Startup
             }
         }
 
+        public void MarkExpectedExit()
+        {
+            var state = ReadState(out _) ?? new StartupCrashState();
+            state.ConsecutiveStartupCrashes = 0;
+            WriteState(state);
+        }
+
         private string ResolveStatePath()
         {
             return Path.Combine(_dataRoot, "State", "startup.json");

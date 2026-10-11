@@ -36,6 +36,7 @@ namespace VAL.Tests.Continuum
                 var archives = new ContinuumArchiveService(truthStore, sessionContext);
                 var attemptFinished = 0;
                 var completed = 0;
+                using var backgroundTasks = new BackgroundTaskSupervisor(new FakeLog());
                 var workflow = new ContinuumChronicleWorkflow(
                     sender,
                     toasts,
@@ -44,6 +45,8 @@ namespace VAL.Tests.Continuum
                     operations,
                     new ToastLedgerService(truthStore),
                     archives,
+                    backgroundTasks,
+                    action => action(),
                     () => false,
                     _ => attemptFinished++,
                     _ => completed++);
@@ -55,6 +58,15 @@ namespace VAL.Tests.Continuum
                 var startMessage = Assert.Single(sender.Messages);
                 Assert.Equal(WebCommandNames.ContinuumChronicleStart, startMessage.Name);
                 var requestId = startMessage.Payload!.Value.GetProperty("requestId").GetString();
+
+                workflow.Complete(new ContinuumCommandMessage { ChatId = "wrong-chat", RequestId = requestId, CapturedTurns = 8 });
+                workflow.Complete(new ContinuumCommandMessage { ChatId = chatId, CapturedTurns = 8 });
+                workflow.Complete(new ContinuumCommandMessage { ChatId = chatId, RequestId = "stale", CapturedTurns = 8 });
+                Assert.True(workflow.IsInFlight);
+                Assert.True(operations.IsRunning(GuardedOperationKind.Chronicle));
+                Assert.Equal(0, completed);
+
+                truthStore.AppendTruthLine(chatId, 'U', "captured content");
 
                 workflow.Complete(new ContinuumCommandMessage
                 {
@@ -93,7 +105,7 @@ namespace VAL.Tests.Continuum
                 using var backgroundTasks = new BackgroundTaskSupervisor(new FakeLog());
                 var sender = new RecordingMessageSender();
                 var inbox = new ContinuumInjectInbox();
-                var workflow = new ContinuumPulseWorkflow(
+                using var workflow = new ContinuumPulseWorkflow(
                     sender,
                     new RecordingToastHub(),
                     new FakeQuickRefreshService(),
@@ -112,6 +124,9 @@ namespace VAL.Tests.Continuum
                 Assert.Equal(WebCommandNames.ContinuumCaptureFlush, flushMessage.Name);
                 var requestId = flushMessage.Payload!.Value.GetProperty("requestId").GetString();
 
+                workflow.HandleCaptureFlushAck(new ContinuumCommandMessage { ChatId = "wrong-chat", RequestId = requestId });
+                Assert.Equal(0, inbox.Count);
+
                 workflow.HandleCaptureFlushAck(new ContinuumCommandMessage
                 {
                     ChatId = chatId,
@@ -119,11 +134,26 @@ namespace VAL.Tests.Continuum
                 });
 
                 Assert.Equal(1, inbox.Count);
-                Assert.Equal("Signal", inbox.Dequeue()!.Mode);
-
-                workflow.CompleteInjection(chatId);
+                var signal = inbox.Dequeue()!;
+                Assert.Equal("Signal", signal.Mode);
+                workflow.CompleteInjection(chatId, signal.RequestId);
+                Assert.True(workflow.IsInFlight);
+                workflow.HandleEvent(new ContinuumCommandMessage
+                {
+                    ChatId = chatId,
+                    RequestId = signal.RequestId,
+                    Event = "signal.send.failed:no_button",
+                });
+                var pulse = inbox.Dequeue()!;
+                Assert.Equal("Pulse", pulse.Mode);
+                Assert.NotEmpty(pulse.RequestId);
+                Assert.NotEqual(signal.RequestId, pulse.RequestId);
+                workflow.CompleteInjection(chatId, "unrelated");
+                Assert.True(workflow.IsInFlight);
+                workflow.CompleteInjection(chatId, pulse.RequestId);
                 Assert.False(workflow.IsInFlight);
                 Assert.False(operations.IsBusy);
+                Assert.True(pulse.CancellationToken.IsCancellationRequested);
                 await backgroundTasks.StopAsync(TimeSpan.FromSeconds(2));
             }
             finally

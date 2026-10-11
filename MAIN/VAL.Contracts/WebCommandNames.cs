@@ -37,6 +37,7 @@ namespace VAL.Contracts
         public const string InjectSuccess = "inject.success";
         public const string ContinuumEvent = "continuum.event";
         public const string ContinuumInjectText = "continuum.inject_text";
+        public const string ContinuumInjectCancel = "continuum.inject.cancel";
 
         // ---- Abyss ----
         public const string AbyssCommandOpenQueryUi = "abyss.command.open_query_ui";

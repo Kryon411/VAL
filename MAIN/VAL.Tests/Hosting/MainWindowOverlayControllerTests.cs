@@ -3,6 +3,7 @@ using System.Windows;
 
 using VAL.App.Host.Services;
 using VAL.App.State;
+using VAL.Tests.Shared;
 
 using Xunit;
 
@@ -19,7 +20,7 @@ namespace VAL.Tests.Hosting
             {
                 ClampedGeometry = new GeometryState(120, 140, 40, 40)
             };
-            var controller = new MainWindowOverlayController(stateController, overlayHost);
+            var controller = new MainWindowOverlayController(stateController, overlayHost, CreateReadyRuntime());
             var factoryCalls = 0;
 
             controller.InitializeGeometry(() =>
@@ -43,7 +44,7 @@ namespace VAL.Tests.Hosting
         public void HandleOwnerStateChangedHidesOverlayWhenMinimized()
         {
             var overlayHost = new FakeControlCentreOverlayHost();
-            var controller = new MainWindowOverlayController(CreateLoadedStateController(), overlayHost);
+            var controller = new MainWindowOverlayController(CreateLoadedStateController(), overlayHost, CreateReadyRuntime());
 
             controller.HandleOwnerStateChanged(WindowState.Minimized);
 
@@ -57,7 +58,7 @@ namespace VAL.Tests.Hosting
             var stateController = CreateLoadedStateController();
             stateController.ToggleLayoutMode();
             var overlayHost = new FakeControlCentreOverlayHost();
-            var controller = new MainWindowOverlayController(stateController, overlayHost);
+            var controller = new MainWindowOverlayController(stateController, overlayHost, CreateReadyRuntime());
 
             controller.HandleOwnerBoundsChanged();
 
@@ -68,7 +69,7 @@ namespace VAL.Tests.Hosting
         public void HandleNavigationCompletedShowsPulsesAndRequestsDockSyncWhenVisible()
         {
             var overlayHost = new FakeControlCentreOverlayHost();
-            var controller = new MainWindowOverlayController(CreateLoadedStateController(), overlayHost);
+            var controller = new MainWindowOverlayController(CreateLoadedStateController(), overlayHost, CreateReadyRuntime());
 
             var requiresDockSync = controller.HandleNavigationCompleted(WindowState.Maximized, isActive: true);
 
@@ -83,7 +84,7 @@ namespace VAL.Tests.Hosting
             var stateController = CreateLoadedStateController();
             stateController.ToggleLayoutMode();
             var overlayHost = new FakeControlCentreOverlayHost();
-            var controller = new MainWindowOverlayController(stateController, overlayHost);
+            var controller = new MainWindowOverlayController(stateController, overlayHost, CreateReadyRuntime());
 
             controller.ApplyLayoutMode();
 
@@ -97,6 +98,108 @@ namespace VAL.Tests.Hosting
             return controller;
         }
 
+        [Fact]
+        public void AutomaticAnchorFollowsHeaderButUserDragIsNotOverwritten()
+        {
+            var state = CreateLoadedStateController();
+            var overlay = new FakeControlCentreOverlayHost();
+            var controller = new MainWindowOverlayController(state, overlay, CreateReadyRuntime());
+            var anchor = new GeometryState(100, 20, 40, 40);
+            controller.InitializeGeometry(() => anchor);
+            anchor = new GeometryState(200, 20, 40, 40);
+            controller.HandleOwnerBoundsChanged();
+            Assert.Equal(anchor, overlay.LastAppliedGeometry);
+            Assert.False(state.IsControlCentreCustom);
+
+            controller.HandleGeometryChanged();
+            anchor = new GeometryState(300, 20, 40, 40);
+            controller.HandleOwnerBoundsChanged();
+            Assert.True(state.IsControlCentreCustom);
+            Assert.NotEqual(anchor, overlay.LastAppliedGeometry);
+
+            state.ResetPlacement();
+            controller.HandleOwnerBoundsChanged();
+            Assert.Equal(anchor, overlay.LastAppliedGeometry);
+        }
+
+        [Fact]
+        public void HeaderUpdatesNeverInterruptPointerInteraction()
+        {
+            var overlay = new FakeControlCentreOverlayHost { IsInteracting = true };
+            var controller = new MainWindowOverlayController(CreateLoadedStateController(), overlay, CreateReadyRuntime());
+            controller.HandleOwnerBoundsChanged();
+            Assert.Equal(0, overlay.ClampCalls);
+        }
+
+        [Fact]
+        public void CustomLauncherMovesWithOwnerAndStaysInsideRestoredViewport()
+        {
+            var state = CreateLoadedStateController();
+            var overlay = new FakeControlCentreOverlayHost { ReadAppliedGeometry = true };
+            var controller = new MainWindowOverlayController(state, overlay, CreateReadyRuntime());
+            var bounds = new Rect(1000, 100, 500, 400);
+            controller.InitializeGeometry(() => new GeometryState(1100, 120, 40, 40), () => bounds);
+            controller.HandleGeometryChanged();
+            bounds = new Rect(1200, 200, 500, 400);
+            controller.HandleOwnerBoundsChanged();
+            Assert.Equal(new GeometryState(1300, 220, 40, 40), state.CreateSnapshot().ControlCentre);
+
+            bounds = new Rect(1200, 200, 80, 80);
+            controller.HandleOwnerBoundsChanged();
+            Assert.Equal(new GeometryState(1240, 220, 40, 40), state.CreateSnapshot().ControlCentre);
+            Assert.True(state.IsControlCentreCustom);
+        }
+
+        [Theory]
+        [InlineData("activation")]
+        [InlineData("restore")]
+        [InlineData("navigation")]
+        [InlineData("source")]
+        [InlineData("bounds")]
+        [InlineData("geometry")]
+        public void DisarmedBridgeKeepsLauncherHiddenWithoutChangingSavedGeometry(string refresh)
+        {
+            var state = CreateLoadedStateController();
+            var before = state.CreateSnapshot();
+            var overlay = new FakeControlCentreOverlayHost();
+            var controller = new MainWindowOverlayController(state, overlay, new TestWebViewRuntime { IsReady = true });
+
+            switch (refresh)
+            {
+                case "activation": controller.HandleActivated(); break;
+                case "restore": controller.HandleOwnerStateChanged(WindowState.Maximized); break;
+                case "navigation": Assert.False(controller.HandleNavigationCompleted(WindowState.Maximized, true)); break;
+                case "source": controller.HandleNavigationStateChanged(WindowState.Maximized); break;
+                case "bounds": controller.HandleOwnerBoundsChanged(); break;
+                case "geometry": controller.HandleGeometryChanged(); break;
+            }
+
+            Assert.Equal(1, overlay.HideCalls);
+            Assert.Equal(0, overlay.ShowCalls);
+            Assert.Equal(0, overlay.PulseCalls);
+            Assert.Equal(0, overlay.ClampCalls);
+            Assert.Equal(before.ControlCentre, state.CreateSnapshot().ControlCentre);
+        }
+
+        [Fact]
+        public void ReturningToTrustedPageRestoresLauncherButMinimizedOwnerKeepsItHidden()
+        {
+            var runtime = new TestWebViewRuntime { IsReady = true };
+            var overlay = new FakeControlCentreOverlayHost();
+            var controller = new MainWindowOverlayController(CreateLoadedStateController(), overlay, runtime);
+
+            controller.HandleNavigationStateChanged(WindowState.Maximized);
+            runtime.IsBridgeReady = true;
+            controller.HandleNavigationStateChanged(WindowState.Minimized);
+            Assert.Equal(0, overlay.ShowCalls);
+            controller.HandleNavigationStateChanged(WindowState.Maximized);
+
+            Assert.Equal(2, overlay.HideCalls);
+            Assert.Equal(1, overlay.ShowCalls);
+        }
+
+        private static TestWebViewRuntime CreateReadyRuntime() => new() { IsReady = true, IsBridgeReady = true };
+
         private static MainWindowShellStateController CreateStateController()
         {
             return new MainWindowShellStateController(new FakeControlCentreUiStateStore());
@@ -104,9 +207,13 @@ namespace VAL.Tests.Hosting
 
         private sealed class FakeControlCentreOverlayHost : IControlCentreOverlayHost
         {
+            public bool IsInteracting { get; set; }
+            public bool ReadAppliedGeometry { get; set; }
             public event EventHandler? Clicked { add { } remove { } }
             public event EventHandler? GeometryChanged { add { } remove { } }
             public event EventHandler? LayoutToggleRequested { add { } remove { } }
+            public event EventHandler? BrowserFocusRequested { add { } remove { } }
+            public bool TryFocus() => false;
 
             public GeometryState LastAppliedGeometry { get; private set; }
             public GeometryState ClampedGeometry { get; set; }
@@ -155,10 +262,10 @@ namespace VAL.Tests.Hosting
                 LastAppliedGeometry = geometry;
             }
 
-            public bool TryClampToVirtualScreen(out GeometryState geometry)
+            public bool TryClampToVirtualScreen(out GeometryState geometry, Rect? viewportBounds = null)
             {
                 ClampCalls++;
-                geometry = ClampedGeometry;
+                geometry = ReadAppliedGeometry ? LastAppliedGeometry : ClampedGeometry;
                 return true;
             }
         }

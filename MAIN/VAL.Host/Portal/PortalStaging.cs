@@ -56,5 +56,11 @@ namespace VAL.Host.Portal
                 return drained;
             }
         }
+
+        internal void RestoreFront(IEnumerable<BitmapSource> images)
+        {
+            lock (_lock)
+                _items.InsertRange(0, images.Take(MAX - _items.Count));
+        }
     }
 }

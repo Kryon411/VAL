@@ -115,6 +115,24 @@ namespace VAL.Tests.Abyss
             return root;
         }
 
+        [Fact]
+        public void SearchPreservesZeroBasedPhysicalLineLocations()
+        {
+            var root = CreateTempRoot();
+            try
+            {
+                var path = CreateTruthPath(root, "chat");
+                File.WriteAllText(path, "invalid\nU|needle question\nA|answer\n");
+                var exchange = Assert.Single(new AbyssSearchService(new FakeLog()).Search(root, "needle", 4)).Exchange;
+                Assert.Equal(1, Assert.Single(exchange.UserLines).LineIndex);
+                Assert.Equal(2, Assert.Single(exchange.AssistantLines).LineIndex);
+            }
+            finally
+            {
+                TryDelete(root);
+            }
+        }
+
         private static string CreateTruthPath(string root, string chatId)
         {
             var dir = Path.Combine(root, chatId);

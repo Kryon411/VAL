@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#f5f1e8" />
+  <rect x="12" y="12" width="616" height="336" rx="12" fill="none" stroke="#174a62" stroke-width="4" />
+  <rect x="38" y="38" width="564" height="52" fill="#174a62" />
+  <text x="320" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="26" fill="white">VAL Portal Validation</text>
+  <circle cx="142" cy="182" r="44" fill="#d95440" />
+  <rect x="230" y="138" width="88" height="88" fill="#2a806f" />
+  <path d="M 426 138 L 476 226 L 376 226 Z" fill="#d7a52a" />
+  <text x="320" y="272" text-anchor="middle" font-family="monospace" font-size="20" fill="#174a62">VAL-PORTAL-2026-10-10-P1</text>
+  <text x="320" y="310" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="#174a62">Synthetic image only. No personal data.</text>
+</svg>

@@ -25,10 +25,13 @@ The executable is a leaf composition project. Tests reference the assemblies the
 
 1. `VAL.Desktop` starts `ValDesktopBootstrapper`.
 2. `VAL.App` builds the dependency injection host and registers UI, feature, and platform services.
-3. `HostCommandRouter` validates and dispatches WebView messages through registered command contributors.
-4. Feature runtimes coordinate domain services; Continuum delegates Pulse and Chronicle to isolated lifecycle workflows.
-5. `IBackgroundTaskSupervisor` owns non-UI background work, observes failures, and drains work during bounded shutdown.
-6. `ITruthStore` and atomic file helpers protect conversation data and rebuild operations.
+3. Any pending data deletion runs before live feature services and WebView startup; incomplete cleanup blocks startup and retains the retry request.
+4. `HostCommandRouter` validates and dispatches WebView messages through registered command contributors.
+5. Feature runtimes coordinate domain services; Continuum delegates Pulse and Chronicle to isolated lifecycle workflows.
+6. `IBackgroundTaskSupervisor` owns non-UI background work, observes failures, and drains work during bounded shutdown.
+7. `ITruthStore` and atomic file helpers protect conversation data and rebuild operations.
+
+The current runtime target is .NET 10 LTS, with an exact SDK pin and centralized locked dependency versions. Truth appends, rebuild transitions, resets, and archive reads share a per-chat gate. Rebuilds retain the existing archive until a nonempty replacement commits successfully. Only validated session-attach messages change active conversation context. Injected modules and session nonces are restricted to top-level trusted ChatGPT origins; outbound browser messages require an armed trusted bridge.
 
 Program content and mutable data have separate roots. Installed binaries, modules, icons, and Dock assets live under `%LOCALAPPDATA%\Programs\VAL`; state, conversation memory, logs, profiles, and settings live under `%LOCALAPPDATA%\VAL` and survive application uninstall.
 
@@ -39,6 +42,8 @@ Program content and mutable data have separate roots. Installed binaries, module
 - Put WPF windows, view models, application composition, and desktop lifecycle in `VAL.App`.
 - Keep feature behavior in its feature assembly; do not make features depend on `VAL.App` or `VAL.Desktop`.
 - Keep persistence writes atomic and cancellation-aware.
+- Correlate guarded workflow completions to their exact request and operation identities; invalidate queued client work on cancellation and own a bounded deadline.
+- Publish asynchronous query metadata and results together on the UI boundary only for the latest generation; Clear and disposal must invalidate prior work.
 - Do not use unobserved fire-and-forget tasks. Schedule background work through `IBackgroundTaskSupervisor` or own and await a documented lifecycle task.
 - Do not launch processes directly from feature code. Use `IProcessLauncher`.
 - Add a canonical command contract before introducing a new JavaScript-to-host command.
@@ -46,4 +51,6 @@ Program content and mutable data have separate roots. Installed binaries, module
 
 ## Quality Gates
 
-`VAL.sln` is the authoritative build surface. CI verifies formatting, locked restore, all projects, unit and architecture tests, JavaScript command/manifests, dependency vulnerabilities, manifest freshness, self-contained publish, and a published executable smoke test. The release pipeline adds version validation, symbol separation, installer compilation, checksums, and optional Authenticode signing.
+`VAL.sln` is the authoritative build surface. CI verifies formatting, locked restore, all projects, unit/integration and architecture tests, JavaScript command/manifests, dependency vulnerabilities, manifest freshness, self-contained publish, and published startup/deferred-cleanup checks. The release pipeline adds version validation, symbol separation, installer compilation, isolated installer lifecycle validation, checksums, and optional Authenticode signing.
+
+These boundaries provide a conventional modular desktop foundation, not a certification of commercial readiness. See [the October 2026 review](Reviews/VAL-2026-10-10.md) for remaining concurrency, privacy, scalability, and test-coverage work.

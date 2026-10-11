@@ -78,7 +78,10 @@ namespace VAL.App.Host.Services
                 return;
 
             if (ReferenceEquals(_modulesInitializedForCore, core))
+            {
+                SendPrivacySettings();
                 return;
+            }
 
             if (Interlocked.CompareExchange(ref _modulesInitInFlight, 1, 0) != 0)
                 return;

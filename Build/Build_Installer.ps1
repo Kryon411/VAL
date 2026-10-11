@@ -2,6 +2,8 @@
 param(
     [string]$RuntimeIdentifier = "win-x64",
     [switch]$SkipPublish,
+    [string]$ValidationOutputRoot,
+    [switch]$IsolatedInstallerValidation,
     [string]$CompilerPath = $env:INNO_SETUP_COMPILER,
     [string]$CertificatePath = $env:VAL_SIGNING_CERTIFICATE_PATH,
     [string]$CertificatePassword = $env:VAL_SIGNING_CERTIFICATE_PASSWORD,
@@ -12,11 +14,18 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "Release_Paths.ps1")
+$validationRoot = Resolve-ValValidationRoot -RepoRoot $repoRoot -RequestedRoot $ValidationOutputRoot
+if ($IsolatedInstallerValidation -and $null -eq $validationRoot) {
+    throw "An isolated validation installer requires ValidationOutputRoot under artifacts."
+}
 $buildPropsPath = Join-Path $repoRoot "Directory.Build.props"
 $installerScript = Join-Path $repoRoot "Installer\VAL.iss"
 $publishScript = Join-Path $PSScriptRoot "Publish_Release.ps1"
-$publishPath = Join-Path $repoRoot "PRODUCT\Publish"
-$installerOutput = Join-Path $repoRoot "InstallerOutput"
+$publishPath = if ($null -eq $validationRoot) { Join-Path $repoRoot "PRODUCT\Publish" } else { Join-Path $validationRoot "Publish" }
+$installerOutput = if ($null -eq $validationRoot) { Join-Path $repoRoot "InstallerOutput" }
+    elseif ($IsolatedInstallerValidation) { Join-Path $validationRoot "ValidationInstallerOutput" }
+    else { Join-Path $validationRoot "InstallerOutput" }
 
 [xml]$buildProps = Get-Content -LiteralPath $buildPropsPath -Raw
 $versionNodes = @(
@@ -41,6 +50,7 @@ if (-not $installerVersion.Success -or $installerVersion.Groups[1].Value -ne $ve
 
 if (-not $SkipPublish.IsPresent) {
     $publishParameters = @{ RuntimeIdentifier = $RuntimeIdentifier }
+    if ($null -ne $validationRoot) { $publishParameters.ValidationOutputRoot = $validationRoot }
     if (-not [string]::IsNullOrWhiteSpace($CertificatePath)) {
         $publishParameters.CertificatePath = $CertificatePath
         $publishParameters.CertificatePassword = $CertificatePassword
@@ -52,11 +62,17 @@ if (-not $SkipPublish.IsPresent) {
 }
 
 $executablePath = Join-Path $publishPath "VAL.exe"
+Assert-ValBuildDirectory -RepoRoot $repoRoot -Path $publishPath
 if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
     throw "Published executable was not found: $executablePath"
 }
+$expectedExecutableHash = (Get-Content -LiteralPath "$executablePath.sha256" -Raw).Split(' ', [StringSplitOptions]::RemoveEmptyEntries)[0]
+if ((Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash -ne $expectedExecutableHash) {
+    throw "Published executable checksum mismatch. Republish before building the installer."
+}
 
 $fileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($executablePath).FileVersion
+$payloadHash = Get-ValPayloadHash -Path $publishPath
 $expectedFileVersion = "$version.0"
 if ($fileVersion -ne $expectedFileVersion) {
     throw "Published VAL.exe has file version '$fileVersion'; expected '$expectedFileVersion'."
@@ -77,6 +93,7 @@ if ([string]::IsNullOrWhiteSpace($CompilerPath) -or
 }
 
 $resolvedOutput = [System.IO.Path]::GetFullPath($installerOutput)
+Assert-ValBuildDirectory -RepoRoot $repoRoot -Path $resolvedOutput
 $expectedOutput = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 if (-not $resolvedOutput.StartsWith($expectedOutput, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to clean installer output outside the repository."
@@ -88,10 +105,21 @@ if (Test-Path -LiteralPath $resolvedOutput) {
 New-Item -ItemType Directory -Path $resolvedOutput -Force | Out-Null
 
 Write-Host "Compiling VAL v$version installer..."
-& $CompilerPath $installerScript
+$baseName = "VAL_Setup_v$version"
+$compilerArguments = @("/O$resolvedOutput", "/DPayloadDir=$publishPath")
+if ($IsolatedInstallerValidation) {
+    $baseName = "VAL_Validation_Setup_v$version"
+    $validationAppId = [Guid]::NewGuid().ToString('N')
+    $installRoot = Join-Path $validationRoot "Installed"
+    if ($installRoot.Contains("'")) { throw "Validation install path cannot contain an apostrophe." }
+    Assert-ValBuildDirectory -RepoRoot $repoRoot -Path $installRoot
+    $compilerArguments += @("/DValidationBuild", "/DValidationAppId=$validationAppId", "/DValidationInstallRoot=$installRoot")
+}
+$compilerArguments += @("/F$baseName", $installerScript)
+& $CompilerPath @compilerArguments | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed." }
 
-$installerPath = Join-Path $resolvedOutput "VAL_Setup_v$version.exe"
+$installerPath = Join-Path $resolvedOutput "$baseName.exe"
 if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
     throw "Expected installer was not produced: $installerPath"
 }
@@ -123,6 +151,13 @@ else {
 $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $hashPath = "$installerPath.sha256"
 Set-Content -LiteralPath $hashPath -Value "$hash  $(Split-Path -Leaf $installerPath)" -Encoding ASCII
+if ((Get-ValPayloadHash -Path $publishPath) -ne $payloadHash) { throw 'Published payload changed while compiling the installer.' }
+if ($IsolatedInstallerValidation) {
+    @{ AppId = "VAL.Validation.$validationAppId"; InstallRoot = $installRoot; InstallerPath = $installerPath; PayloadSha256 = $payloadHash } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $resolvedOutput "validation-installer.json") -Encoding utf8
+}
+@{ ExecutableSha256 = $expectedExecutableHash; PayloadSha256 = $payloadHash; InstallerSha256 = $hash } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $resolvedOutput 'installer-build.json') -Encoding utf8
 
 Write-Host "Installer build successful."
 Write-Host "Installer: $installerPath"

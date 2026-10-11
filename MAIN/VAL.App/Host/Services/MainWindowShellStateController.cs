@@ -33,6 +33,7 @@ namespace VAL.App.Host.Services
         public bool IsDockOpen => _state.Dock.IsOpen;
 
         public bool IsLayoutModeEnabled => _state.LayoutMode;
+        public bool IsControlCentreCustom => _state.ControlCentreIsCustom;
 
         public void Load()
         {
@@ -50,6 +51,7 @@ namespace VAL.App.Host.Services
             {
                 Version = _state.Version,
                 ControlCentre = _state.ControlCentre,
+                ControlCentreIsCustom = _state.ControlCentreIsCustom,
                 Dock = new DockGeometryState
                 {
                     IsOpen = _state.Dock.IsOpen,
@@ -57,6 +59,7 @@ namespace VAL.App.Host.Services
                     Y = _state.Dock.Y,
                     W = _state.Dock.W,
                     H = _state.Dock.H,
+                    IsCustom = _state.Dock.IsCustom,
                 },
                 LayoutMode = _state.LayoutMode,
             };
@@ -66,7 +69,7 @@ namespace VAL.App.Host.Services
         {
             ArgumentNullException.ThrowIfNull(defaultGeometryFactory);
 
-            if (!_state.ControlCentre.HasPosition)
+            if (!_state.ControlCentreIsCustom || !_state.ControlCentre.HasPosition)
             {
                 _state.ControlCentre = defaultGeometryFactory();
             }
@@ -74,9 +77,17 @@ namespace VAL.App.Host.Services
             return _state.ControlCentre;
         }
 
-        public void UpdateControlCentreGeometry(GeometryState geometry)
+        public void UpdateControlCentreGeometry(GeometryState geometry, bool userChanged = false)
         {
             _state.ControlCentre = geometry;
+            if (userChanged) _state.ControlCentreIsCustom = true;
+        }
+
+        public void ResetPlacement()
+        {
+            _state.ControlCentreIsCustom = false;
+            _state.Dock.IsCustom = false;
+            _state.LayoutMode = false;
         }
 
         public bool TryHandleLauncherClick(DateTime nowUtc, out MessageEnvelope envelope, out bool requiresDockStateSync)
@@ -122,6 +133,7 @@ namespace VAL.App.Host.Services
                     w = dock.W,
                     h = dock.H,
                     isOpen = dock.IsOpen,
+                    isCustom = dock.IsCustom,
                 });
         }
 
@@ -150,6 +162,17 @@ namespace VAL.App.Host.Services
                 if (!string.Equals(type, DockUiStateSetType, StringComparison.Ordinal))
                 {
                     return false;
+                }
+
+                if (TryGetPayloadRoot(parsedEnvelope, out var layoutRoot) && layoutRoot.TryGetProperty("headerAnchor", out _))
+                    return false;
+
+                if (TryGetPayloadRoot(parsedEnvelope, out var root))
+                {
+                    if (root.TryGetProperty("resetPlacement", out var reset) && reset.ValueKind == JsonValueKind.True)
+                        ResetPlacement();
+                    if (root.TryGetProperty("isCustom", out var custom) && TryReadBoolean(custom, out var isCustom))
+                        _state.Dock.IsCustom = isCustom;
                 }
 
                 if (TryReadIsOpen(parsedEnvelope, out var isOpen))
@@ -302,13 +325,13 @@ namespace VAL.App.Host.Services
                 return false;
             }
 
-            if (property.ValueKind == JsonValueKind.Number && property.TryGetDouble(out value))
+            if (property.ValueKind == JsonValueKind.Number && property.TryGetDouble(out value) && double.IsFinite(value))
             {
                 return true;
             }
 
             if (property.ValueKind == JsonValueKind.String &&
-                double.TryParse(property.GetString(), out var parsed))
+                double.TryParse(property.GetString(), out var parsed) && double.IsFinite(parsed))
             {
                 value = parsed;
                 return true;

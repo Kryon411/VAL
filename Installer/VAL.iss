@@ -1,12 +1,27 @@
 ; VAL per-user installer. Keep AppId stable so existing installations are recognized as upgrades.
 
-#define AppName "VAL"
-#define AppVersion "5.0.0"
+#ifdef ValidationBuild
+  #ifndef ValidationAppId
+    #error ValidationAppId is required for an isolated validation installer.
+  #endif
+  #ifndef ValidationInstallRoot
+    #error ValidationInstallRoot is required for an isolated validation installer.
+  #endif
+  #define AppName "VAL Validation"
+  #define AppIdGuid "VAL.Validation." + ValidationAppId
+#else
+  #define AppName "VAL"
+  #define AppIdGuid "{{d11fe636-f181-4cdf-bc7e-e4adcfe52237}}"
+#endif
+#ifndef AppVersion
+#define AppVersion "5.1.0"
+#endif
 #define AppPublisher "Kerry Ryan"
 #define AppUrl "https://github.com/Kryon411/VAL"
 #define AppExeName "VAL.exe"
-#define AppIdGuid "{{d11fe636-f181-4cdf-bc7e-e4adcfe52237}}"
-#define PayloadDir "..\PRODUCT\Publish"
+#ifndef PayloadDir
+  #define PayloadDir "..\PRODUCT\Publish"
+#endif
 
 [Setup]
 AppId={#AppIdGuid}
@@ -23,7 +38,11 @@ VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} installer
 VersionInfoProductName={#AppName}
 PrivilegesRequired=lowest
+#ifdef ValidationBuild
+DefaultDirName={#ValidationInstallRoot}
+#else
 DefaultDirName={localappdata}\Programs\{#AppName}
+#endif
 DefaultGroupName={#AppName}
 UsePreviousAppDir=no
 DisableDirPage=auto
@@ -38,7 +57,11 @@ OutputBaseFilename=VAL_Setup_v{#AppVersion}
 SetupIconFile={#PayloadDir}\Icons\VAL_Blue_Lens.ico
 UninstallDisplayName={#AppName} v{#AppVersion}
 UninstallDisplayIcon={app}\{#AppExeName}
+#ifdef ValidationBuild
+AppMutex=Local\VAL.Validation.{#ValidationAppId}
+#else
 AppMutex=Local\VAL.Desktop.SingleInstance
+#endif
 CloseApplications=yes
 RestartApplications=no
 WizardStyle=modern
@@ -47,20 +70,37 @@ SetupLogging=yes
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+#ifndef ValidationBuild
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+#endif
 
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+#ifndef ValidationBuild
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
 Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
+#endif
 
 [Code]
+#ifdef ValidationBuild
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if CompareText(RemoveBackslashUnlessRoot(ExpandConstant('{app}')),
+    RemoveBackslashUnlessRoot('{#ValidationInstallRoot}')) <> 0 then
+  begin
+    Result := 'Validation installers may only use their isolated test directory.';
+  end;
+end;
+#endif
+
+#ifndef ValidationBuild
 procedure DeleteLegacyInstallerFiles(const LegacyRoot: String);
 var
   Index: Integer;
@@ -110,3 +150,4 @@ begin
     CleanupLegacyPayload;
   end;
 end;
+#endif

@@ -170,8 +170,21 @@ try {
     "_ToolsOut"
   )
 
+  function Get-SourceFiles([string] $directory) {
+    foreach ($item in Get-ChildItem -LiteralPath $directory -Force) {
+      if ($item.PSIsContainer) {
+        if ($excludedDirectories -notcontains $item.Name -and
+            ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0) {
+          Get-SourceFiles $item.FullName
+        }
+      } else {
+        $item
+      }
+    }
+  }
+
   [string[]] $files = @(
-    Get-ChildItem -LiteralPath $rootFull -Recurse -File -Force |
+    Get-SourceFiles $rootFull |
     Where-Object {
       $p = $_.FullName
 

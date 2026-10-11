@@ -1,6 +1,6 @@
 {
   "name": "Dock",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "apiVersion": "1",
   "hostMinVersion": "0.0.0",
   "capabilities": [
@@ -8,10 +8,12 @@
   ],
   "enabled": true,
   "entryScripts": [
+    "Dock.Layout.js",
     "Dock.main.js"
   ],
   "styles": [
-    "Dock.styles.css"
+    "Dock.styles.css",
+    "VAL.Controls.css"
   ],
   "entry": "Dock.main.js"
 }

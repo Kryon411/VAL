@@ -36,9 +36,6 @@ namespace VAL.App.State
 
             try
             {
-                if (!File.Exists(path))
-                    return new JsonStateFileReadResult<T>(JsonStateFileReadStatus.Missing, default);
-
                 var json = File.ReadAllText(path);
                 if (string.IsNullOrWhiteSpace(json))
                     return new JsonStateFileReadResult<T>(JsonStateFileReadStatus.Empty, default);
@@ -47,6 +44,14 @@ namespace VAL.App.State
                 return value is null
                     ? new JsonStateFileReadResult<T>(JsonStateFileReadStatus.Invalid, default)
                     : new JsonStateFileReadResult<T>(JsonStateFileReadStatus.Success, value);
+            }
+            catch (FileNotFoundException)
+            {
+                return new JsonStateFileReadResult<T>(JsonStateFileReadStatus.Missing, default);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return new JsonStateFileReadResult<T>(JsonStateFileReadStatus.Missing, default);
             }
             catch (Exception ex)
             {

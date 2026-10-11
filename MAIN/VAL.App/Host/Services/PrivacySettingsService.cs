@@ -16,23 +16,33 @@ namespace VAL.App.Host.Services
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
-        private readonly ContinuumHost _continuumHost;
+        private readonly Action<bool> _applyLogging;
         private readonly ILog _log;
         private readonly object _gate = new();
         private readonly string _settingsPath;
         private PrivacySettingsState _settings;
 
         public PrivacySettingsService(IAppPaths appPaths, ContinuumHost continuumHost, ILog log)
+            : this(appPaths, CreateLoggingSetter(continuumHost), log)
+        {
+        }
+
+        internal PrivacySettingsService(IAppPaths appPaths, Action<bool> applyLogging, ILog log)
         {
             ArgumentNullException.ThrowIfNull(appPaths);
-            ArgumentNullException.ThrowIfNull(continuumHost);
 
-            _continuumHost = continuumHost;
+            _applyLogging = applyLogging ?? throw new ArgumentNullException(nameof(applyLogging));
             _log = log ?? throw new ArgumentNullException(nameof(log));
             _settingsPath = Path.Combine(appPaths.DataRoot, "settings.json");
             _settings = LoadSettings();
 
             ApplyContinuumLogging(_settings.ContinuumLoggingEnabled);
+        }
+
+        private static Action<bool> CreateLoggingSetter(ContinuumHost host)
+        {
+            ArgumentNullException.ThrowIfNull(host);
+            return enabled => host.ApplyLoggingSetting(enabled, showToast: false);
         }
 
         public event Action<PrivacySettingsSnapshot>? SettingsChanged;
@@ -47,10 +57,7 @@ namespace VAL.App.Host.Services
 
         public bool UpdateContinuumLogging(bool enabled)
         {
-            var updated = Update(settings => settings.ContinuumLoggingEnabled = enabled);
-            if (updated)
-                ApplyContinuumLogging(enabled);
-            return updated;
+            return Update(settings => settings.ContinuumLoggingEnabled = enabled, applyLogging: true);
         }
 
         public bool UpdatePortalCapture(bool enabled)
@@ -58,12 +65,18 @@ namespace VAL.App.Host.Services
             return Update(settings => settings.PortalCaptureEnabled = enabled);
         }
 
+        public bool DisableCapture() => Update(settings =>
+        {
+            settings.ContinuumLoggingEnabled = false;
+            settings.PortalCaptureEnabled = false;
+        }, applyLogging: true);
+
         private PrivacySettingsState LoadSettings()
         {
             try
             {
                 var result = JsonStateFile.Read<PrivacySettingsState>(_settingsPath, JsonOptions);
-                if (result.Status == JsonStateFileReadStatus.Missing || result.Status == JsonStateFileReadStatus.Empty)
+                if (result.Status == JsonStateFileReadStatus.Missing)
                     return PrivacySettingsState.CreateDefault();
 
                 if (!result.IsSuccess)
@@ -74,23 +87,23 @@ namespace VAL.App.Host.Services
                         ? errorType
                         : $"{errorType}: {errorMessage}";
                     _log.Warn(nameof(PrivacySettingsService), $"Failed to load settings.json. {suffix}");
-                    return PrivacySettingsState.CreateDefault();
+                    return PrivacySettingsState.CreateDisabled();
                 }
 
                 var settings = result.Value!;
-                if (settings.Version <= 0)
-                    settings.Version = CurrentVersion;
+                if (settings.Version != CurrentVersion)
+                    return PrivacySettingsState.CreateDisabled();
 
                 return settings.WithDefaults();
             }
             catch (Exception ex)
             {
                 _log.Warn(nameof(PrivacySettingsService), $"Failed to load settings.json. {ex.GetType().Name}: {ex.Message}");
-                return PrivacySettingsState.CreateDefault();
+                return PrivacySettingsState.CreateDisabled();
             }
         }
 
-        private bool Update(Action<PrivacySettingsState> update)
+        private bool Update(Action<PrivacySettingsState> update, bool applyLogging = false)
         {
             PrivacySettingsSnapshot snapshot;
             bool changed;
@@ -105,8 +118,10 @@ namespace VAL.App.Host.Services
                 changed = !next.Equals(_settings);
                 if (changed)
                 {
-                    _settings = next;
                     PersistSettings(next);
+                    _settings = next;
+                    if (applyLogging)
+                        ApplyContinuumLogging(next.ContinuumLoggingEnabled);
                 }
 
                 snapshot = _settings.ToSnapshot();
@@ -114,7 +129,14 @@ namespace VAL.App.Host.Services
 
             if (changed)
             {
-                SettingsChanged?.Invoke(snapshot);
+                if (SettingsChanged != null)
+                {
+                    foreach (var handler in SettingsChanged.GetInvocationList())
+                    {
+                        try { ((Action<PrivacySettingsSnapshot>)handler)(snapshot); }
+                        catch { _log.Warn(nameof(PrivacySettingsService), "Privacy settings subscriber failed."); }
+                    }
+                }
             }
 
             return changed;
@@ -129,6 +151,7 @@ namespace VAL.App.Host.Services
             catch (Exception ex)
             {
                 _log.Warn(nameof(PrivacySettingsService), $"Failed to persist settings.json. {ex.GetType().Name}: {ex.Message}");
+                throw;
             }
         }
 
@@ -136,7 +159,7 @@ namespace VAL.App.Host.Services
         {
             try
             {
-                _continuumHost.ApplyLoggingSetting(enabled, showToast: false);
+                _applyLogging(enabled);
             }
             catch
             {
@@ -147,12 +170,15 @@ namespace VAL.App.Host.Services
         private sealed class PrivacySettingsState : IEquatable<PrivacySettingsState>
         {
             [JsonPropertyName("version")]
+            [JsonRequired]
             public int Version { get; set; } = CurrentVersion;
 
             [JsonPropertyName("continuumLoggingEnabled")]
+            [JsonRequired]
             public bool ContinuumLoggingEnabled { get; set; } = true;
 
             [JsonPropertyName("portalCaptureEnabled")]
+            [JsonRequired]
             public bool PortalCaptureEnabled { get; set; } = true;
 
             public static PrivacySettingsState CreateDefault()
@@ -164,6 +190,12 @@ namespace VAL.App.Host.Services
                     PortalCaptureEnabled = true
                 };
             }
+
+            public static PrivacySettingsState CreateDisabled() => new()
+            {
+                ContinuumLoggingEnabled = false,
+                PortalCaptureEnabled = false,
+            };
 
             public PrivacySettingsState WithDefaults()
             {

@@ -63,6 +63,17 @@ namespace VAL.Tests.Continuum
         }
 
         [Fact]
+        public void FallbackSourceReferencesAreOneBasedInEverySection()
+        {
+            var snapshot = BuildSnapshot();
+            var rendered = PulsePacketComposer.Compose(snapshot, Filter2Restructure.BuildSections(snapshot), signalSummary: null);
+
+            Assert.Contains("Truth 1-2", rendered);
+            Assert.Contains("Source: Truth 5-6", rendered);
+            Assert.DoesNotContain("Truth 0-", rendered);
+        }
+
+        [Fact]
         public void ComposeOutputIsSmallerThanRepresentativeLegacyNestedPacket()
         {
             var snapshot = BuildSnapshot();
@@ -182,7 +193,7 @@ Tail summary: Pulse ownership is moving local.
 Tail decision: Continue from the approved refactor plan.
 
 WHERE WE LEFT OFF — LAST COMPLETE EXCHANGE (AUTHORITATIVE)
-Source: Truth 4-5
+Source: Truth 5-6
 USER:
 Keep the final payload plain text first, preserve stable headings, and keep the injection runtime unchanged.
 ASSISTANT:
@@ -203,7 +214,7 @@ ARTIFACTS AND REFERENCES
 - C:\\Users\\Vault\\OneDrive\\Desktop\\VAL\\MAIN\\VAL.Continuum\\Pipeline\\02_Signal\\SignalPacket.cs
 
 ACTIVE THREAD (MOST RELEVANT PRIOR EXCHANGE)
-Source: Truth 2-3
+Source: Truth 3-4
 USER:
 Task: Refactor VAL Pulse so Continuum owns the final handoff packet.
 ASSISTANT:

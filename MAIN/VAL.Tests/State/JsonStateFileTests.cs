@@ -49,6 +49,18 @@ namespace VAL.Tests.State
         }
 
         [Fact]
+        public void ReadWhenPathIsDirectoryReturnsInvalidInsteadOfMissing()
+        {
+            var path = CreateTempPath();
+            Directory.CreateDirectory(path);
+
+            var result = JsonStateFile.Read<TestState>(path);
+
+            Assert.Equal(JsonStateFileReadStatus.Invalid, result.Status);
+            Assert.NotNull(result.Error);
+        }
+
+        [Fact]
         public void WriteThenReadRoundTripsValue()
         {
             var path = CreateTempPath();

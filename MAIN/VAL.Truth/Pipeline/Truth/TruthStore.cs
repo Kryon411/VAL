@@ -11,13 +11,12 @@ using VAL.Continuum.Pipeline;
 
 namespace VAL.Continuum.Pipeline.Truth
 {
-    public sealed class TruthStore : ITruthStore
+    public sealed class TruthStore : ITruthStore, IDisposable
     {
         public const string DefaultTruthFileName = "Truth.log";
 
         private sealed class RebuildSession
         {
-            public readonly object Gate = new();
             public readonly System.Collections.Generic.HashSet<string> Seen =
                 new(StringComparer.Ordinal);
             public string TempPath = string.Empty;
@@ -36,9 +35,9 @@ namespace VAL.Continuum.Pipeline.Truth
         private readonly ITruthTelemetryPublisher _telemetryPublisher;
         private readonly string _memoryChatsRoot;
         private readonly ConcurrentDictionary<string, ChatIndex> _indexByChat =
-            new(StringComparer.Ordinal);
+            new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, RebuildSession> _rebuildByChat =
-            new(StringComparer.Ordinal);
+            new(StringComparer.OrdinalIgnoreCase);
 
         public TruthStore(ITruthTelemetryPublisher telemetryPublisher)
             : this(telemetryPublisher, memoryChatsRootOverride: null)
@@ -65,32 +64,27 @@ namespace VAL.Continuum.Pipeline.Truth
                 var roleChar = (role == 'A' || role == 'a') ? 'A' : 'U';
                 var normalized = NormalizeForStorage(text);
                 if (string.IsNullOrWhiteSpace(normalized)) return false;
+                var fp = Fingerprint(roleChar, NormalizeForFingerprint(normalized));
+                var line = (roleChar == 'A' ? "A|" : "U|") + normalized + Environment.NewLine;
 
-                if (_rebuildByChat.TryGetValue(chatId, out var rebuild))
+                var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
+                // One gate owns appends, rebuild transitions, resets, and archive reads.
+                lock (idx.Gate)
                 {
-                    if (rebuild.Token.IsCancellationRequested)
-                        return false;
-
-                    lock (rebuild.Gate)
+                    if (_rebuildByChat.TryGetValue(chatId, out var rebuild))
                     {
                         if (rebuild.Token.IsCancellationRequested)
                             return false;
 
-                        var fp = Fingerprint(roleChar, NormalizeForFingerprint(normalized));
                         if (rebuild.Seen.Contains(fp))
                             return false;
 
-                        var line = (roleChar == 'A' ? "A|" : "U|") + normalized + Environment.NewLine;
-                        File.AppendAllText(rebuild.TempPath, line);
+                        if (!AtomicFile.TryAppendAllText(rebuild.TempPath, line))
+                            return false;
                         rebuild.Seen.Add(fp);
                         PublishTelemetry(chatId);
                         return true;
                     }
-                }
-
-                var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
-                lock (idx.Gate)
-                {
                     try
                     {
                         var path = GetTruthPath(chatId);
@@ -103,11 +97,9 @@ namespace VAL.Continuum.Pipeline.Truth
 
                     EnsureIndexLoaded(chatId, idx);
 
-                    var fp = Fingerprint(roleChar, NormalizeForFingerprint(normalized));
                     if (idx.Seen.Contains(fp))
                         return false;
 
-                    var line = (roleChar == 'A' ? "A|" : "U|") + normalized + Environment.NewLine;
                     if (!AtomicFile.TryAppendAllText(GetTruthPath(chatId), line))
                         return false;
 
@@ -127,6 +119,15 @@ namespace VAL.Continuum.Pipeline.Truth
             if (string.IsNullOrWhiteSpace(chatId))
                 throw new ArgumentNullException(nameof(chatId));
 
+            if (chatId is "." or ".." || Path.IsPathRooted(chatId) ||
+                chatId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                chatId.EndsWith('.') || chatId.EndsWith(' '))
+                throw new ArgumentException("Chat IDs must be safe single directory names.", nameof(chatId));
+
+            var stem = chatId.Split('.')[0];
+            if (Regex.IsMatch(stem, "^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                throw new ArgumentException("Chat IDs cannot use reserved device names.", nameof(chatId));
+
             return Path.Combine(_memoryChatsRoot, chatId);
         }
 
@@ -138,7 +139,7 @@ namespace VAL.Continuum.Pipeline.Truth
         public string EnsureChatDir(string chatId)
         {
             var dir = GetChatDir(chatId);
-            try { Directory.CreateDirectory(dir); } catch { }
+            Directory.CreateDirectory(dir);
             return dir;
         }
 
@@ -153,54 +154,36 @@ namespace VAL.Continuum.Pipeline.Truth
             {
                 EnsureChatDir(chatId);
 
-                if (_rebuildByChat.ContainsKey(chatId))
-                    return false;
-
-                var finalPath = GetTruthPath(chatId);
-                var dir = Path.GetDirectoryName(finalPath) ?? EnsureChatDir(chatId);
-
-                if (backupExisting && File.Exists(finalPath))
+                var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
+                lock (idx.Gate)
                 {
-                    var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-                    var dest = Path.Combine(dir, $"Truth.pre_chronicle.{stamp}.log");
-                    try
+                    if (token.IsCancellationRequested || _rebuildByChat.ContainsKey(chatId))
+                        return false;
+
+                    var finalPath = GetTruthPath(chatId);
+                    var dir = Path.GetDirectoryName(finalPath) ?? EnsureChatDir(chatId);
+
+                    if (backupExisting && File.Exists(finalPath))
                     {
-                        if (File.Exists(dest)) File.Delete(dest);
-                        File.Copy(finalPath, dest, overwrite: true);
+                        var dest = GetBackupPath(dir);
+                        File.Copy(finalPath, dest, overwrite: false);
                         backupPath = dest;
                     }
-                    catch
-                    {
-                    }
-                }
 
-                tempTruthPath = Path.Combine(dir, TruthFileName + ".tmp");
-                if (File.Exists(tempTruthPath))
-                {
-                    try { File.Delete(tempTruthPath); } catch { }
-                }
-
-                var session = new RebuildSession
-                {
-                    TempPath = tempTruthPath,
-                    Token = token,
-                    BackupPath = backupPath
-                };
-
-                if (!_rebuildByChat.TryAdd(chatId, session))
-                    return false;
-
-                try
-                {
+                    tempTruthPath = Path.Combine(dir, TruthFileName + ".tmp." + Guid.NewGuid().ToString("N"));
                     AtomicFile.WriteAllTextAtomic(tempTruthPath, string.Empty);
-                }
-                catch
-                {
-                    AbortTruthRebuild(chatId);
-                    return false;
-                }
 
-                return true;
+                    var session = new RebuildSession
+                    {
+                        TempPath = tempTruthPath,
+                        Token = token,
+                        BackupPath = backupPath
+                    };
+
+                    _rebuildByChat[chatId] = session;
+
+                    return true;
+                }
             }
             catch
             {
@@ -214,15 +197,13 @@ namespace VAL.Continuum.Pipeline.Truth
 
             try
             {
-                if (_rebuildByChat.TryRemove(chatId, out var session))
+                GetChatDir(chatId);
+                var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
+                lock (idx.Gate)
                 {
-                    try
+                    if (_rebuildByChat.TryRemove(chatId, out var session))
                     {
-                        if (!string.IsNullOrWhiteSpace(session.TempPath) && File.Exists(session.TempPath))
-                            File.Delete(session.TempPath);
-                    }
-                    catch
-                    {
+                        try { File.Delete(session.TempPath); } catch { }
                     }
                 }
             }
@@ -251,37 +232,33 @@ namespace VAL.Continuum.Pipeline.Truth
 
             try
             {
-                if (!_rebuildByChat.TryRemove(chatId, out var session))
-                    return false;
-
-                if (session.Token.IsCancellationRequested)
+                GetChatDir(chatId);
+                var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
+                lock (idx.Gate)
                 {
-                    try { if (File.Exists(session.TempPath)) File.Delete(session.TempPath); } catch { }
-                    return false;
-                }
+                    if (!_rebuildByChat.TryGetValue(chatId, out var session))
+                        return false;
 
-                var finalPath = GetTruthPath(chatId);
-                if (string.IsNullOrWhiteSpace(session.TempPath) || !File.Exists(session.TempPath))
-                    return false;
-
-                AtomicFile.ReplaceAtomic(session.TempPath, finalPath);
-
-                try
-                {
-                    if (_indexByChat.TryGetValue(chatId, out var idx))
+                    if (session.Token.IsCancellationRequested)
                     {
-                        lock (idx.Gate)
-                        {
-                            idx.Seen.Clear();
-                            idx.Loaded = false;
-                        }
+                        AbortTruthRebuild(chatId);
+                        return false;
                     }
-                }
-                catch
-                {
-                }
 
-                return true;
+                    var finalPath = GetTruthPath(chatId);
+                    if (string.IsNullOrWhiteSpace(session.TempPath) || !File.Exists(session.TempPath))
+                        return false;
+                    if (new FileInfo(session.TempPath).Length == 0)
+                        return false;
+
+                    AtomicFile.ReplaceAtomic(session.TempPath, finalPath);
+                    _rebuildByChat.TryRemove(chatId, out _);
+                    idx.Seen.Clear();
+                    idx.Loaded = false;
+                    PublishTelemetry(chatId);
+
+                    return true;
+                }
             }
             catch
             {
@@ -294,34 +271,30 @@ namespace VAL.Continuum.Pipeline.Truth
             backupPath = string.Empty;
             if (string.IsNullOrWhiteSpace(chatId)) return false;
 
-            try { EnsureChatDir(chatId); } catch { }
-
             try
             {
+                EnsureChatDir(chatId);
                 var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
                 lock (idx.Gate)
                 {
-                    idx.Seen.Clear();
-                    idx.Loaded = true;
+                    if (_rebuildByChat.ContainsKey(chatId))
+                        return false;
 
                     var path = GetTruthPath(chatId);
-                    if (!File.Exists(path))
-                        return true;
-
-                    if (backupExisting)
+                    if (File.Exists(path) && backupExisting)
                     {
                         var dir = Path.GetDirectoryName(path) ?? EnsureChatDir(chatId);
-                        var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-                        var dest = Path.Combine(dir, $"Truth.pre_chronicle.{stamp}.log");
-
-                        try { if (File.Exists(dest)) File.Delete(dest); } catch { }
-                        try { File.Move(path, dest); backupPath = dest; } catch { }
+                        var dest = GetBackupPath(dir);
+                        File.Move(path, dest);
+                        backupPath = dest;
                     }
                     else
                     {
-                        try { File.Delete(path); } catch { }
+                        File.Delete(path);
                     }
 
+                    idx.Seen.Clear();
+                    idx.Loaded = true;
                     return true;
                 }
             }
@@ -334,46 +307,53 @@ namespace VAL.Continuum.Pipeline.Truth
         public string ReadTruthText(string chatId)
         {
             var path = GetTruthPath(chatId);
-            if (!File.Exists(path))
-                return string.Empty;
-
-            var sb = new StringBuilder();
-            foreach (var entry in TruthReader.Read(path, repairTailFirst: true))
+            var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
+            lock (idx.Gate)
             {
-                sb.Append(entry.Role);
-                sb.Append('|');
-                sb.Append(entry.Payload);
-                sb.Append(Environment.NewLine);
-            }
+                if (!File.Exists(path))
+                    return string.Empty;
 
-            return sb.ToString();
+                var sb = new StringBuilder();
+                foreach (var entry in TruthReader.Read(path, repairTailFirst: true))
+                {
+                    sb.Append(entry.Role);
+                    sb.Append('|');
+                    sb.Append(entry.Payload);
+                    sb.Append(Environment.NewLine);
+                }
+
+                return sb.ToString();
+            }
         }
 
         public string[] ReadTruthLines(string chatId)
         {
             var path = GetTruthPath(chatId);
-            if (!File.Exists(path))
-                return Array.Empty<string>();
+            var idx = _indexByChat.GetOrAdd(chatId, _ => new ChatIndex());
+            lock (idx.Gate)
+            {
+                if (!File.Exists(path))
+                    return Array.Empty<string>();
 
-            var lines = new System.Collections.Generic.List<string>();
-            foreach (var entry in TruthReader.Read(path, repairTailFirst: true))
-                lines.Add($"{entry.Role}|{entry.Payload}");
+                var lines = new System.Collections.Generic.List<string>();
+                foreach (var entry in TruthReader.Read(path, repairTailFirst: true))
+                    lines.Add($"{entry.Role}|{entry.Payload}");
 
-            return lines.ToArray();
+                return lines.ToArray();
+            }
+        }
+
+        private static string GetBackupPath(string directory)
+        {
+            var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fffffff", CultureInfo.InvariantCulture);
+            return Path.Combine(directory, $"Truth.pre_chronicle.{stamp}.{Guid.NewGuid():N}.log");
         }
 
         private static string ResolveMemoryChatsRoot(string? memoryChatsRootOverride)
         {
             if (!string.IsNullOrWhiteSpace(memoryChatsRootOverride))
             {
-                try
-                {
-                    return Path.GetFullPath(memoryChatsRootOverride.Trim());
-                }
-                catch
-                {
-                    return memoryChatsRootOverride.Trim();
-                }
+                return Path.GetFullPath(memoryChatsRootOverride.Trim());
             }
 
             return Path.Combine(
@@ -481,7 +461,7 @@ namespace VAL.Continuum.Pipeline.Truth
                     }
                 }
 
-                foreach (var entry in TruthReader.Read(path, repairTailFirst: false))
+                foreach (var entry in TruthReader.Read(path, repairTailFirst: false, throwOnOpenFailure: true))
                 {
                     var txt = NormalizeForStorage(entry.Payload);
                     if (string.IsNullOrWhiteSpace(txt)) continue;
@@ -491,11 +471,10 @@ namespace VAL.Continuum.Pipeline.Truth
             }
             catch
             {
+                idx.Seen.Clear();
+                throw;
             }
-            finally
-            {
-                idx.Loaded = true;
-            }
+            idx.Loaded = true;
         }
 
         private void PublishTelemetry(string chatId)
@@ -523,5 +502,7 @@ namespace VAL.Continuum.Pipeline.Truth
             {
             }
         }
+
+        public void Dispose() => AbortAllTruthRebuilds();
     }
 }

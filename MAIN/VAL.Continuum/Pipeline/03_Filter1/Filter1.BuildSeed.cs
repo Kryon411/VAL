@@ -136,8 +136,6 @@ namespace VAL.Continuum.Pipeline.Filter1
                         inWs = false;
                     }
 
-                    if (sb.Length >= 4096)
-                        break;
                 }
 
                 var compact = sb.ToString().Trim();
@@ -344,7 +342,7 @@ namespace VAL.Continuum.Pipeline.Filter1
             if (sb == null) return;
 
             var msgLabel = $"***Message {ex.Index} - USER***";
-            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {ex.UserLineIndex}\u2013{ex.UserLineIndex})";
+            if (ex.UserLineIndex >= 0) msgLabel += $" (Source: Truth {ex.UserLineIndex + 1}\u2013{ex.UserLineIndex + 1})";
             msgLabel += ":";
 
             sb.AppendLine(msgLabel);
@@ -357,7 +355,7 @@ namespace VAL.Continuum.Pipeline.Filter1
             sb.AppendLine();
 
             var respLabel = $"***Response {ex.Index} - ASSISTANT***";
-            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {ex.AssistantLineIndex}\u2013{ex.AssistantLineIndex})";
+            if (ex.AssistantLineIndex >= 0) respLabel += $" (Source: Truth {ex.AssistantLineIndex + 1}\u2013{ex.AssistantLineIndex + 1})";
             respLabel += ":";
 
             sb.AppendLine(respLabel);

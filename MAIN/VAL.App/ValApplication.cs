@@ -16,33 +16,31 @@ public sealed class ValApplication : Application
     private static readonly Uri ThemeDictionaryUri =
         new("pack://application:,,,/VAL.App;component/UI/VALWindowTheme.xaml", UriKind.Absolute);
 
-    private readonly MainWindow _mainWindow;
+    private readonly IWindowFactory<MainWindow> _mainWindowFactory;
     private readonly IDesktopUiContext _uiContext;
 
-    public ValApplication(MainWindow mainWindow, IDesktopUiContext uiContext)
+    public ValApplication(IWindowFactory<MainWindow> mainWindowFactory, IDesktopUiContext uiContext)
     {
-        _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+        _mainWindowFactory = mainWindowFactory ?? throw new ArgumentNullException(nameof(mainWindowFactory));
         _uiContext = uiContext ?? throw new ArgumentNullException(nameof(uiContext));
     }
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
-
         EnsureThemeLoaded();
 
-        _uiContext.RegisterMainWindow(_mainWindow);
-        MainWindow = _mainWindow;
-        _mainWindow.Show();
+        // Windows created before Application miss its resource lookup and invalidation lifecycle.
+        var mainWindow = _mainWindowFactory.Create();
+        _uiContext.RegisterMainWindow(mainWindow);
+        MainWindow = mainWindow;
+
+        base.OnStartup(e);
+        mainWindow.Show();
     }
 
-    private static void EnsureThemeLoaded()
+    private void EnsureThemeLoaded()
     {
-        var resources = Current?.Resources;
-        if (resources is null)
-        {
-            return;
-        }
+        var resources = Resources;
 
         foreach (var dictionary in resources.MergedDictionaries)
         {

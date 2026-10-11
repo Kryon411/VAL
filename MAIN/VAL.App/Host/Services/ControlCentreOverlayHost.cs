@@ -22,6 +22,11 @@ namespace VAL.App.Host.Services
         public event EventHandler? Clicked;
         public event EventHandler? GeometryChanged;
         public event EventHandler? LayoutToggleRequested;
+        public event EventHandler? BrowserFocusRequested;
+        public bool IsInteracting => _overlay?.IsPointerInteraction == true;
+
+        public bool TryFocus() => _overlay != null &&
+            NativeControlKeyboardNavigation.TryFocus(_overlay, _overlay.LauncherButton);
 
         public void EnsureAttached(Window owner)
         {
@@ -37,6 +42,7 @@ namespace VAL.App.Host.Services
             _overlay.Clicked += Overlay_Clicked;
             _overlay.GeometryChanged += Overlay_GeometryChanged;
             _overlay.LayoutToggleRequested += Overlay_LayoutToggleRequested;
+            _overlay.BrowserFocusRequested += Overlay_BrowserFocusRequested;
             _overlay.Closed += Overlay_Closed;
         }
 
@@ -51,6 +57,7 @@ namespace VAL.App.Host.Services
             {
                 var overlay = _overlay;
                 DetachOverlay(overlay);
+                overlay.OwnerShutdownAllowed = true;
                 overlay.Close();
             }
             catch
@@ -114,7 +121,7 @@ namespace VAL.App.Host.Services
             _overlay.Top = geometry.Y;
         }
 
-        public bool TryClampToVirtualScreen(out GeometryState geometry)
+        public bool TryClampToVirtualScreen(out GeometryState geometry, Rect? viewportBounds = null)
         {
             geometry = default;
             if (_overlay == null)
@@ -125,7 +132,7 @@ namespace VAL.App.Host.Services
             geometry = new GeometryState(_overlay.Left, _overlay.Top, _overlay.Width, _overlay.Height);
             geometry = ClampGeometry(
                 geometry,
-                GetVirtualScreenBounds(),
+                viewportBounds ?? GetVirtualScreenBounds(),
                 _overlay.MinWidth,
                 _overlay.MinHeight,
                 _overlay.MaxWidth,
@@ -197,11 +204,15 @@ namespace VAL.App.Host.Services
             LayoutToggleRequested?.Invoke(this, EventArgs.Empty);
         }
 
+        private void Overlay_BrowserFocusRequested(object? sender, EventArgs e) =>
+            BrowserFocusRequested?.Invoke(this, EventArgs.Empty);
+
         private void DetachOverlay(ControlCentreOverlay overlay)
         {
             overlay.Clicked -= Overlay_Clicked;
             overlay.GeometryChanged -= Overlay_GeometryChanged;
             overlay.LayoutToggleRequested -= Overlay_LayoutToggleRequested;
+            overlay.BrowserFocusRequested -= Overlay_BrowserFocusRequested;
             overlay.Closed -= Overlay_Closed;
 
             if (ReferenceEquals(_overlay, overlay))

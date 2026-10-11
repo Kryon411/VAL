@@ -53,21 +53,23 @@ namespace VAL.Tests.Hosting
         }
 
         [Fact]
-        public void ResolveControlCentreGeometryCachesDefaultGeometry()
+        public void ResolveControlCentreGeometryRefreshesAutomaticButPreservesCustomGeometry()
         {
             var controller = CreateController();
             controller.Load();
             var expected = new GeometryState(100, 120, 40, 40);
 
             var first = controller.ResolveControlCentreGeometry(() => expected);
-            var second = controller.ResolveControlCentreGeometry(() => new GeometryState(1, 2, 3, 4));
+            var next = new GeometryState(200, 20, 40, 40);
+            var second = controller.ResolveControlCentreGeometry(() => next);
 
             Assert.Equal(expected.X, first.X);
             Assert.Equal(expected.Y, first.Y);
             Assert.Equal(expected.W, first.W);
             Assert.Equal(expected.H, first.H);
-            Assert.Equal(first.X, second.X);
-            Assert.Equal(first.Y, second.Y);
+            Assert.Equal(next, second);
+            controller.UpdateControlCentreGeometry(expected, userChanged: true);
+            Assert.Equal(expected, controller.ResolveControlCentreGeometry(() => next));
         }
 
         [Fact]

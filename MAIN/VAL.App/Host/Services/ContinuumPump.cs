@@ -78,6 +78,8 @@ namespace VAL.App.Host.Services
             }
             finally
             {
+                _pendingSeed = null;
+                _injectQueue.Clear();
                 cts.Dispose();
             }
         }
@@ -91,7 +93,7 @@ namespace VAL.App.Host.Services
                 {
                     if (_pendingSeed == null)
                     {
-                        if (_webViewRuntime.Core == null)
+                        if (!_webViewRuntime.IsBridgeReady)
                         {
                             await Task.Delay(RetryDelay, cancellationToken).ConfigureAwait(false);
                             continue;
@@ -134,7 +136,12 @@ namespace VAL.App.Host.Services
             var didSend = false;
             _uiThread.Invoke(() =>
             {
-                if (_webViewRuntime.Core == null)
+                if (seed.CancellationToken.IsCancellationRequested)
+                {
+                    didSend = true;
+                    return;
+                }
+                if (!_webViewRuntime.IsBridgeReady)
                     return;
 
                 try

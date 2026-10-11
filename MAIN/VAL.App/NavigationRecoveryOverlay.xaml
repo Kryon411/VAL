@@ -1,0 +1,23 @@
+<Window x:Class="VAL.App.NavigationRecoveryOverlay"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VAL - Return to ChatGPT"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="False"
+        UseLayoutRounding="True">
+    <Button x:Name="NavigationRecoveryButton"
+            Content="Return to ChatGPT"
+            Command="{Binding ReturnToChatGptCommand}"
+            Style="{DynamicResource VAL.NativeRecoveryButton}"
+            AutomationProperties.Name="Return to ChatGPT"
+            AutomationProperties.AcceleratorKey="F6"
+            ToolTip="F6 to focus. Enter or Space to return to ChatGPT. Tab or Escape returns focus to the page."
+            PreviewKeyDown="NavigationRecoveryButton_PreviewKeyDown"
+            AutomationProperties.HelpText="Press F6 from the page to focus this button, then Enter or Space to return to ChatGPT's home page. Tab or Escape returns focus to the page without navigating." />
+</Window>

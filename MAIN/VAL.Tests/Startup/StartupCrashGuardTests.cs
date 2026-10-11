@@ -52,6 +52,24 @@ namespace VAL.Tests.Startup
         }
 
         [Fact]
+        public void ExpectedCleanupFailuresDoNotAccumulateStartupCrashesOrClaimSuccess()
+        {
+            var dataRoot = CreateTempRoot();
+            WriteState(dataRoot, 0);
+            var guard = new StartupCrashGuard(new FakeLog(), dataRoot);
+
+            for (var attempt = 0; attempt < 4; attempt++)
+            {
+                Assert.False(guard.EvaluateAndMarkStarting());
+                guard.MarkExpectedExit();
+            }
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dataRoot, "State", "startup.json")));
+            Assert.Equal(0, doc.RootElement.GetProperty("consecutiveStartupCrashes").GetInt32());
+            Assert.Equal("2024-01-01T00:00:00Z", doc.RootElement.GetProperty("lastSuccessUtc").GetString());
+        }
+
+        [Fact]
         public void EvaluateWhenStateCorruptEntersSafeMode()
         {
             var dataRoot = CreateTempRoot();

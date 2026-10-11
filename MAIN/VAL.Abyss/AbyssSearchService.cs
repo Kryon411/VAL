@@ -43,6 +43,16 @@ namespace VAL.Host.Abyss
         private static readonly TimeSpan LogInterval = TimeSpan.FromSeconds(10);
         private readonly object _cacheGate = new();
         private readonly Dictionary<string, TruthLogCache> _cacheByRoot = new(StringComparer.OrdinalIgnoreCase);
+        private long _cacheGeneration;
+
+        internal void ClearCache()
+        {
+            lock (_cacheGate)
+            {
+                _cacheGeneration++;
+                _cacheByRoot.Clear();
+            }
+        }
 
         public AbyssSearchService(ILog log)
         {
@@ -57,6 +67,7 @@ namespace VAL.Host.Abyss
         private sealed class TruthLogEntry
         {
             public DateTime LastWriteUtc { get; init; }
+            public long Length { get; init; }
             public List<AbyssExchange> Exchanges { get; init; } = new();
         }
 
@@ -148,7 +159,7 @@ namespace VAL.Host.Abyss
             if (max < 0 || min == int.MaxValue)
                 return (0, 0);
 
-            return (min, max);
+            return (min + 1, max + 1);
         }
 
         internal static string BuildFingerprint(AbyssExchange exchange)
@@ -242,6 +253,8 @@ namespace VAL.Host.Abyss
 
         private List<TruthLogSnapshot> GetTruthLogSnapshots(string memoryRoot, CancellationToken cancellationToken)
         {
+            long generation;
+            lock (_cacheGate) generation = _cacheGeneration;
             var paths = EnumerateTruthLogs(memoryRoot, cancellationToken).ToList();
             var snapshots = new List<TruthLogSnapshot>(paths.Count);
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -252,9 +265,12 @@ namespace VAL.Host.Abyss
                 seen.Add(truthPath);
 
                 DateTime lastWriteUtc;
+                long length;
                 try
                 {
-                    lastWriteUtc = File.GetLastWriteTimeUtc(truthPath);
+                    var info = new FileInfo(truthPath);
+                    lastWriteUtc = info.LastWriteTimeUtc;
+                    length = info.Length;
                 }
                 catch (Exception ex)
                 {
@@ -267,6 +283,8 @@ namespace VAL.Host.Abyss
 
                 lock (_cacheGate)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (generation != _cacheGeneration) throw new OperationCanceledException();
                     if (!_cacheByRoot.TryGetValue(memoryRoot, out var cache))
                     {
                         cache = new TruthLogCache();
@@ -274,7 +292,7 @@ namespace VAL.Host.Abyss
                     }
 
                     if (cache.Entries.TryGetValue(truthPath, out cachedEntry) &&
-                        cachedEntry.LastWriteUtc == lastWriteUtc)
+                        cachedEntry.LastWriteUtc == lastWriteUtc && cachedEntry.Length == length)
                     {
                         useCache = true;
                     }
@@ -291,11 +309,14 @@ namespace VAL.Host.Abyss
 
                     lock (_cacheGate)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (generation != _cacheGeneration) throw new OperationCanceledException();
                         if (_cacheByRoot.TryGetValue(memoryRoot, out var cache))
                         {
                             cache.Entries[truthPath] = new TruthLogEntry
                             {
                                 LastWriteUtc = lastWriteUtc,
+                                Length = length,
                                 Exchanges = exchanges
                             };
                         }
@@ -339,7 +360,7 @@ namespace VAL.Host.Abyss
                 var payload = UnescapeTruthPayload(entry.Payload);
                 var line = new AbyssTruthLine
                 {
-                    LineIndex = entry.LineNumber,
+                    LineIndex = entry.LineNumber - 1,
                     Role = entry.Role,
                     Text = payload
                 };
@@ -387,7 +408,7 @@ namespace VAL.Host.Abyss
             _log.Warn(nameof(AbyssSearchService), $"Abyss file operation failed. {ex.GetType().Name}: {LogSanitizer.Sanitize(ex.Message)}");
         }
 
-        private static int ScoreExchange(AbyssExchange exchange, IReadOnlyList<string> tokens)
+        private static int ScoreExchange(AbyssExchange exchange, List<string> tokens)
         {
             if (tokens.Count == 0)
                 return 0;

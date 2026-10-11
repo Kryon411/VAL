@@ -95,6 +95,7 @@ namespace VAL.App.Host.Commands
             {
                 cmd.TryGetString("query", out var query);
                 cmd.TryGetString("queryOriginal", out var queryOriginal);
+                cmd.TryGetString("requestId", out var requestId);
 
                 if (string.IsNullOrWhiteSpace(query) && !string.IsNullOrWhiteSpace(queryOriginal))
                     query = queryOriginal;
@@ -105,7 +106,7 @@ namespace VAL.App.Host.Commands
 
                 var exclude = ParseStringList(cmd, "excludeFingerprints");
 
-                _abyssRuntime.Search(cmd.ChatId, query ?? string.Empty, max, queryOriginal, exclude);
+                _abyssRuntime.Search(cmd.ChatId, query ?? string.Empty, max, queryOriginal, exclude, requestId);
             }
             catch (Exception ex)
             {
@@ -127,7 +128,8 @@ namespace VAL.App.Host.Commands
                     max = parsed;
 
                 var exclude = ParseStringList(cmd, "excludeFingerprints");
-                _abyssRuntime.RetryLast(cmd.ChatId, exclude, max);
+                cmd.TryGetString("requestId", out var requestId);
+                _abyssRuntime.RetryLast(cmd.ChatId, exclude, max, requestId);
             }
             catch (Exception ex)
             {
@@ -185,7 +187,8 @@ namespace VAL.App.Host.Commands
         {
             try
             {
-                _abyssRuntime.EmitResults(cmd.ChatId);
+                cmd.TryGetString("requestId", out var requestId);
+                _abyssRuntime.EmitResults(cmd.ChatId, requestId);
             }
             catch (Exception ex)
             {
@@ -197,7 +200,8 @@ namespace VAL.App.Host.Commands
         {
             try
             {
-                _abyssRuntime.ClearResults(cmd.ChatId);
+                cmd.TryGetString("requestId", out var requestId);
+                _abyssRuntime.ClearResults(cmd.ChatId, requestId);
             }
             catch (Exception ex)
             {
@@ -247,7 +251,8 @@ namespace VAL.App.Host.Commands
                 if (cmd.TryGetBool("inject", out var parsedBool))
                     inject = parsedBool;
 
-                _abyssRuntime.FetchLast(cmd.ChatId, count, inject);
+                cmd.TryGetString("requestId", out var requestId);
+                _abyssRuntime.FetchLast(cmd.ChatId, count, inject, requestId);
             }
             catch (Exception ex)
             {

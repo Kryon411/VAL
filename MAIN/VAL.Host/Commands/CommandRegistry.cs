@@ -50,7 +50,7 @@ namespace VAL.Host.Commands
             _specs[key] = spec;
         }
 
-        public CommandDispatchResult Dispatch(HostCommand cmd)
+        public CommandDispatchResult Dispatch(HostCommand cmd, Action? beforeExecute = null)
         {
             if (string.IsNullOrWhiteSpace(cmd.Type))
             {
@@ -83,6 +83,7 @@ namespace VAL.Host.Commands
 
             try
             {
+                beforeExecute?.Invoke();
                 spec.Handler(cmd);
                 return new CommandDispatchResult(CommandDispatchStatus.Accepted, spec.Type, spec.Module, "Dispatched to registered handler.", null);
             }

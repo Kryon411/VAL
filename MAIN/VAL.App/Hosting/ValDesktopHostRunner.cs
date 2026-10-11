@@ -20,7 +20,8 @@ namespace VAL.App.Hosting
         public static int RunValDesktopApp(
             this IHost host,
             SafeBoot safeBoot,
-            StartupOptions startupOptions)
+            StartupOptions startupOptions,
+            DataWipeResult? completedWipe = null)
         {
             ArgumentNullException.ThrowIfNull(host);
             ArgumentNullException.ThrowIfNull(safeBoot);
@@ -41,8 +42,19 @@ namespace VAL.App.Hosting
                 LogStartup(safeBoot, services, startupOptions);
 
                 var app = services.GetRequiredService<ValApplication>();
+                using var browserObserver = startupOptions.ValidationSession
+                    ? new ValidationBrowserObserver(services.GetRequiredService<IAppPaths>(),
+                        services.GetRequiredService<IWebViewRuntime>(), services.GetRequiredService<ILog>())
+                    : null;
+                if (browserObserver != null) app.Startup += (_, _) => browserObserver.Start();
                 var crashHandler = services.GetRequiredService<ICrashHandler>();
                 crashHandler.Register(app);
+                if (completedWipe is { Success: true })
+                    app.Startup += (_, _) => app.Dispatcher.BeginInvoke(
+                        System.Windows.Threading.DispatcherPriority.ContextIdle,
+                        new Action(() => services.GetRequiredService<IToastHub>().TryShow(
+                            ToastKey.DataWipeCompleted, bypassLaunchQuiet: true,
+                            origin: ToastOrigin.HostCommand, reason: ToastReason.Background)));
 
                 if (smokeSettings.Enabled)
                 {

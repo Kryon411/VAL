@@ -214,6 +214,9 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
           ? parsed.collapsed
           : (typeof parsed.isOpen === "boolean" ? !parsed.isOpen : true),
         mode: DOCK_DEFAULT_MODE,
+        isCustom: parsed.isCustom === true || (parsed.isCustom == null &&
+          ["x", "y", "w", "h"].some(key => Number.isFinite(Number(parsed[key])) &&
+            Number(parsed[key]) !== ({ x:72, y:56, w:560, h:460 })[key])),
         x: Number.isFinite(Number(parsed.x)) ? Number(parsed.x) : undefined,
         y: Number.isFinite(Number(parsed.y)) ? Number(parsed.y) : undefined,
         w: Number.isFinite(Number(parsed.w)) ? Number(parsed.w) : undefined,
@@ -239,6 +242,11 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
   let state = loadLocalDockState();
   let layoutMode = false;
   let dockGeometry = { x: 72, y: 56, w: 560, h: 460 };
+  let dockIsCustom = false;
+  let renderedGeometry = { ...dockGeometry };
+  let headerAnchor = null;
+  let lastHeaderLayout = "";
+  let headerRefreshScheduled = false;
   let isBootstrapping = true;
   let hostReady = false;
   let hostStateReceived = false;
@@ -259,6 +267,7 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
         isOpen: !state.collapsed,
         collapsed: state.collapsed,
         mode: DOCK_DEFAULT_MODE,
+        isCustom: dockIsCustom,
         x: Math.round(dockGeometry.x),
         y: Math.round(dockGeometry.y),
         w: Math.round(dockGeometry.w),
@@ -278,6 +287,7 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
         type: getCommandName("DockUiStateSet"),
         isOpen: !state.collapsed,
         mode: DOCK_DEFAULT_MODE,
+        isCustom: dockIsCustom,
         x: Math.round(dockGeometry.x),
         y: Math.round(dockGeometry.y),
         w: Math.round(dockGeometry.w),
@@ -288,6 +298,7 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
 
   function el(tag, cls, text){
     const n = document.createElement(tag);
+    n.setAttribute("data-val-ui", "1");
     if (cls) n.className = cls;
     if (text != null) n.textContent = text;
     return n;
@@ -369,27 +380,12 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
 
 
   // Ensure the ChatGPT composer is focused so host-side Ctrl+V paste lands correctly.
-  // We keep selectors broad because ChatGPT's composer can vary (textarea vs contenteditable).
   function focusComposerForPaste(){
     try {
-      const selectors = [
-        "#prompt-textarea",
-        "textarea#prompt-textarea",
-        "textarea[data-testid='prompt-textarea']",
-        "textarea[placeholder*='Message']",
-        "textarea[placeholder*='Send']",
-        "div.ProseMirror[contenteditable='true']",
-        "[role='textbox'][contenteditable='true']",
-        "div[contenteditable='true'][role='textbox']",
-      ];
-
-      for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (!el) continue;
-        try { el.focus({ preventScroll: true }); } catch(_) { try { el.focus(); } catch(__) {} }
-        try { el.click(); } catch(_) {}
-        return true;
-      }
+      const el = getComposerElement();
+      if (!el) return false;
+      try { el.focus({ preventScroll: true }); } catch(_) { el.focus(); }
+      return document.activeElement === el || el.contains(document.activeElement);
     } catch(_) {}
     return false;
   }
@@ -403,6 +399,7 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
         toast = document.createElement("div");
         toast.id = "val-dock-toast";
         toast.className = "valdock-toast";
+        toast.setAttribute("data-val-ui", "1");
         document.body.appendChild(toast);
       }
 
@@ -421,19 +418,24 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
 
   function getComposerElement(){
     const selectors = [
-      "#prompt-textarea",
+      "form[data-chatgpt-composer] [data-composer-markdown][contenteditable='true'][role='textbox']",
+      "#prompt-textarea[contenteditable='true']",
+      "#mobile-composer-prompt[contenteditable='true']",
       "textarea#prompt-textarea",
-      "textarea[data-testid='prompt-textarea']",
-      "textarea[placeholder*='Message']",
-      "textarea[placeholder*='Send']",
-      "div.ProseMirror[contenteditable='true']",
-      "[role='textbox'][contenteditable='true']",
-      "div[contenteditable='true'][role='textbox']"
+      "textarea#mobile-composer-prompt",
+      "textarea[data-testid='prompt-textarea']"
     ];
 
     for (const selector of selectors) {
-      const node = document.querySelector(selector);
-      if (node) return node;
+      for (const node of document.querySelectorAll(selector)) {
+        if (!node.isConnected || node.disabled || node.readOnly ||
+            node.getAttribute('aria-disabled') === 'true') continue;
+        const rect = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        if (rect.width > 0 && rect.height > 0 && rect.bottom > 0 &&
+            rect.top < window.innerHeight && style.display !== 'none' &&
+            style.visibility !== 'hidden') return node;
+      }
     }
 
     return null;
@@ -639,6 +641,7 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
     if (Object.prototype.hasOwnProperty.call(payload, "isOpen")) {
       state.collapsed = !payload.isOpen;
     }
+    dockIsCustom = payload.isCustom === true;
 
     const nx = Number(payload.x);
     const ny = Number(payload.y);
@@ -655,6 +658,7 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
 
   function applyGeometrySnapshot(snapshot){
     if (!snapshot || typeof snapshot !== "object") return;
+    dockIsCustom = snapshot.isCustom === true;
     const nx = Number(snapshot.x);
     const ny = Number(snapshot.y);
     const nw = Number(snapshot.w);
@@ -726,6 +730,8 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
     if (requiresChatId) {
       msg.chatId = getChatId();
     }
+    if (typeof window.VAL_Abyss_requestResults === "function" &&
+        window.VAL_Abyss_requestResults(commandName, msg)) return;
     try { post(msg); } catch(_) {}
   }
 
@@ -960,6 +966,23 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
     });
   }
 
+  function restoreDockFocus(){
+    if (!dock || !dock.contains(document.activeElement)) return;
+    const candidates = [lastFocusedElement, launcher];
+    for (const node of candidates) {
+      if (!(node instanceof HTMLElement) || !node.isConnected || dock.contains(node)) continue;
+      if (node.hasAttribute("disabled") || node.getAttribute("aria-disabled") === "true") continue;
+      const rect = node.getBoundingClientRect();
+      const style = window.getComputedStyle(node);
+      if (rect.width <= 0 || rect.height <= 0 || style.display === "none" || style.visibility === "hidden") continue;
+      try { node.focus({ preventScroll: true }); } catch(_) { try { node.focus(); } catch(__) {} }
+      if (document.activeElement === node) return;
+    }
+    if (dock.contains(document.activeElement)) {
+      try { document.activeElement.blur(); } catch(_) {}
+    }
+  }
+
   function focusFirstDockControl(){
     const focusables = getDockFocusableElements();
     if (focusables.length > 0) {
@@ -969,12 +992,12 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
 
   function isVisibleNode(node){
     if (!(node instanceof HTMLElement)) return false;
-    const style = window.getComputedStyle(node);
-    if (style.visibility === "hidden" || style.display === "none" || style.pointerEvents === "none") return false;
     const rect = node.getBoundingClientRect();
     if (rect.width < 18 || rect.height < 18) return false;
     if (rect.top < -2 || rect.top > 96) return false;
-    if ((window.innerWidth - rect.right) > 240) return false;
+    if ((window.innerWidth - rect.right) > 340) return false;
+    const style = window.getComputedStyle(node);
+    if (style.visibility === "hidden" || style.display === "none" || style.pointerEvents === "none") return false;
     return rect.bottom > 0 && rect.left < window.innerWidth;
   }
 
@@ -1002,6 +1025,30 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
       return a.rect.top - b.rect.top;
     });
     return candidates[0].node;
+  }
+
+  function refreshHeaderLayout(){
+    headerRefreshScheduled = false;
+    const headerControls = document.querySelectorAll("header button, header a, header [role='button'], [data-desktop-header] button, [data-desktop-header] a, [data-desktop-header] [role='button']");
+    const candidates = headerControls.length ? headerControls : document.querySelectorAll("button, a, [role='button']");
+    const rectangles = Array.from(candidates)
+      .filter(node => !node.closest("[data-val-ui='1'], aside") && isVisibleNode(node))
+      .map(node => node.getBoundingClientRect());
+    headerAnchor = window.VAL_DockLayout.selectHeaderAnchor(rectangles, window.innerWidth);
+    const geometry = window.VAL_DockLayout.resolveLauncher(headerAnchor, window.innerWidth, window.innerHeight);
+    const header = { ...geometry, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight };
+    const signature = JSON.stringify(header);
+    if (signature !== lastHeaderLayout) {
+      lastHeaderLayout = signature;
+      post({ type: getCommandName("DockUiStateSet"), headerAnchor: header });
+    }
+    if (!state.collapsed && !layoutDragStart) positionPanel();
+  }
+
+  function scheduleHeaderLayout(){
+    if (headerRefreshScheduled) return;
+    headerRefreshScheduled = true;
+    setTimeout(refreshHeaderLayout, 120);
   }
 
   function applyLauncherFailSafeStyles(launcherBtn){
@@ -1093,22 +1140,17 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
 
   function positionPanel(){
     if (!panel) return;
-
-    const maxW = Math.max(360, Math.floor(window.innerWidth - 24));
-    const maxH = Math.max(180, Math.floor(window.innerHeight - 24));
-    dockGeometry.w = Math.min(Math.max(360, dockGeometry.w), maxW);
-    dockGeometry.h = Math.min(Math.max(180, dockGeometry.h), maxH);
-    dockGeometry.x = Math.min(Math.max(0, dockGeometry.x), Math.max(0, window.innerWidth - dockGeometry.w));
-    dockGeometry.y = Math.min(Math.max(0, dockGeometry.y), Math.max(0, window.innerHeight - dockGeometry.h));
-
-    panel.style.left = `${Math.round(dockGeometry.x)}px`;
-    panel.style.top = `${Math.round(dockGeometry.y)}px`;
+    renderedGeometry = window.VAL_DockLayout.resolvePanel(dockGeometry, dockIsCustom, headerAnchor,
+      window.innerWidth, window.innerHeight);
+    const geometry = renderedGeometry;
+    panel.style.left = `${Math.round(geometry.x)}px`;
+    panel.style.top = `${Math.round(geometry.y)}px`;
     panel.style.right = "auto";
-    panel.style.width = `${Math.round(dockGeometry.w)}px`;
-    panel.style.minWidth = `${Math.round(dockGeometry.w)}px`;
-    panel.style.maxWidth = `${Math.round(dockGeometry.w)}px`;
-    panel.style.maxHeight = `${Math.round(dockGeometry.h)}px`;
-    panel.style.height = `${Math.round(dockGeometry.h)}px`;
+    panel.style.width = `${Math.round(geometry.w)}px`;
+    panel.style.minWidth = `${Math.round(geometry.w)}px`;
+    panel.style.maxWidth = `${Math.round(geometry.w)}px`;
+    panel.style.maxHeight = `${Math.round(geometry.h)}px`;
+    panel.style.height = `${Math.round(geometry.h)}px`;
   }
 
   function setLayoutMode(next){
@@ -1134,6 +1176,7 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
     if (!panel) return;
 
     try { hideTooltip(); } catch(_) {}
+    if (state.collapsed) restoreDockFocus();
     panel.style.display = state.collapsed ? "none" : "flex";
     if (launcher) {
       launcher.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
@@ -1145,9 +1188,6 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
     emitDockState();
 
     if (state.collapsed) {
-      if (launcher && lastFocusedElement && dock && dock.contains(lastFocusedElement)) {
-        try { launcher.focus({ preventScroll: true }); } catch(_) { try { launcher.focus(); } catch(__) {} }
-      }
       return;
     }
 
@@ -1188,8 +1228,27 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
     }
 
     panel = el("div","valdock-panel valdock-shelf");
-    const moveBar = el("div", "valdock-layout-movebar", "Layout mode: drag");
+    const moveBar = el("div", "valdock-layout-movebar", "Control Centre");
     const resizeHandle = el("div", "valdock-layout-resize", "");
+    moveBar.tabIndex = 0;
+    moveBar.setAttribute("role", "button");
+    moveBar.setAttribute("aria-label", "Move Control Centre. Use arrow keys to move; Shift for larger steps.");
+    moveBar.title = "Drag to move, or use arrow keys";
+    resizeHandle.tabIndex = 0;
+    resizeHandle.setAttribute("role", "button");
+    resizeHandle.setAttribute("aria-label", "Resize Control Centre. Use arrow keys to resize; Shift for larger steps.");
+    resizeHandle.title = "Drag to resize, or use arrow keys";
+    const resetBtn = el("button", "valdock-btn valdock-layout-reset", "Reset");
+    resetBtn.type = "button";
+    resetBtn.setAttribute("aria-label", "Reset Control Centre and launcher to automatic placement");
+    resetBtn.title = "Restore automatic placement (Ctrl+Alt+Shift+L)";
+    resetBtn.addEventListener("click", () => {
+      markUserInteraction();
+      dockIsCustom = false;
+      positionPanel();
+      saveState();
+      post({ type: getCommandName("DockUiStateSet"), resetPlacement: true, isCustom: false });
+    });
     panel.id = "valdock-panel";
     panel.setAttribute("role", "dialog");
     panel.setAttribute("aria-label", "Control Centre");
@@ -1205,22 +1264,24 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
     }, true);
 
 
-    moveBar.addEventListener("mousedown", (e)=>{
-      if (!layoutMode) return;
-      layoutDragStart = { mx: e.clientX, my: e.clientY, x: dockGeometry.x, y: dockGeometry.y };
+    function startPointerLayout(e, resize){
+      if (e.button !== 0 || layoutDragStart) return;
+      layoutDragStart = { mx:e.clientX, my:e.clientY, ...renderedGeometry, resize,
+        pointerId:e.pointerId, target:e.currentTarget, changed:false };
+      e.currentTarget.setPointerCapture(e.pointerId);
       e.preventDefault();
-    }, true);
+    }
+    moveBar.addEventListener("pointerdown", e => startPointerLayout(e, false));
+    resizeHandle.addEventListener("pointerdown", e => startPointerLayout(e, true));
 
-    resizeHandle.addEventListener("mousedown", (e)=>{
-      if (!layoutMode) return;
-      layoutDragStart = { mx: e.clientX, my: e.clientY, w: dockGeometry.w, h: dockGeometry.h, resize: true };
-      e.preventDefault();
-    }, true);
-
-    document.addEventListener("mousemove", (e)=>{
-      if (!layoutDragStart || !layoutMode) return;
+    document.addEventListener("pointermove", (e)=>{
+      if (!layoutDragStart || e.pointerId !== layoutDragStart.pointerId) return;
+      if (!layoutDragStart.changed && Math.abs(e.clientX - layoutDragStart.mx) + Math.abs(e.clientY - layoutDragStart.my) < 4) return;
+      layoutDragStart.changed = true;
+      dockIsCustom = true;
+      dockGeometry = { ...renderedGeometry };
       if (layoutDragStart.resize) {
-        dockGeometry.w = Math.max(360, layoutDragStart.w + (e.clientX - layoutDragStart.mx));
+        dockGeometry.w = Math.max(Math.min(360, window.innerWidth - 24), layoutDragStart.w + (e.clientX - layoutDragStart.mx));
         dockGeometry.h = Math.max(180, layoutDragStart.h + (e.clientY - layoutDragStart.my));
       } else {
         dockGeometry.x = layoutDragStart.x + (e.clientX - layoutDragStart.mx);
@@ -1228,16 +1289,37 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
       }
       positionPanel();
     }, true);
-
-    document.addEventListener("mouseup", ()=>{
+    function finishPointerLayout(){
       if (!layoutDragStart) return;
+      const drag = layoutDragStart;
       layoutDragStart = null;
-      persistHostDockUiState();
-    }, true);
+      if (drag.target.hasPointerCapture(drag.pointerId)) drag.target.releasePointerCapture(drag.pointerId);
+      if (drag.changed) { markUserInteraction(); saveState(); persistHostDockUiState(); }
+    }
+    document.addEventListener("pointerup", finishPointerLayout, true);
+    document.addEventListener("pointercancel", finishPointerLayout, true);
+    moveBar.addEventListener("lostpointercapture", finishPointerLayout);
+    resizeHandle.addEventListener("lostpointercapture", finishPointerLayout);
+    window.addEventListener("blur", finishPointerLayout);
+    function keyboardLayout(e, resize){
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const step = e.shiftKey ? 32 : 8;
+      const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      dockGeometry = { ...renderedGeometry };
+      if (resize) { dockGeometry.w += dx; dockGeometry.h += dy; }
+      else { dockGeometry.x += dx; dockGeometry.y += dy; }
+      dockIsCustom = true;
+      markUserInteraction(); positionPanel(); saveState(); persistHostDockUiState();
+    }
+    moveBar.addEventListener("keydown", e => keyboardLayout(e, false));
+    resizeHandle.addEventListener("keydown", e => keyboardLayout(e, true));
 
     const body = el("div","valdock-body");
     dockBody = body;
-    panel.append(moveBar, portalBadge, closeBtn, body, resizeHandle);
+    panel.append(moveBar, resetBtn, portalBadge, closeBtn, body, resizeHandle);
     dock.append(panel);
 
     document.body.appendChild(dock);
@@ -1332,19 +1414,20 @@ try { window.valThemeEnabled = getThemeEnabled(); } catch(_) { window.valThemeEn
     });
 
     window.addEventListener("resize", ()=>{
+      scheduleHeaderLayout();
       if (!HOST_LAUNCHER) ensureLauncherInserted();
       if (!state.collapsed) positionPanel();
     }, { passive: true });
 
-    if (!HOST_LAUNCHER) {
-      try {
-        headerMutationObserver = new MutationObserver(()=>{
-          ensureLauncherInserted();
-          if (!state.collapsed) positionPanel();
-        });
-        headerMutationObserver.observe(document.body, { childList: true, subtree: true });
-      } catch(_) {}
-    }
+    try {
+      headerMutationObserver = new MutationObserver(records => {
+        if (records.some(record => !record.target.closest?.("[data-val-ui='1']"))) scheduleHeaderLayout();
+      });
+      headerMutationObserver.observe(document.body, { childList:true, subtree:true, attributes:true,
+        attributeFilter:["class", "style", "hidden", "aria-expanded"] });
+      new ResizeObserver(scheduleHeaderLayout).observe(document.documentElement);
+    } catch(_) {}
+    refreshHeaderLayout();
 
     try { if (typeof window.applyVoidToAll === "function") window.applyVoidToAll(); } catch(_) {}
     try { console.log("[VAL Dock] Loaded for", CHAT_ID); } catch(_) {}

@@ -31,6 +31,7 @@ namespace VAL.Tests.Hosting
                         Y = 80,
                         W = 640,
                         H = 520,
+                        IsCustom = true,
                     },
                     LayoutMode = true,
                 }
@@ -46,7 +47,8 @@ namespace VAL.Tests.Hosting
             Assert.Equal(80, snapshot.Dock.Y);
             Assert.Equal(640, snapshot.Dock.W);
             Assert.Equal(520, snapshot.Dock.H);
-            Assert.True(snapshot.LayoutMode);
+            Assert.False(snapshot.LayoutMode);
+            Assert.True(snapshot.Dock.IsCustom);
             Assert.Empty(log.Warnings);
         }
 
@@ -83,13 +85,14 @@ namespace VAL.Tests.Hosting
             var stateStore = new FakeControlCentreUiStateStore();
             var (_, stateController, factory, timingController, _) = CreateController(stateStore);
             timingController.LoadState();
-            stateController.ToggleLayoutMode();
+            stateController.UpdateControlCentreGeometry(new GeometryState(100, 40, 40, 40), userChanged: true);
 
             factory.PersistAction.Trigger();
 
             Assert.Equal(1, stateStore.SaveCallCount);
             Assert.NotNull(stateStore.LastSavedState);
-            Assert.True(stateStore.LastSavedState!.LayoutMode);
+            Assert.True(stateStore.LastSavedState!.ControlCentreIsCustom);
+            Assert.False(stateStore.LastSavedState.LayoutMode);
         }
 
         [Fact]
@@ -122,7 +125,7 @@ namespace VAL.Tests.Hosting
             var stateStore = new FakeControlCentreUiStateStore();
             var (_, stateController, factory, timingController, _) = CreateController(stateStore);
             timingController.LoadState();
-            stateController.ToggleLayoutMode();
+            stateController.UpdateControlCentreGeometry(new GeometryState(100, 40, 40, 40), userChanged: true);
 
             timingController.FlushAndStop();
 
@@ -130,7 +133,8 @@ namespace VAL.Tests.Hosting
             Assert.Equal(1, factory.DockStateSyncAction.CancelCount);
             Assert.Equal(1, stateStore.SaveCallCount);
             Assert.NotNull(stateStore.LastSavedState);
-            Assert.True(stateStore.LastSavedState!.LayoutMode);
+            Assert.True(stateStore.LastSavedState!.ControlCentreIsCustom);
+            Assert.False(stateStore.LastSavedState.LayoutMode);
         }
 
         private static (
@@ -239,6 +243,7 @@ namespace VAL.Tests.Hosting
         private sealed class FakeWebViewRuntime : IWebViewRuntime
         {
             public bool IsReady { get; set; }
+            public long NavigationGeneration => 0;
 
             public CoreWebView2? Core => null;
 
@@ -247,6 +252,7 @@ namespace VAL.Tests.Hosting
             public event Action<WebMessageEnvelope>? WebMessageJsonReceived { add { } remove { } }
 
             public event Action? NavigationCompleted { add { } remove { } }
+            public event Action? NavigationStateChanged { add { } remove { } }
 
             public System.Threading.Tasks.Task InitializeAsync(WebView2 control) => System.Threading.Tasks.Task.CompletedTask;
 
@@ -255,6 +261,7 @@ namespace VAL.Tests.Hosting
             }
 
             public System.Threading.Tasks.Task ExecuteScriptAsync(string js) => System.Threading.Tasks.Task.CompletedTask;
+            public System.Threading.Tasks.Task<string?> EvaluateScriptAsync(string js) => System.Threading.Tasks.Task.FromResult<string?>(null);
 
             public void Navigate(string url)
             {

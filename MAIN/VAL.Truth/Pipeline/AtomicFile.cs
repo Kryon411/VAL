@@ -39,49 +39,6 @@ namespace VAL.Continuum.Pipeline
             }
         }
 
-        public static void AppendAllTextAtomic(string path, string appendText)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                throw new ArgumentNullException(nameof(path));
-
-            var dir = Path.GetDirectoryName(path);
-            if (!string.IsNullOrWhiteSpace(dir))
-                Directory.CreateDirectory(dir);
-
-            // If the file doesn't exist, a single atomic write is enough.
-            if (!File.Exists(path))
-            {
-                WriteAllTextAtomic(path, appendText ?? string.Empty);
-                return;
-            }
-
-            var tmp = GetTempPath(path);
-
-            try
-            {
-                // Stream-copy existing content into tmp, then append.
-                using (var src = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (var dst = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
-                {
-                    src.CopyTo(dst);
-
-                    using (var sw = new StreamWriter(dst, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), bufferSize: 1024, leaveOpen: true))
-                    {
-                        sw.Write(appendText ?? string.Empty);
-                        sw.Flush();
-                    }
-
-                    dst.Flush(flushToDisk: true);
-                }
-
-                ReplaceAtomic(tmp, path);
-            }
-            finally
-            {
-                TryDelete(tmp);
-            }
-        }
-
         internal static bool TryAppendAllText(string path, string text)
         {
             return TryAppendAllText(path, text, durable: true);
@@ -99,8 +56,8 @@ namespace VAL.Continuum.Pipeline
                     Directory.CreateDirectory(dir);
 
                 var options = durable ? FileOptions.WriteThrough : FileOptions.None;
-                // Truth repair/readers may need concurrent read-write access while an append is in flight.
-                using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, options))
+                // Readers may observe the file, but another writer or tail repair must not mutate it.
+                using (var fs = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, options))
                 using (var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
                 {
                     sw.Write(text ?? string.Empty);
