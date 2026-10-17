@@ -25,9 +25,9 @@
       },
       "xunit.runner.visualstudio": {
         "type": "Direct",
-        "requested": "[4.0.0, )",
-        "resolved": "4.0.0",
-        "contentHash": "kzLFyBYUnoidpGOXvpNOfIo8C92gVgVR6X8ncHwhcrDYugiOut5rrhDkr0L3cWHd7J2pKXf6LgaeXoBBDlx1ag=="
+        "requested": "[4.0.1, )",
+        "resolved": "4.0.1",
+        "contentHash": "8CoAaZkniVekR1ycJyxn+hOz+6ZQCDPcoIsIs6ujd4WyFcBMlxGNU15Qb8Uxd4iO4UmOuETb0M6vzBbwX/mfLA=="
       },
       "Microsoft.CodeCoverage": {
         "type": "Transitive",
@@ -273,9 +273,9 @@
       "val.abyss": {
         "type": "Project",
         "dependencies": {
-          "VAL.Contracts": "[5.0.0, )",
-          "VAL.Host": "[5.0.0, )",
-          "VAL.Truth": "[5.0.0, )"
+          "VAL.Contracts": "[5.1.0, )",
+          "VAL.Host": "[5.1.0, )",
+          "VAL.Truth": "[5.1.0, )"
         }
       },
       "val.app": {
@@ -285,17 +285,17 @@
           "Microsoft.Extensions.Hosting": "[10.0.12, )",
           "Microsoft.Extensions.Options": "[10.0.12, )",
           "Microsoft.Web.WebView2": "[1.0.4258.31, )",
-          "VAL.Abyss": "[5.0.0, )",
-          "VAL.Continuum": "[5.0.0, )",
-          "VAL.Host": "[5.0.0, )"
+          "VAL.Abyss": "[5.1.0, )",
+          "VAL.Continuum": "[5.1.0, )",
+          "VAL.Host": "[5.1.0, )"
         }
       },
       "val.continuum": {
         "type": "Project",
         "dependencies": {
-          "VAL.Contracts": "[5.0.0, )",
-          "VAL.Host": "[5.0.0, )",
-          "VAL.Truth": "[5.0.0, )"
+          "VAL.Contracts": "[5.1.0, )",
+          "VAL.Host": "[5.1.0, )",
+          "VAL.Truth": "[5.1.0, )"
         }
       },
       "val.contracts": {
@@ -309,8 +309,8 @@
           "Microsoft.Extensions.Options": "[10.0.12, )",
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[10.0.12, )",
           "Microsoft.Web.WebView2": "[1.0.4258.31, )",
-          "VAL.Contracts": "[5.0.0, )",
-          "VAL.Truth": "[5.0.0, )"
+          "VAL.Contracts": "[5.1.0, )",
+          "VAL.Truth": "[5.1.0, )"
         }
       },
       "val.truth": {
